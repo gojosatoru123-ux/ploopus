@@ -392,7 +392,7 @@ const Settings = () => {
     ];
 
     return (
-        <div className="flex-1 h-full bg-background overflow-y-auto scrollbar-none">
+        <div className="flex-1 h-full bg-background overflow-y-auto scrollbar-thin">
             <AnimatePresence>
                 {isRestoring && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 bg-white/60 backdrop-blur-sm flex items-center justify-center p-6">
@@ -415,12 +415,11 @@ const Settings = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
-
+            <div className="max-w-7xl mx-auto p-2 sm:p-8">
             <motion.div
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
-                className="max-w-7xl mx-auto p-4 sm:p-8"
             >
                 {/* Welcome Header */}
                 <motion.div
@@ -593,6 +592,7 @@ const Settings = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            </div>
         </div>
     );
 };
