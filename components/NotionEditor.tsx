@@ -152,6 +152,8 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [menuFilter, setMenuFilter] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [toolbarFeedback, setToolbarFeedback] = useState<"copied" | "cut" | null>(null);
+  const toolbarFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Block-level selection (Ctrl+A / drag-select) ──────────────────────────
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
@@ -532,22 +534,28 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
       return clone;
     });
 
+  const showToolbarFeedback = (type: "copied" | "cut") => {
+    if (toolbarFeedbackTimer.current) clearTimeout(toolbarFeedbackTimer.current);
+    setToolbarFeedback(type);
+    toolbarFeedbackTimer.current = setTimeout(() => setToolbarFeedback(null), 1500);
+  };
+
   const copySelectedBlocks = () => {
     const ordered = blocks.filter((b) => selectedBlockIds.has(b.id));
     if (!ordered.length) return;
     setBlockClipboard(ordered, false);
-
     const text = ordered.map((b) => b.content || "").filter(Boolean).join("\n");
     navigator.clipboard.writeText(text).catch(() => {/* ignore */});
+    showToolbarFeedback("copied");
   };
 
   const cutSelectedBlocks = () => {
     const ordered = blocks.filter((b) => selectedBlockIds.has(b.id));
     if (!ordered.length) return;
     setBlockClipboard(ordered, true);
-
     const text = ordered.map((b) => b.content || "").filter(Boolean).join("\n");
     navigator.clipboard.writeText(text).catch(() => {/* ignore */});
+    showToolbarFeedback("cut");
     onChange(blocks.filter((b) => !selectedBlockIds.has(b.id)));
     clearSelection();
   };
@@ -2607,16 +2615,30 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
           <button
             onClick={copySelectedBlocks}
             title="Copy (Ctrl+C)"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition-colors text-foreground"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              toolbarFeedback === "copied"
+                ? "bg-green-500/15 text-green-600 dark:text-green-400"
+                : "hover:bg-muted text-foreground"
+            }`}
           >
-            <Copy className="w-3.5 h-3.5" /> Copy
+            {toolbarFeedback === "copied"
+              ? <><Check className="w-3.5 h-3.5" /> Copied!</>
+              : <><Copy className="w-3.5 h-3.5" /> Copy</>
+            }
           </button>
           <button
             onClick={cutSelectedBlocks}
             title="Cut (Ctrl+X)"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition-colors text-foreground"
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              toolbarFeedback === "cut"
+                ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                : "hover:bg-muted text-foreground"
+            }`}
           >
-            <X className="w-3.5 h-3.5" /> Cut
+            {toolbarFeedback === "cut"
+              ? <><Check className="w-3.5 h-3.5" /> Cut!</>
+              : <><X className="w-3.5 h-3.5" /> Cut</>
+            }
           </button>
           <button
             onClick={() => {
