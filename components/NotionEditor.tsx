@@ -136,11 +136,32 @@ const progressColors = [
 
 const timelineColors = ["bg-blue-500", "bg-green-500", "bg-purple-500", "bg-orange-500", "bg-pink-500"];
 
+// ── Module-level clipboard — persists across note switches ────────────────────
+// Stored outside the component so navigating to a different note never clears it.
+let _blockClipboard: NoteBlock[] = [];
+let _clipboardIsCut = false;
+const getBlockClipboard = () => _blockClipboard;
+const setBlockClipboard = (blocks: NoteBlock[], isCut: boolean) => {
+  _blockClipboard = blocks;
+  _clipboardIsCut = isCut;
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [menuFilter, setMenuFilter] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  // ── Block-level selection (Ctrl+A / drag-select) ──────────────────────────
+  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
+
+  // ── Drag-to-select state ───────────────────────────────────────────────────
+  const [dragSelect, setDragSelect] = useState<{
+    startX: number; startY: number; curX: number; curY: number; active: boolean;
+  } | null>(null);
+  const editorRootRef = useRef<HTMLDivElement>(null);
+  const isDragSelectingRef = useRef(false);
 
   // ✅
   const isTouch = useIsTouchDevice();
@@ -371,6 +392,353 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
     }
   };
 
+  // ── Selection helpers ──────────────────────────────────────────────────────
+
+  const selectAll = () => {
+    setSelectedBlockIds(new Set(blocks.map((b) => b.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedBlockIds(new Set());
+  };
+
+  /**
+   * Fully deep-clone a block array with fresh IDs at every level.
+   *
+   * Every NoteBlock property that is an array-of-objects with an `id` field
+   * gets new IDs so pasted copies are completely independent of the originals.
+   * Plain arrays (tableData, cellFormattingMap values, etc.) are structurally
+   * cloned so mutations to the copy never reach the source.
+   */
+  const cloneBlocksWithNewIds = (src: NoteBlock[]): NoteBlock[] =>
+    src.map((b) => {
+      // structuredClone gives us a true deep copy with no shared references.
+      // It handles nested arrays, plain objects, primitives, and undefined/null.
+      // (Available in all modern browsers and Node 17+.)
+      const clone: NoteBlock = structuredClone(b);
+
+      // Fresh top-level block id
+      clone.id = crypto.randomUUID();
+
+      // Refresh ids on every sub-item that carries one, so e.g. two pasted
+      // kanban boards don't share card ids that other code might key on.
+      if (clone.tableData) {
+        // tableData is string[][] — no ids, nothing to refresh
+      }
+      if (clone.timelineItems) {
+        clone.timelineItems = clone.timelineItems.map((item) => ({
+          ...item, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.kanbanColumns) {
+        clone.kanbanColumns = clone.kanbanColumns.map((col) => ({
+          ...col,
+          id: crypto.randomUUID(),
+          cards: col.cards.map((card) => ({ ...card, id: crypto.randomUUID() })),
+        }));
+      }
+      if (clone.galleryImages) {
+        clone.galleryImages = clone.galleryImages.map((img) => ({
+          ...img, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.databaseRows) {
+        clone.databaseRows = clone.databaseRows.map((row) => ({
+          ...row, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.databaseColumns) {
+        clone.databaseColumns = clone.databaseColumns.map((col) => ({
+          ...col, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.mindMapNodes) {
+        // Build an old→new id map so connections stay consistent
+        const nodeIdMap = new Map<string, string>();
+        clone.mindMapNodes = clone.mindMapNodes.map((node) => {
+          const newId = crypto.randomUUID();
+          nodeIdMap.set(node.id, newId);
+          return { ...node, id: newId };
+        });
+        if (clone.mindMapConnections) {
+          clone.mindMapConnections = clone.mindMapConnections.map((conn) => ({
+            ...conn,
+            id: crypto.randomUUID(),
+            from: nodeIdMap.get(conn.from) ?? conn.from,
+            to:   nodeIdMap.get(conn.to)   ?? conn.to,
+          }));
+        }
+      }
+      if (clone.tabsData) {
+        clone.tabsData = clone.tabsData.map((tab) => ({
+          ...tab,
+          id: crypto.randomUUID(),
+          // Recursively clone nested blocks inside tabs
+          blocks: tab.blocks ? cloneBlocksWithNewIds(tab.blocks) : undefined,
+        }));
+      }
+      if (clone.flashcards) {
+        clone.flashcards = clone.flashcards.map((card) => ({
+          ...card, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.chartColumns) {
+        clone.chartColumns = clone.chartColumns.map((col) => ({
+          ...col, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.chartRows) {
+        clone.chartRows = clone.chartRows.map((row) => ({
+          ...row, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.chartData) {
+        clone.chartData = clone.chartData.map((d) => ({
+          ...d, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.stepsItems) {
+        clone.stepsItems = clone.stepsItems.map((step) => ({
+          ...step, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.faqItems) {
+        clone.faqItems = clone.faqItems.map((item) => ({
+          ...item, id: crypto.randomUUID(),
+        }));
+      }
+      if (clone.comparisonColumns) {
+        // Build old→new id map so comparisonRows.values keys stay consistent
+        const colIdMap = new Map<string, string>();
+        clone.comparisonColumns = clone.comparisonColumns.map((col) => {
+          const newId = crypto.randomUUID();
+          colIdMap.set(col.id, newId);
+          return { ...col, id: newId };
+        });
+        if (clone.comparisonRows) {
+          clone.comparisonRows = clone.comparisonRows.map((row) => {
+            const newValues: typeof row.values = {};
+            for (const [oldKey, val] of Object.entries(row.values)) {
+              newValues[colIdMap.get(oldKey) ?? oldKey] = val;
+            }
+            return { ...row, id: crypto.randomUUID(), values: newValues };
+          });
+        }
+      }
+      if (clone.columns) {
+        // columns blocks — recursively clone each column's block array
+        clone.columns = clone.columns.map((col) => cloneBlocksWithNewIds(col));
+      }
+      return clone;
+    });
+
+  const copySelectedBlocks = () => {
+    const ordered = blocks.filter((b) => selectedBlockIds.has(b.id));
+    if (!ordered.length) return;
+    setBlockClipboard(ordered, false);
+
+    const text = ordered.map((b) => b.content || "").filter(Boolean).join("\n");
+    navigator.clipboard.writeText(text).catch(() => {/* ignore */});
+  };
+
+  const cutSelectedBlocks = () => {
+    const ordered = blocks.filter((b) => selectedBlockIds.has(b.id));
+    if (!ordered.length) return;
+    setBlockClipboard(ordered, true);
+
+    const text = ordered.map((b) => b.content || "").filter(Boolean).join("\n");
+    navigator.clipboard.writeText(text).catch(() => {/* ignore */});
+    onChange(blocks.filter((b) => !selectedBlockIds.has(b.id)));
+    clearSelection();
+  };
+
+  const pasteBlocks = (afterBlockId?: string) => {
+    const clipboard = getBlockClipboard();
+    if (!clipboard.length) return;
+    const pasted = cloneBlocksWithNewIds(clipboard);
+
+    let insertAt: number;
+    if (afterBlockId !== undefined) {
+      // Toolbar "Paste after" — insert right after the specified block
+      const idx = blocks.findIndex((b) => b.id === afterBlockId);
+      insertAt = idx >= 0 ? idx + 1 : blocks.length;
+    } else {
+      // Ctrl+V — insert after the currently focused block, or after last selected, or at end
+      const focusedBlockId = activeBlockId;
+      if (focusedBlockId) {
+        const idx = blocks.findIndex((b) => b.id === focusedBlockId);
+        insertAt = idx >= 0 ? idx + 1 : blocks.length;
+      } else {
+        // Fall back: after last selected block, or end of note
+        let last = -1;
+        blocks.forEach((b, i) => { if (selectedBlockIds.has(b.id)) last = i; });
+        insertAt = last >= 0 ? last + 1 : blocks.length;
+      }
+    }
+
+    const newBlocks = [...blocks];
+    newBlocks.splice(insertAt, 0, ...pasted);
+    onChange(newBlocks);
+
+    // Highlight the pasted blocks and focus the first one
+    setSelectedBlockIds(new Set(pasted.map((b) => b.id)));
+    setTimeout(() => {
+      const el = blockRefs.current.get(pasted[0].id);
+      if (el) {
+        const input = el.querySelector('[contenteditable], input') as HTMLElement | null;
+        input?.focus();
+      }
+    }, 20);
+  };
+
+  const deleteSelectedBlocks = () => {
+    if (!selectedBlockIds.size) return;
+    const remaining = blocks.filter((b) => !selectedBlockIds.has(b.id));
+    // Always keep at least one block
+    if (remaining.length === 0) {
+      const empty: NoteBlock = { id: crypto.randomUUID(), type: "text", content: "" };
+      onChange([empty]);
+    } else {
+      onChange(remaining);
+    }
+    clearSelection();
+  };
+
+  // Global keyboard shortcut handler for block-level operations
+  useEffect(() => {
+    const handler = (e: globalThis.KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod) return;
+
+      // Ctrl/Cmd+A — select all blocks whenever the cursor is anywhere inside the editor
+      if (e.key === "a" || e.key === "A") {
+        const active = document.activeElement as HTMLElement | null;
+        if (!active?.closest("[data-editor-root]")) return;
+        e.preventDefault();
+        window.getSelection()?.removeAllRanges();
+        selectAll();
+        return;
+      }
+
+      if (!selectedBlockIds.size && e.key !== "v" && e.key !== "V") return;
+
+      if (e.key === "c" || e.key === "C") {
+        const sel = window.getSelection()?.toString() ?? "";
+        if (sel.length === 0) {
+          e.preventDefault();
+          copySelectedBlocks();
+        }
+        return;
+      }
+
+      if (e.key === "x" || e.key === "X") {
+        const sel = window.getSelection()?.toString() ?? "";
+        if (sel.length === 0) {
+          e.preventDefault();
+          cutSelectedBlocks();
+        }
+        return;
+      }
+
+      if (e.key === "v" || e.key === "V") {
+        const active = document.activeElement as HTMLElement | null;
+        if (!active?.closest("[data-editor-root]")) return;
+        if (getBlockClipboard().length > 0) {
+          e.preventDefault();
+          pasteBlocks(); // no afterBlockId → uses activeBlockId from state
+        }
+        return;
+      }
+    };
+
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks, selectedBlockIds]);
+
+  // ── Drag-to-select mouse logic ─────────────────────────────────────────────
+  useEffect(() => {
+    const root = editorRootRef.current;
+    if (!root) return;
+
+    // Helper: get the rect of the drag selection box
+    const getSelectionRect = (ds: NonNullable<typeof dragSelect>) => ({
+      left:   Math.min(ds.startX, ds.curX),
+      top:    Math.min(ds.startY, ds.curY),
+      right:  Math.max(ds.startX, ds.curX),
+      bottom: Math.max(ds.startY, ds.curY),
+    });
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target as HTMLElement;
+
+      // If clicking an interactive element, just clear any existing block-selection
+      // (so typing in a text block properly deselects the multi-block highlight)
+      const isInteractive =
+        target.isContentEditable ||
+        !!target.closest('button, input, textarea, [contenteditable], [data-no-drag-select]');
+
+      if (isInteractive) {
+        clearSelection();
+        return;
+      }
+
+      // Start drag selection from anywhere on the editor surface
+      isDragSelectingRef.current = false;
+      const startX = e.clientX;
+      const startY = e.clientY;
+      setDragSelect({ startX, startY, curX: startX, curY: startY, active: false });
+
+      const onMouseMove = (me: MouseEvent) => {
+        const dx = Math.abs(me.clientX - startX);
+        const dy = Math.abs(me.clientY - startY);
+        if (dx > 5 || dy > 5) {
+          isDragSelectingRef.current = true;
+          setDragSelect({ startX, startY, curX: me.clientX, curY: me.clientY, active: true });
+
+          const selRect = {
+            left:   Math.min(startX, me.clientX),
+            top:    Math.min(startY, me.clientY),
+            right:  Math.max(startX, me.clientX),
+            bottom: Math.max(startY, me.clientY),
+          };
+
+          const newSelected = new Set<string>();
+          blocks.forEach((block) => {
+            const el = blockRefs.current.get(block.id);
+            if (!el) return;
+            const r = el.getBoundingClientRect();
+            // A block is "hit" when the drag rect overlaps its vertical span
+            // (use vertical-only overlap so horizontal gutter drag still works)
+            const overlapsV = r.top < selRect.bottom && r.bottom > selRect.top;
+            if (overlapsV) newSelected.add(block.id);
+          });
+          setSelectedBlockIds(newSelected);
+          window.getSelection()?.removeAllRanges();
+        }
+      };
+
+      const onMouseUp = () => {
+        setDragSelect(null);
+        if (!isDragSelectingRef.current) {
+          clearSelection();
+        }
+        isDragSelectingRef.current = false;
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+      };
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    };
+
+    root.addEventListener("mousedown", onMouseDown);
+    return () => root.removeEventListener("mousedown", onMouseDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
+
   const isListType = (type: NoteBlock["type"]) => type === "bullet" || type === "numbered" || type === "todo";
 
   const handleKeyDown = (e: KeyboardEvent, block: NoteBlock) => {
@@ -495,6 +863,9 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
       setMenuFilter("");
     }
     if (e.key === "Escape") {
+      if (selectedBlockIds.size > 0) {
+        clearSelection();
+      }
       setShowMenu(null);
       setMenuFilter("");
     }
@@ -1902,8 +2273,27 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
 
   return (
     <>
-      <div className="space-y-1 min-h-50 w-full min-w-0">
-        {blocks.map((block) => (
+      <div
+        ref={editorRootRef}
+        className="space-y-1 min-h-50 w-full min-w-0 relative"
+        data-editor-root
+        style={{ userSelect: dragSelect?.active ? 'none' : undefined, cursor: dragSelect?.active ? 'crosshair' : undefined }}
+      >
+        {/* Drag-select rectangle */}
+        {dragSelect?.active && (
+          <div
+            className="fixed pointer-events-none z-40 border border-primary/60 bg-primary/10 rounded"
+            style={{
+              left:   Math.min(dragSelect.startX, dragSelect.curX),
+              top:    Math.min(dragSelect.startY, dragSelect.curY),
+              width:  Math.abs(dragSelect.curX - dragSelect.startX),
+              height: Math.abs(dragSelect.curY - dragSelect.startY),
+            }}
+          />
+        )}
+        {blocks.map((block) => {
+          const isSelected = selectedBlockIds.has(block.id);
+          return (
           <motion.div
             key={`${block.id}-${block.type}`}
             layout
@@ -1916,13 +2306,11 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
               scale: draggedBlockId === block.id ? 0.98 : 1,
             }}
             transition={{ duration: 0.15, type: "spring", stiffness: 300, damping: 30 }}
-            className={`group relative flex items-start gap-1 rounded-lg transition-all w-full min-w-0 ${draggedBlockId === block.id
-              ? 'bg-primary/5 shadow-lg shadow-primary/20'
-              : ''
-              } ${dragOverBlockId === block.id && draggedBlockId !== block.id
-                ? 'border-t-2 border-primary/50 pt-1'
-                : ''
-              }`}
+            className={`group relative flex items-start gap-1 rounded-lg transition-all w-full min-w-0
+              ${draggedBlockId === block.id ? 'bg-primary/5 shadow-lg shadow-primary/20' : ''}
+              ${dragOverBlockId === block.id && draggedBlockId !== block.id ? 'border-t-2 border-primary/50 pt-1' : ''}
+              ${isSelected ? 'bg-primary/8 ring-1 ring-primary/30 ring-inset' : ''}
+            `}
             onMouseEnter={() => {
               setActiveBlockId(block.id);
               if (draggedBlockId && draggedBlockId !== block.id) {
@@ -1940,7 +2328,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
           >
             {/* Block Controls */}
             <motion.div
-              className={`hidden md:flex items-center gap-0.5 pt-1 transition-all shrink-0 duration-200 ${activeBlockId === block.id ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
+              className={`hidden md:flex items-center gap-0.5 pt-1 transition-all shrink-0 duration-200 ${activeBlockId === block.id || isSelected ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
                 }`}
             >
               <motion.button
@@ -2191,17 +2579,78 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
               </AnimatePresence>
             </div>
           </motion.div>
-        ))}
+          );
+        })}
 
         {/* Click to add block at end */}
         <motion.div
-          onClick={() => addBlockAfter(blocks[blocks.length - 1]?.id || "")}
+          onClick={() => {
+            clearSelection();
+            addBlockAfter(blocks[blocks.length - 1]?.id || "");
+          }}
           className="h-51 cursor-text flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
           whileHover={{ scale: 1.01 }}
         >
           <span className="text-sm text-muted-foreground/50">Click to add a block</span>
         </motion.div>
       </div>
+
+      {/* ── Block selection action bar ─────────────────────────────────── */}
+      {selectedBlockIds.size > 0 && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border shadow-2xl shadow-black/20 backdrop-blur-sm"
+          data-editor-root
+        >
+          <span className="text-xs text-muted-foreground font-medium px-2 border-r border-border mr-1">
+            {selectedBlockIds.size} block{selectedBlockIds.size > 1 ? "s" : ""} selected
+          </span>
+          <button
+            onClick={copySelectedBlocks}
+            title="Copy (Ctrl+C)"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition-colors text-foreground"
+          >
+            <Copy className="w-3.5 h-3.5" /> Copy
+          </button>
+          <button
+            onClick={cutSelectedBlocks}
+            title="Cut (Ctrl+X)"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition-colors text-foreground"
+          >
+            <X className="w-3.5 h-3.5" /> Cut
+          </button>
+          <button
+            onClick={() => {
+              // Pass the last selected block id so toolbar paste inserts right after selection
+              const lastId = [...selectedBlockIds].reduce<string | undefined>((acc, id) => {
+                const idx = blocks.findIndex(b => b.id === id);
+                const accIdx = acc ? blocks.findIndex(b => b.id === acc) : -1;
+                return idx > accIdx ? id : acc;
+              }, undefined);
+              pasteBlocks(lastId);
+            }}
+            title="Paste after selected (Ctrl+V)"
+            disabled={getBlockClipboard().length === 0}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-muted transition-colors text-foreground disabled:opacity-40"
+          >
+            <PlusCircle className="w-3.5 h-3.5" /> Paste after
+          </button>
+          <div className="w-px h-4 bg-border mx-1" />
+          <button
+            onClick={deleteSelectedBlocks}
+            title="Delete selected"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-destructive/10 transition-colors text-destructive"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Delete
+          </button>
+          <button
+            onClick={clearSelection}
+            title="Deselect"
+            className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground ml-1"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Image Lightbox */}
       <ImageLightbox
