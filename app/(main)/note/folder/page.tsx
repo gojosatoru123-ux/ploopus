@@ -157,7 +157,7 @@ const FolderPage = () => {
 
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           <AnimatePresence mode="wait">
-            <motion.div key={searchQuery} variants={containerVariants} initial="hidden" animate="visible">
+            <motion.div key={`${searchQuery}-${folders.length}`} variants={containerVariants} initial="hidden" animate="visible">
               {filteredFolders.length === 0 ? (
                 <div className="text-center py-10 text-sm text-muted-foreground">No folders.</div>
               ) : (
