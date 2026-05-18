@@ -2225,7 +2225,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
       case "faq":
         return (
           <FaqBlock
-            items={block.faqItems || [{ id: crypto.randomUUID(), question: "", answer: "" }]}
+            items={block.faqItems || []}
             onUpdate={(faqItems) => updateBlock(block.id, { faqItems })}
           />
         );
@@ -2237,9 +2237,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
               { id: "col1", name: "Option A" },
               { id: "col2", name: "Option B" },
             ]}
-            rows={block.comparisonRows || [
-              { id: crypto.randomUUID(), feature: "", values: { col1: "", col2: "" } },
-            ]}
+            rows={block.comparisonRows || []}
             onUpdate={(updates) => updateBlock(block.id, updates)}
           />
         );
@@ -2247,7 +2245,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
       case "steps":
         return (
           <StepsBlock
-            steps={block.stepsItems || [{ id: crypto.randomUUID(), title: "Step 1", description: "", completed: false }]}
+            steps={block.stepsItems || []}
             onUpdate={(stepsItems) => updateBlock(block.id, { stepsItems })}
           />
         );

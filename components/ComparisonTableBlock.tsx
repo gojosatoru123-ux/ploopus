@@ -71,12 +71,20 @@ const AutoSizeTextarea = ({
 
 const ComparisonTableBlock = ({ columns, rows, onUpdate }: ComparisonTableBlockProps) => {
     const [focusTarget, setFocusTarget] = useState<string | null>(null);
+    const [activeCell, setActiveCell] = useState<{ rowId: string | null; colId: string | null }>({ rowId: null, colId: null });
 
     const addColumn = () => {
         if (columns.length >= 6) return;
         const newCol: ComparisonColumn = { id: crypto.randomUUID(), name: "" };
+        const insertAfterIdx = activeCell.colId ? columns.findIndex(c => c.id === activeCell.colId) : columns.length - 1;
+        const insertAt = insertAfterIdx + 1;
+        const newColumns = [
+            ...columns.slice(0, insertAt),
+            newCol,
+            ...columns.slice(insertAt),
+        ];
         const newRows = rows.map(r => ({ ...r, values: { ...r.values, [newCol.id]: "" } }));
-        onUpdate({ comparisonColumns: [...columns, newCol], comparisonRows: newRows });
+        onUpdate({ comparisonColumns: newColumns, comparisonRows: newRows });
     };
 
     const removeColumn = (id: string) => {
@@ -97,9 +105,20 @@ const ComparisonTableBlock = ({ columns, rows, onUpdate }: ComparisonTableBlockP
 
         let newRows = [...rows];
         if (typeof index === 'number') {
+            // Called from onEnter inside a row — insert after that row
             newRows.splice(index + 1, 0, newRow);
         } else {
-            newRows.push(newRow);
+            // Called from Add row button — insert after active row, fallback to end
+            // If only a column header is active (rowId null, colId set), insert as first row
+            let insertAt: number;
+            if (activeCell.rowId) {
+                insertAt = rows.findIndex(r => r.id === activeCell.rowId) + 1;
+            } else if (activeCell.colId) {
+                insertAt = 0;
+            } else {
+                insertAt = rows.length;
+            }
+            newRows.splice(insertAt, 0, newRow);
         }
 
         onUpdate({ comparisonRows: newRows });
@@ -166,6 +185,7 @@ const ComparisonTableBlock = ({ columns, rows, onUpdate }: ComparisonTableBlockP
                                             <input
                                                 value={col.name}
                                                 onChange={(e) => updateColumnName(col.id, e.target.value)}
+                                                onFocus={() => setActiveCell({ rowId: null, colId: col.id })}
                                                 placeholder="Option"
                                                 className="text-sm font-semibold text-foreground bg-transparent outline-none text-center min-w-[4ch] placeholder:text-muted-foreground/30 border-none focus:ring-0"
                                                 style={{ width: `${Math.max(col.name.length, 6)}ch` }}
@@ -199,7 +219,7 @@ const ComparisonTableBlock = ({ columns, rows, onUpdate }: ComparisonTableBlockP
                                         exit={{ opacity: 0, x: -10 }}
                                         className="group/row border-b border-border/10 last:border-0 hover:bg-muted/10 transition-colors"
                                     >
-                                        <td className="p-3 px-4 align-top">
+                                        <td className="p-3 px-4 align-top" onClick={() => setActiveCell({ rowId: row.id, colId: null })}>
                                             <div className="flex items-start gap-2">
                                                 <AutoSizeTextarea
                                                     value={row.feature}
@@ -220,7 +240,7 @@ const ComparisonTableBlock = ({ columns, rows, onUpdate }: ComparisonTableBlockP
                                             </div>
                                         </td>
                                         {columns.map((col) => (
-                                            <td key={col.id} className={`p-3 text-center transition-colors ${col.highlighted ? "bg-primary/5" : ""}`}>
+                                            <td key={col.id} className={`p-3 text-center transition-colors ${col.highlighted ? "bg-primary/5" : ""}`} onClick={() => setActiveCell({ rowId: row.id, colId: col.id })}>
                                                 <button
                                                     onClick={() => cycleValue(row.id, col.id)}
                                                     className="mx-auto flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"

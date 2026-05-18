@@ -87,11 +87,24 @@ const DataTable = ({ block, onUpdate, onCreateChart }: DataTableProps) => {
 
   const addRow = () => {
     const newRow = Array(tableData[0]?.length || 3).fill("");
-    onUpdate({ tableData: [...tableData, newRow] });
+    const insertAfter = selectedCell ? selectedCell.row : tableData.length - 1;
+    const insertAt = Math.max(1, insertAfter + 1);
+    const newTableData = [
+      ...tableData.slice(0, insertAt),
+      newRow,
+      ...tableData.slice(insertAt),
+    ];
+    onUpdate({ tableData: newTableData });
   };
 
   const addColumn = () => {
-    const newTableData = tableData.map((row) => [...row, ""]);
+    const insertAfter = selectedCell ? selectedCell.col : (tableData[0]?.length ?? 1) - 1;
+    const insertAt = insertAfter + 1;
+    const newTableData = tableData.map((row) => [
+      ...row.slice(0, insertAt),
+      "",
+      ...row.slice(insertAt),
+    ]);
     onUpdate({ tableData: newTableData });
   };
 
@@ -234,6 +247,7 @@ const DataTable = ({ block, onUpdate, onCreateChart }: DataTableProps) => {
                   key={colIndex}
                   style={{ width: getColumnWidth(colIndex), minWidth: getColumnWidth(colIndex) }}
                   className="px-4 py-3 text-left text-sm font-bold border-r border-border last:border-r-0 group/col hover:bg-primary/10 transition-colors relative"
+                  onClick={() => setSelectedCell({ row: 0, col: colIndex })}
                 >
                   <input
                     type="text"

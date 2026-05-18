@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, MoreHorizontal, Star, Share2, Clock, Focus, Minimize2, BookOpen, Sparkles, Undo2, Redo2, Download, FileText, FileCode, FileType, FileJsonIcon, File } from "lucide-react";
+import { X, Plus, MoreHorizontal, Star, Share2, Clock, Focus, Minimize2, BookOpen, Sparkles, Undo2, Redo2, Download, FileText, FileCode, FileType, FileJsonIcon, File, Upload } from "lucide-react";
 import NotionEditor from "./NotionEditor";
 import FloatingToolbar from "./FloatingToolbar";
 import FindReplaceBar from "./FindReplaceBar";
@@ -154,10 +154,9 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
 
   return (
     <>
-      <motion.div
-        className={`flex-1 h-full bg-card flex flex-col overflow-hidden transition-all duration-300 ${focusMode ? 'fixed inset-0 z-50 bg-background' : ''
-          }`}
-        layout
+      <div
+        className={`flex-1 h-full bg-card flex flex-col overflow-hidden ${focusMode ? 'fixed inset-0 z-50 bg-background' : ''}`}
+        style={{ transition: 'background-color 0.4s ease' }}
       >
         {/* Floating Toolbar - appears on text selection */}
         <FloatingToolbar />
@@ -169,6 +168,7 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
               className="absolute inset-0 bg-background -z-10"
             />
           )}
@@ -181,9 +181,8 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
             : 'bg-card/50 backdrop-blur-sm'
             }`}
           initial={false}
-          animate={{
-            opacity: focusMode ? 0 : 1,
-          }}
+          animate={{ opacity: focusMode ? 0 : 1 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
           whileHover={{ opacity: 1 }}
         >
           <div className="flex items-center gap-3">
@@ -306,6 +305,18 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
                 title="Export note"
               >
                 <Download className="w-4 h-4" />
+              </motion.button>
+            </div>
+
+            {/* Import Button */}
+            <div className="relative">
+              <motion.button
+                className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                title="Import note"
+              >
+                <Upload className="w-4 h-4" />
               </motion.button>
             </div>
 
@@ -457,19 +468,23 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
             )}
 
             <motion.div
-              className={`mx-auto transition-all duration-300 relative z-10 w-full min-w-0  ${focusMode
+              className={`mx-auto relative z-10 w-full min-w-0 ${focusMode
                 ? 'max-w-5xl pt-16 px-4 md:px-6 py-6'
                 : 'max-w-5xl p-6 md:p-10'
                 }`}
-              layout
+              animate={{
+                paddingTop: focusMode ? 64 : undefined,
+              }}
+              transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
             >
               {/* Focus mode exit hint */}
               <AnimatePresence>
                 {focusMode && (
                   <motion.div
-                    initial={{ opacity: 0, y: -10 }}
+                    initial={{ opacity: 0, y: -8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.3, ease: "easeOut", delay: 0.15 }}
                     className="text-center mb-12"
                   >
                     <span className="text-xs text-muted-foreground bg-primary/10 px-4 py-2 rounded-full border border-primary/20 inline-block">
@@ -581,9 +596,10 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
         <AnimatePresence>
           {focusMode && (
             <motion.button
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
+              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 10 }}
+              transition={{ duration: 0.3, ease: "easeOut", delay: 0.2 }}
               onClick={onToggleFocusMode}
               className="fixed bottom-6 right-6 p-3 rounded-full bg-primary/10 border border-primary/30 shadow-lg hover:bg-primary/20 hover:border-primary/50 text-primary transition-all z-50"
               whileHover={{ scale: 1.15 }}
@@ -594,7 +610,7 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
             </motion.button>
           )}
         </AnimatePresence>
-      </motion.div>
+      </div>
     </>
   );
 };
