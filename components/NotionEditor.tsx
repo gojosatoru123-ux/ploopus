@@ -1573,16 +1573,22 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
             <div className="grid grid-cols-2 gap-4">
               {(block.columns || [[], []]).map((column, colIndex) => (
                 <div key={colIndex} className="min-h-25 border border-dashed border-muted-foreground/20 rounded-lg p-3">
-                  <input
-                    type="text"
-                    value={columnTitles[colIndex] || `Column ${colIndex + 1}`}
-                    onChange={(e) => {
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    data-placeholder={`Column ${colIndex + 1}`}
+                    onBlur={(e) => {
                       const newTitles = [...columnTitles];
-                      newTitles[colIndex] = e.target.value;
+                      newTitles[colIndex] = e.currentTarget.innerHTML;
                       updateBlock(block.id, { columnTitles: newTitles });
                     }}
-                    className="text-sm font-semibold mb-3 bg-muted/40 outline-none focus:bg-muted focus:text-foreground transition-colors w-full px-2 py-1 rounded border border-transparent focus:border-primary/30 text-foreground"
-                    placeholder={`Column ${colIndex + 1}`}
+                    onInput={(e) => {
+                      const newTitles = [...columnTitles];
+                      newTitles[colIndex] = e.currentTarget.innerHTML;
+                      updateBlock(block.id, { columnTitles: newTitles });
+                    }}
+                    dangerouslySetInnerHTML={{ __html: columnTitles[colIndex] || `Column ${colIndex + 1}` }}
+                    className="text-sm font-semibold mb-3 bg-muted/40 outline-none focus:bg-muted focus:text-foreground transition-colors w-full px-2 py-1 rounded border border-transparent focus:border-primary/30 text-foreground empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
                   />
                   <div className="space-y-2">
                     {(column || []).map((nestedBlock, blockIndex) => (

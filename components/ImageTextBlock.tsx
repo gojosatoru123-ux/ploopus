@@ -7,34 +7,42 @@ import { ImagePlus, ArrowLeftRight, ZoomIn, Trash2, Upload } from "lucide-react"
 import { MediaUploader } from "./MediaUploader";
 import PersistentImage from "./PersistentImage";
 
-// --- Internal Auto-Sizing Component ---
-interface AutoResizeProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+// --- ContentEditable div that supports rich text formatting ---
+const EditableDiv = ({
+    value,
+    onChange,
+    placeholder,
+    className,
+}: {
     value: string;
-}
-
-const AutoResizeTextarea = ({ value, className, ...props }: AutoResizeProps) => {
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-    const adjustHeight = () => {
-        const node = textareaRef.current;
-        if (node) {
-            node.style.height = "auto";
-            node.style.height = `${node.scrollHeight}px`;
-        }
-    };
+    onChange: (val: string) => void;
+    placeholder: string;
+    className: string;
+}) => {
+    const ref = useRef<HTMLDivElement>(null);
+    const isFocused = useRef(false);
 
     useEffect(() => {
-        adjustHeight();
+        if (ref.current && !isFocused.current) {
+            if (ref.current.innerHTML !== value) {
+                ref.current.innerHTML = value;
+            }
+        }
     }, [value]);
 
     return (
-        <textarea
-            {...props}
-            ref={textareaRef}
-            value={value}
-            rows={1}
-            spellCheck={false}
-            className={`w-full bg-transparent outline-none resize-none overflow-hidden transition-all ${className}`}
+        <div
+            ref={ref}
+            contentEditable
+            suppressContentEditableWarning
+            data-placeholder={placeholder}
+            onFocus={() => { isFocused.current = true; }}
+            onBlur={(e) => {
+                isFocused.current = false;
+                onChange(e.currentTarget.innerHTML);
+            }}
+            onInput={(e) => onChange(e.currentTarget.innerHTML)}
+            className={`w-full bg-transparent outline-none transition-all ${className} empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/25 empty:before:pointer-events-none`}
         />
     );
 };
@@ -132,17 +140,17 @@ const ImageTextBlock = ({
                     <div className="sm:w-[55%] p-8 flex flex-col justify-center relative">
                         <div className={`absolute top-8 ${isLeft ? "left-8" : "right-8"} w-10 h-1 rounded-full bg-primary/20`} />
 
-                        <AutoResizeTextarea
+                        <EditableDiv
                             value={title}
-                            onChange={(e) => onUpdate({ imageTextTitle: e.target.value })}
-                            className="text-2xl font-bold text-foreground tracking-tight placeholder:text-muted-foreground/25 mb-3 mt-4"
+                            onChange={(val) => onUpdate({ imageTextTitle: val })}
+                            className="text-2xl font-bold text-foreground tracking-tight mb-3 mt-4"
                             placeholder="Add a title…"
                         />
 
-                        <AutoResizeTextarea
+                        <EditableDiv
                             value={description}
-                            onChange={(e) => onUpdate({ imageTextDescription: e.target.value })}
-                            className="text-[15px] text-muted-foreground leading-relaxed placeholder:text-muted-foreground/20"
+                            onChange={(val) => onUpdate({ imageTextDescription: val })}
+                            className="text-[15px] text-muted-foreground leading-relaxed"
                             placeholder="Write your content here…"
                         />
                     </div>

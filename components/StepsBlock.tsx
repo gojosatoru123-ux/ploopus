@@ -1,5 +1,5 @@
 'use client'
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, Check } from "lucide-react";
 
@@ -23,6 +23,47 @@ const stepColors = [
   "from-emerald-500 to-teal-500",
   "from-fuchsia-500 to-pink-500",
 ];
+
+// contentEditable div that stays in sync with external value without fighting the cursor
+const EditableDiv = ({
+  value,
+  onChange,
+  className,
+  placeholder,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  className: string;
+  placeholder: string;
+}) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const isFocused = useRef(false);
+
+  // Only sync from outside when not focused (avoids cursor jumping while typing)
+  useEffect(() => {
+    if (ref.current && !isFocused.current) {
+      if (ref.current.innerHTML !== value) {
+        ref.current.innerHTML = value;
+      }
+    }
+  }, [value]);
+
+  return (
+    <div
+      ref={ref}
+      contentEditable
+      suppressContentEditableWarning
+      data-placeholder={placeholder}
+      onFocus={() => { isFocused.current = true; }}
+      onBlur={(e) => {
+        isFocused.current = false;
+        onChange(e.currentTarget.innerHTML);
+      }}
+      onInput={(e) => onChange(e.currentTarget.innerHTML)}
+      className={`${className} empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50 empty:before:pointer-events-none`}
+    />
+  );
+};
 
 const StepsBlock = ({ steps, onUpdate }: StepsBlockProps) => {
   const [hoveredStep, setHoveredStep] = useState<string | null>(null);
@@ -58,7 +99,7 @@ const StepsBlock = ({ steps, onUpdate }: StepsBlockProps) => {
         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
           <motion.div
             className="h-full rounded-full bg-linear-to-r from-blue-500 to-emerald-500"
-            initial={false} // Prevents progress bar from sliding on first load
+            initial={false}
             animate={{ width: `${progress}%` }}
             transition={{ duration: 0.5, ease: "easeOut" }}
           />
@@ -71,14 +112,13 @@ const StepsBlock = ({ steps, onUpdate }: StepsBlockProps) => {
       <div className="relative">
         <div className="absolute left-5 top-6 bottom-6 w-px bg-border/60" />
 
-        {/* Added mode="popLayout" and initial={false} to stop jitter/initial mount animation */}
         <AnimatePresence mode="popLayout" initial={false}>
           {steps.map((step, index) => {
             const color = stepColors[index % stepColors.length];
             return (
               <motion.div
                 key={step.id}
-                layout // Smoothly slides other items when one is removed
+                layout
                 className="relative flex gap-4 mb-3 last:mb-0 group"
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -105,18 +145,18 @@ const StepsBlock = ({ steps, onUpdate }: StepsBlockProps) => {
                 }`}>
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
-                      <input
+                      <EditableDiv
                         value={step.title}
-                        onChange={(e) => updateStep(step.id, { title: e.target.value })}
-                        className={`w-full bg-transparent border-none outline-none text-sm font-semibold text-foreground placeholder:text-muted-foreground/50 ${
+                        onChange={(val) => updateStep(step.id, { title: val })}
+                        className={`w-full bg-transparent outline-none text-sm font-semibold text-foreground ${
                           step.completed ? "line-through" : ""
                         }`}
                         placeholder={`Step ${index + 1} title...`}
                       />
-                      <input
+                      <EditableDiv
                         value={step.description}
-                        onChange={(e) => updateStep(step.id, { description: e.target.value })}
-                        className="w-full bg-transparent border-none outline-none text-xs text-muted-foreground mt-1 placeholder:text-muted-foreground/30"
+                        onChange={(val) => updateStep(step.id, { description: val })}
+                        className="w-full bg-transparent outline-none text-xs text-muted-foreground mt-1"
                         placeholder="Add details..."
                       />
                     </div>

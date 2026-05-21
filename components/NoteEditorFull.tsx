@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, MoreHorizontal, Star, Share2, Clock, Focus, Minimize2, BookOpen, Sparkles, Undo2, Redo2, Download, FileText, FileCode, FileType, FileJsonIcon, File, Upload } from "lucide-react";
 import NotionEditor from "./NotionEditor";
@@ -14,6 +14,7 @@ import { Template } from "@/data/templates";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
+import { toast } from "sonner";
 
 interface NoteEditorFullProps {
   note: Note;
@@ -38,6 +39,8 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
   const [showIndex, setShowIndex] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const activeBlockIndexRef = useRef<number>(-1);
+  const importInputRef = useRef<HTMLInputElement>(null);
   // Index functionality
   const { index, scrollToHeading } = useHeadingIndex(note.blocks);
   const { exportNote } = useNoteExport();
@@ -127,6 +130,62 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
   const handleBlocksChange = (blocks: NoteBlock[]) => {
     pushState(blocks); // Track state for undo/redo
     onUpdate({ blocks });
+  };
+
+  // Track focused block index for import insertion point
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const blockEl = (e.target as HTMLElement).closest("[data-block-id]");
+      if (!blockEl) return;
+      const blockId = blockEl.getAttribute("data-block-id");
+      if (!blockId) return;
+      const idx = note.blocks.findIndex(b => b.id === blockId);
+      if (idx !== -1) activeBlockIndexRef.current = idx;
+    };
+    document.addEventListener("focusin", handleFocusIn);
+    return () => document.removeEventListener("focusin", handleFocusIn);
+  }, [note.blocks]);
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const raw = JSON.parse(ev.target?.result as string);
+        // Support both raw array and { blocks: [...] } or full note object
+        let importedRaw: any[] = [];
+        if (Array.isArray(raw)) {
+          importedRaw = raw;
+        } else if (Array.isArray(raw?.blocks)) {
+          importedRaw = raw.blocks;
+        } else {
+          toast.error("Invalid format: expected a JSON array of blocks or a note object with a blocks array.",{position:"top-right"});
+          return;
+        }
+        if (importedRaw.length === 0) return;
+        const importedBlocks: NoteBlock[] = importedRaw.map((b: any) => ({
+          ...b,
+          id: crypto.randomUUID(),
+        }));
+        const current = note.blocks;
+        const insertAt = activeBlockIndexRef.current >= 0
+          ? activeBlockIndexRef.current + 1
+          : current.length;
+        const newBlocks = [
+          ...current.slice(0, insertAt),
+          ...importedBlocks,
+          ...current.slice(insertAt),
+        ];
+        handleBlocksChange(newBlocks);
+        toast.success(`Successfully imported ${importedBlocks.length} blocks!`, { position: "top-right" });
+      } catch (err) {
+        toast.error("Failed to parse JSON file. Make sure it's a valid JSON.",{position:"top-right"});
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file);
   };
 
   const getTagStyle = (colorName: string) => {
@@ -310,11 +369,19 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
 
             {/* Import Button */}
             <div className="relative">
+              <input
+                ref={importInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={handleImport}
+              />
               <motion.button
                 className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
-                title="Import note"
+                title="Import blocks from JSON"
+                onClick={() => importInputRef.current?.click()}
               >
                 <Upload className="w-4 h-4" />
               </motion.button>

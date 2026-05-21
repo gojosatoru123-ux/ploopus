@@ -14,35 +14,42 @@ interface FaqBlockProps {
     onUpdate: (items: FaqItem[]) => void;
 }
 
-// Helper component for auto-expanding textareas
-const AutoSizeTextarea = ({
+// contentEditable div that stays in sync with external value without fighting the cursor
+const EditableDiv = ({
     value,
     onChange,
     placeholder,
-    className
+    className,
 }: {
     value: string;
     onChange: (val: string) => void;
     placeholder: string;
     className: string;
 }) => {
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const ref = useRef<HTMLDivElement>(null);
+    const isFocused = useRef(false);
 
     useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = "auto";
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        if (ref.current && !isFocused.current) {
+            if (ref.current.innerHTML !== value) {
+                ref.current.innerHTML = value;
+            }
         }
     }, [value]);
 
     return (
-        <textarea
-            ref={textareaRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className={`${className} resize-none overflow-hidden`}
-            placeholder={placeholder}
-            rows={1}
+        <div
+            ref={ref}
+            contentEditable
+            suppressContentEditableWarning
+            data-placeholder={placeholder}
+            onFocus={() => { isFocused.current = true; }}
+            onBlur={(e) => {
+                isFocused.current = false;
+                onChange(e.currentTarget.innerHTML);
+            }}
+            onInput={(e) => onChange(e.currentTarget.innerHTML)}
+            className={`${className} empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40 empty:before:pointer-events-none`}
         />
     );
 };
@@ -100,38 +107,39 @@ const FaqBlock = ({ items, onUpdate }: FaqBlockProps) => {
 
             {/* FAQ Items */}
             <div className="space-y-2">
-                {/* Fix: Added mode="popLayout" and initial={false} to prevent mount-jitter */}
                 <AnimatePresence mode="popLayout" initial={false}>
-                    {items.map((item, index) => {
+                    {items.map((item) => {
                         const isExpanded = expandedIds.has(item.id);
                         return (
                             <motion.div
                                 key={item.id}
-                                layout // Fix: Allows items to slide smoothly when others are removed
+                                layout
                                 className="rounded-xl border border-border/60 overflow-hidden bg-card/50 hover:border-border transition-colors"
                                 initial={{ opacity: 0, y: -8 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.98 }} // Changed from height: 0 to scale for stability
+                                exit={{ opacity: 0, scale: 0.98 }}
                                 transition={{ duration: 0.2 }}
                             >
-                                {/* Question */}
-                                <div
-                                    className="flex items-center gap-3 p-3 cursor-pointer group"
-                                    onClick={() => toggleExpand(item.id)}
-                                >
-                                    <motion.div
-                                        animate={{ rotate: isExpanded ? 180 : 0 }}
-                                        transition={{ duration: 0.2 }}
+                                {/* Question row — click chevron/icon to expand, not the whole row */}
+                                <div className="flex items-center gap-3 p-3 group">
+                                    <div
+                                        className="cursor-pointer"
+                                        onClick={() => toggleExpand(item.id)}
                                     >
-                                        <ChevronDown className="w-4 h-4 text-muted-foreground/40" />
-                                    </motion.div>
+                                        <motion.div
+                                            animate={{ rotate: isExpanded ? 180 : 0 }}
+                                            transition={{ duration: 0.2 }}
+                                        >
+                                            <ChevronDown className="w-4 h-4 text-muted-foreground/40" />
+                                        </motion.div>
+                                    </div>
                                     <div className="flex items-center gap-2 flex-1">
                                         <MessageCircle className="w-3.5 h-3.5 text-violet-400/60 shrink-0" />
-                                        <AutoSizeTextarea
+                                        <EditableDiv
                                             value={item.question}
                                             onChange={(val) => updateItem(item.id, { question: val })}
                                             placeholder="Question..."
-                                            className="w-full bg-transparent border-none outline-none text-sm font-medium text-foreground placeholder:text-muted-foreground/40 p-0 leading-relaxed"
+                                            className="w-full bg-transparent outline-none text-sm font-medium text-foreground leading-relaxed"
                                         />
                                     </div>
                                     {items.length > 1 && (
@@ -155,11 +163,11 @@ const FaqBlock = ({ items, onUpdate }: FaqBlockProps) => {
                                             className="overflow-hidden"
                                         >
                                             <div className="px-3 pb-3 pl-10">
-                                                <AutoSizeTextarea
+                                                <EditableDiv
                                                     value={item.answer}
                                                     onChange={(val) => updateItem(item.id, { answer: val })}
                                                     placeholder="Answer..."
-                                                    className="w-full bg-muted/30 rounded-lg border-none outline-none text-sm text-muted-foreground p-2.5 leading-relaxed placeholder:text-muted-foreground/30"
+                                                    className="w-full bg-muted/30 rounded-lg outline-none text-sm text-muted-foreground p-2.5 leading-relaxed min-h-8"
                                                 />
                                             </div>
                                         </motion.div>
