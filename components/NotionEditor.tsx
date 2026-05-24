@@ -85,6 +85,28 @@ interface NotionEditorProps {
   onChange: (blocks: NoteBlock[]) => void;
 }
 
+// Subtle, Apple-inspired affordance that appears between blocks on hover.
+// A hairline rule fades in, with a soft glassy "+" button centered on it.
+const InlineInserter = ({ onInsert }: { onInsert: () => void }) => {
+  return (
+    <div
+      onClick={onInsert}
+      className="group/inserter relative h-px my-0.5 cursor-pointer"
+      aria-label="Insert block"
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-linear-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover/inserter:opacity-100 transition-opacity duration-200" />
+      <motion.div
+        initial={false}
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover/inserter:opacity-100 transition-opacity duration-200"
+      >
+        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-background/80 backdrop-blur-md border border-border/60 shadow-sm hover:shadow-md hover:scale-110 active:scale-95 transition-all duration-150">
+          <Plus className="w-3 h-3 text-muted-foreground group-hover/inserter:text-primary transition-colors" strokeWidth={2.5} />
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const blockTypes = [
   { type: "text", icon: Type, label: "Text", description: "Plain text block", category: "basic" },
   { type: "heading1", icon: Heading1, label: "Heading 1", description: "Large section heading", category: "basic" },
@@ -864,7 +886,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
       e.preventDefault();
       deleteBlock(block.id);
     }
-    // ✅
+
     if (e.key === "/" && isEmpty && !isTouch) {
       e.preventDefault();
       setShowMenu(block.id);
@@ -1124,19 +1146,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
       case "todo": {
         const todoIndent = block.indentLevel || 0;
         return (
-          <div className="flex items-start gap-3 py-1" style={{ paddingLeft: `${todoIndent * 24}px` }}>
-            <motion.div
-              className="mt-1"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <input
-                type="checkbox"
-                checked={block.checked}
-                onChange={(e) => updateBlock(block.id, { checked: e.target.checked })}
-                className="w-5 h-5 rounded-md border-2 border-muted-foreground/30 accent-primary cursor-pointer transition-all checked:border-primary"
-              />
-            </motion.div>
+          <div className="flex items-start flex-row-reverse gap-3 py-1" style={{ paddingLeft: `${todoIndent * 24}px` }}>
             <div
               ref={(el) => {
                 if (el) {
@@ -1162,9 +1172,21 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
                 }
               }}
               onKeyDown={(e) => handleKeyDown(e, block)}
-              className={`flex-1 outline-none transition-all ${block.checked ? 'line-through text-muted-foreground/50' : ''}`}
+              className={`flex-1 outline-none transition-all ${!!block.checked ? 'line-through text-muted-foreground/50' : ''}`}
               data-placeholder="To-do"
             />
+            <motion.div
+              className="mt-1"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <input
+                type="checkbox"
+                checked={!!block.checked}
+                onChange={(e) => updateBlock(block.id, { checked: e.target.checked })}
+                className="w-5 h-5 rounded-md border-2 border-muted-foreground/30 accent-primary cursor-pointer transition-all checked:border-primary"
+              />
+            </motion.div>
           </div>
         );
       }
@@ -1566,61 +1588,113 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
           />
         );
 
-      case "columns":
-        const columnTitles = block.columnTitles || ["Column 1", "Column 2"];
-        return (
-          <div className="py-2">
-            <div className="grid grid-cols-2 gap-4">
-              {(block.columns || [[], []]).map((column, colIndex) => (
-                <div key={colIndex} className="min-h-25 border border-dashed border-muted-foreground/20 rounded-lg p-3">
-                  <div
-                    contentEditable
-                    suppressContentEditableWarning
-                    data-placeholder={`Column ${colIndex + 1}`}
-                    onBlur={(e) => {
-                      const newTitles = [...columnTitles];
-                      newTitles[colIndex] = e.currentTarget.innerHTML;
-                      updateBlock(block.id, { columnTitles: newTitles });
-                    }}
-                    onInput={(e) => {
-                      const newTitles = [...columnTitles];
-                      newTitles[colIndex] = e.currentTarget.innerHTML;
-                      updateBlock(block.id, { columnTitles: newTitles });
-                    }}
-                    dangerouslySetInnerHTML={{ __html: columnTitles[colIndex] || `Column ${colIndex + 1}` }}
-                    className="text-sm font-semibold mb-3 bg-muted/40 outline-none focus:bg-muted focus:text-foreground transition-colors w-full px-2 py-1 rounded border border-transparent focus:border-primary/30 text-foreground empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
-                  />
-                  <div className="space-y-2">
-                    {(column || []).map((nestedBlock, blockIndex) => (
-                      <div key={nestedBlock.id || blockIndex} className="relative group/nested">
-                        {/* Render nested text blocks with proper update handlers */}
-                        {nestedBlock.type === "text" && (
-                          <div
-                            ref={(el) => {
-                              if (el) {
-                                contentRefs.current.set(nestedBlock.id, el);
-                                if (!initializedRefs.current.has(nestedBlock.id)) {
-                                  el.innerHTML = nestedBlock.content || "";
-                                  initializedRefs.current.add(nestedBlock.id);
-                                }
-                              }
-                            }}
-                            contentEditable
-                            suppressContentEditableWarning
-                            onBlur={(e) => {
-                              const html = e.currentTarget.innerHTML || "";
-                              if (html !== nestedBlock.content) {
-                                updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
-                              }
-                            }}
-                            onKeyDown={(e) => handleKeyDown(e, nestedBlock)}
-                            className="outline-none py-1 text-sm empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
-                            data-placeholder="Type here..."
-                          />
-                        )}
-                        {nestedBlock.type === "bullet" && (
-                          <div className="flex items-start gap-3 py-1">
-                            <span className="mt-2.5 w-2 h-2 rounded-full bg-primary/60 shrink-0" />
+        case "columns":
+          const columnTitles = block.columnTitles || ["Column 1", "Column 2"];
+  
+          // Add a new text block after blockIndex and focus it
+          const addNestedBlock = (colIndex: number, afterIndex: number) => {
+            const newBlock: NoteBlock = { id: crypto.randomUUID(), type: "text", content: "" };
+            const newColumns = [...(block.columns || [[], []])];
+            newColumns[colIndex] = [
+              ...newColumns[colIndex].slice(0, afterIndex + 1),
+              newBlock,
+              ...newColumns[colIndex].slice(afterIndex + 1),
+            ];
+            updateBlock(block.id, { columns: newColumns });
+            // Focus the new block after React re-renders
+            setTimeout(() => {
+              const el = contentRefs.current.get(newBlock.id);
+              el?.focus();
+            }, 20);
+          };
+  
+          // Delete block at blockIndex and focus the previous one (or next if first)
+          const deleteNestedBlock = (colIndex: number, blockIndex: number) => {
+            const col = block.columns?.[colIndex] || [];
+            if (col.length <= 1) return; // keep at least one block
+            const focusId = blockIndex > 0
+              ? col[blockIndex - 1].id
+              : col[blockIndex + 1]?.id;
+            const newColumns = [...(block.columns || [[], []])];
+            newColumns[colIndex] = newColumns[colIndex].filter((_, i) => i !== blockIndex);
+            updateBlock(block.id, { columns: newColumns });
+            setTimeout(() => {
+              if (focusId) {
+                const el = contentRefs.current.get(focusId);
+                el?.focus();
+                // Move cursor to end
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(el!);
+                range.collapse(false);
+                sel?.removeAllRanges();
+                sel?.addRange(range);
+              }
+            }, 20);
+          };
+  
+          const handleNestedKeyDown = (
+            e: React.KeyboardEvent<HTMLDivElement>,
+            colIndex: number,
+            blockIndex: number,
+            nestedBlock: NoteBlock
+          ) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              // Save current content first
+              const html = e.currentTarget.innerHTML || "";
+              updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
+              addNestedBlock(colIndex, blockIndex);
+            } else if (e.key === "Backspace") {
+              const isEmpty = e.currentTarget.innerHTML === "" || e.currentTarget.innerHTML === "<br>";
+              if (isEmpty) {
+                e.preventDefault();
+                deleteNestedBlock(colIndex, blockIndex);
+              }
+            }
+          };
+  
+          return (
+            <div className="py-2">
+              <div className="grid grid-cols-2 gap-4">
+                {(block.columns || [[], []]).map((column, colIndex) => (
+                  <div key={colIndex} className="min-h-25 border border-dashed border-muted-foreground/20 rounded-lg p-3">
+                    <div
+                      ref={(el) => {
+                        if (el) {
+                          // Create a unique key for the title ref using the block ID and column index
+                          const titleKey = `${block.id}-title-${colIndex}`;
+                          contentRefs.current.set(titleKey, el);
+                          if (!initializedRefs.current.has(titleKey)) {
+                            el.innerHTML = columnTitles[colIndex] || `Column ${colIndex + 1}`;
+                            initializedRefs.current.add(titleKey);
+                          }
+                        }
+                      }}
+                      contentEditable
+                      suppressContentEditableWarning
+                      data-placeholder={`Column ${colIndex + 1}`}
+                      onBlur={(e) => {
+                        const html = e.currentTarget.innerHTML || "";
+                        if (html !== columnTitles[colIndex]) {
+                          const newTitles = [...columnTitles];
+                          newTitles[colIndex] = html;
+                          updateBlock(block.id, { columnTitles: newTitles });
+                        }
+                      }}
+                      onInput={(e) => {
+                        // Optional: Keep this if you need instant state sync for other parts of the UI,
+                        // but remove dangerouslySetInnerHTML to prevent the cursor jump.
+                        const newTitles = [...columnTitles];
+                        newTitles[colIndex] = e.currentTarget.innerHTML;
+                        updateBlock(block.id, { columnTitles: newTitles });
+                      }}
+                      className="text-sm font-semibold mb-3 bg-muted/40 outline-none focus:bg-muted focus:text-foreground transition-colors w-full px-2 py-1 rounded border border-transparent focus:border-primary/30 text-foreground empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
+                    />
+                    <div className="space-y-2">
+                      {(column || []).map((nestedBlock, blockIndex) => (
+                        <div key={nestedBlock.id || blockIndex} className="relative group/nested">
+                          {nestedBlock.type === "text" && (
                             <div
                               ref={(el) => {
                                 if (el) {
@@ -1639,110 +1713,165 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
                                   updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
                                 }
                               }}
-                              onKeyDown={(e) => handleKeyDown(e, nestedBlock)}
-                              className="flex-1 outline-none text-sm"
-                              data-placeholder="List item"
+                              onKeyDown={(e) => handleNestedKeyDown(e, colIndex, blockIndex, nestedBlock)}
+                              className="outline-none py-1 text-sm empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
+                              data-placeholder="Type here..."
                             />
-                          </div>
-                        )}
-                        {nestedBlock.type === "heading1" && (
-                          <div
-                            ref={(el) => {
-                              if (el) {
-                                contentRefs.current.set(nestedBlock.id, el);
-                                if (!initializedRefs.current.has(nestedBlock.id)) {
-                                  el.innerHTML = nestedBlock.content || "";
-                                  initializedRefs.current.add(nestedBlock.id);
+                          )}
+                          {nestedBlock.type === "bullet" && (
+                            <div className="flex items-start gap-3 py-1">
+                              <span className="mt-2.5 w-2 h-2 rounded-full bg-primary/60 shrink-0" />
+                              <div
+                                ref={(el) => {
+                                  if (el) {
+                                    contentRefs.current.set(nestedBlock.id, el);
+                                    if (!initializedRefs.current.has(nestedBlock.id)) {
+                                      el.innerHTML = nestedBlock.content || "";
+                                      initializedRefs.current.add(nestedBlock.id);
+                                    }
+                                  }
+                                }}
+                                contentEditable
+                                suppressContentEditableWarning
+                                onBlur={(e) => {
+                                  const html = e.currentTarget.innerHTML || "";
+                                  if (html !== nestedBlock.content) {
+                                    updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
+                                  }
+                                }}
+                                onKeyDown={(e) => handleNestedKeyDown(e, colIndex, blockIndex, nestedBlock)}
+                                className="flex-1 outline-none text-sm"
+                                data-placeholder="List item"
+                              />
+                            </div>
+                          )}
+                          {nestedBlock.type === "heading1" && (
+                            <div
+                              ref={(el) => {
+                                if (el) {
+                                  contentRefs.current.set(nestedBlock.id, el);
+                                  if (!initializedRefs.current.has(nestedBlock.id)) {
+                                    el.innerHTML = nestedBlock.content || "";
+                                    initializedRefs.current.add(nestedBlock.id);
+                                  }
                                 }
-                              }
+                              }}
+                              contentEditable
+                              suppressContentEditableWarning
+                              onBlur={(e) => {
+                                const html = e.currentTarget.innerHTML || "";
+                                if (html !== nestedBlock.content) {
+                                  updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
+                                }
+                              }}
+                              onKeyDown={(e) => handleNestedKeyDown(e, colIndex, blockIndex, nestedBlock)}
+                              className="outline-none text-2xl font-bold empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
+                              data-placeholder="Heading 1"
+                            />
+                          )}
+                          <button
+                            onClick={() => {
+                              const newColumns = [...(block.columns || [])];
+                              newColumns[colIndex] = newColumns[colIndex].filter((_, idx) => idx !== blockIndex);
+                              updateBlock(block.id, { columns: newColumns });
                             }}
-                            contentEditable
-                            suppressContentEditableWarning
-                            onBlur={(e) => {
-                              const html = e.currentTarget.innerHTML || "";
-                              if (html !== nestedBlock.content) {
-                                updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
-                              }
-                            }}
-                            onKeyDown={(e) => handleKeyDown(e, nestedBlock)}
-                            className="outline-none text-2xl font-bold empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
-                            data-placeholder="Heading 1"
-                          />
-                        )}
-                        <button
-                          onClick={() => {
-                            const newColumns = [...(block.columns || [])];
-                            newColumns[colIndex] = newColumns[colIndex].filter((_, idx) => idx !== blockIndex);
-                            updateBlock(block.id, { columns: newColumns });
-                          }}
-                          className="absolute top-0 right-0 opacity-0 group-hover/nested:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity"
-                          title="Delete"
-                        >
-                          <X className="w-3 h-3 text-destructive" />
-                        </button>
-                      </div>
-                    ))}
+                            className="absolute top-0 right-0 opacity-0 group-hover/nested:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity"
+                            title="Delete"
+                          >
+                            <X className="w-3 h-3 text-destructive" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => {
+                        const newColumns = [...(block.columns || [])];
+                        newColumns[colIndex].push({ id: crypto.randomUUID(), type: "text", content: "" });
+                        updateBlock(block.id, { columns: newColumns });
+                      }}
+                      className="mt-2 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
+                    >
+                      + Add content
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      const newColumns = [...(block.columns || [])];
-                      newColumns[colIndex].push({ id: crypto.randomUUID(), type: "text", content: "" });
-                      updateBlock(block.id, { columns: newColumns });
-                    }}
-                    className="mt-2 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
-                  >
-                    + Add content
-                  </button>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        );
+          );
 
-      case "table":
-        return (
-          <DataTable
-            block={block}
-            onUpdate={(updates) => updateBlock(block.id, updates)}
-            onCreateChart={(tableId, columnNames) => {
-              // Add a new chart block after this table block
-              const index = blocks.findIndex((b) => b.id === block.id);
-              const tableData = block.tableData || [];
-
-              // Convert table data to chart format
-              const chartRows = tableData.slice(1).map((row) => ({
-                id: crypto.randomUUID(),
-                cells: row.reduce((acc, cell, idx) => ({
-                  ...acc,
-                  [tableData[0][idx] || `col${idx}`]: isNaN(Number(cell)) ? cell : Number(cell),
-                }), {}),
-              }));
-
-              const chartColumns: { id: string; key: string; type: "text" | "number" }[] = tableData[0].map((name, idx) => ({
-                id: `col${idx}`,
-                key: name || `col${idx}`,
-                type: (/^\d+(\.\d+)?$/.test(tableData[1]?.[idx] || "") ? "number" : "text") as "text" | "number",
-              }));
-
-              const chartBlock: NoteBlock = {
-                id: crypto.randomUUID(),
-                type: "chart",
-                content: "Chart from Table",
-                chartType: "bar",
-                chartTitle: "My Chart",
-                chartColumns,
-                chartRows,
-                chartXAxisKey: chartColumns[0]?.id,
-                chartSelectedSeries: chartColumns.filter(c => c.type === "number").map(c => c.id),
-                chartSeriesColors: {},
-                linkedTableId: tableId, // Link back to source table
-              };
-              const newBlocks = [...blocks];
-              newBlocks.splice(index + 1, 0, chartBlock);
-              onChange(newBlocks);
-            }}
-          />
-        );
+          case "table":
+            return (
+              <DataTable
+                block={block}
+                onUpdate={(updates) => updateBlock(block.id, updates)}
+                onCreateChart={(tableId, columnNames) => {
+                  const index = blocks.findIndex((b) => b.id === block.id);
+                  const tableData = block.tableData || [];
+          
+                  // Helper to strip out all internal HTML elements cleanly
+                  const cleanText = (html: string) => {
+                    if (!html) return "";
+                    
+                    // Create a temporary element to let the browser natively decode entities like &nbsp;
+                    let txt = html;
+                    if (typeof window !== "undefined") {
+                      const parser = new DOMParser();
+                      const doc = parser.parseFromString(html, "text/html");
+                      txt = doc.body.textContent || doc.body.innerText || html;
+                    }
+                  
+                    // Sanitize formatting tags and line breaks
+                    txt = txt.replace(/<\/?(div|p)[^>]*>/gi, " ").replace(/<br\s*\/?>/gi, " ");
+                    txt = txt.replace(/<[^>]*>/g, "");
+                    
+                    // Normalize both standard spaces and unicode non-breaking spaces
+                    return txt.replace(/[\u00A0\s]+/g, " ").trim();
+                  };
+          
+                  // Clean headers cleanly so Recharts keys won't contain active HTML syntax
+                  const sanitizedHeaders = (tableData[0] || []).map((header, idx) => cleanText(header) || `col${idx}`);
+          
+                  // Convert table data to chart format with stripped content keys and numbers
+                  const chartRows = tableData.slice(1).map((row) => ({
+                    id: crypto.randomUUID(),
+                    cells: row.reduce((acc, cell, idx) => {
+                      const cleanedCell = cleanText(cell);
+                      const key = sanitizedHeaders[idx];
+                      return {
+                        ...acc,
+                        [key]: isNaN(Number(cleanedCell)) || cleanedCell === "" ? cleanedCell : Number(cleanedCell),
+                      };
+                    }, {}),
+                  }));
+          
+                  const chartColumns: { id: string; key: string; type: "text" | "number" }[] = sanitizedHeaders.map((name, idx) => {
+                    const firstRowValue = cleanText(tableData[1]?.[idx] || "");
+                    return {
+                      id: `col${idx}`,
+                      key: name,
+                      type: (/^\d+(\.\d+)?$/.test(firstRowValue) ? "number" : "text") as "text" | "number",
+                    };
+                  });
+          
+                  const chartBlock: NoteBlock = {
+                    id: crypto.randomUUID(),
+                    type: "chart",
+                    content: "Chart from Table",
+                    chartType: "bar",
+                    chartTitle: "My Chart",
+                    chartColumns,
+                    chartRows,
+                    chartXAxisKey: chartColumns[0]?.key, // Sync directly to the sanitized key string
+                    chartSelectedSeries: chartColumns.filter(c => c.type === "number").map(c => c.key),
+                    chartSeriesColors: {},
+                    linkedTableId: tableId,
+                  };
+                  const newBlocks = [...blocks];
+                  newBlocks.splice(index + 1, 0, chartBlock);
+                  onChange(newBlocks);
+                }}
+              />
+            );
 
       case "file":
         return (
@@ -2303,294 +2432,301 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
             }}
           />
         )}
-        {blocks.map((block) => {
+        {blocks.map((block,blockIndex) => {
           const isSelected = selectedBlockIds.has(block.id);
+          
           return (
-          <motion.div
-            key={`${block.id}-${block.type}`}
-            layout
-            data-block-id={block.id}
-            ref={(el) => { if (el) blockRefs.current.set(block.id, el); }}
-            initial={{ opacity: 0, y: -5 }}
-            animate={{
-              opacity: draggedBlockId === block.id ? 0.5 : 1,
-              y: 0,
-              scale: draggedBlockId === block.id ? 0.98 : 1,
-            }}
-            transition={{ duration: 0.15, type: "spring", stiffness: 300, damping: 30 }}
-            className={`group relative flex items-start gap-1 rounded-lg transition-all w-full min-w-0
-              ${draggedBlockId === block.id ? 'bg-primary/5 shadow-lg shadow-primary/20' : ''}
-              ${dragOverBlockId === block.id && draggedBlockId !== block.id ? 'border-t-2 border-primary/50 pt-1' : ''}
-              ${isSelected ? 'bg-primary/8 ring-1 ring-primary/30 ring-inset' : ''}
-            `}
-            onMouseEnter={() => {
-              setActiveBlockId(block.id);
-              if (draggedBlockId && draggedBlockId !== block.id) {
-                setDragOverBlockId(block.id);
-              }
-            }}
-            onMouseLeave={() => {
-              if (draggedBlockId !== block.id) {
-                setActiveBlockId(null);
-                if (dragOverBlockId === block.id) {
-                  setDragOverBlockId(null);
-                }
-              }
-            }}
-          >
-            {/* Block Controls */}
-            <motion.div
-              className={`hidden md:flex items-center gap-0.5 pt-1 transition-all shrink-0 duration-200 ${activeBlockId === block.id || isSelected ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
-                }`}
-            >
-              <motion.button
-                onClick={() => setShowMenu(showMenu === block.id ? null : block.id)}
-                className="p-1.5 rounded-lg hover:bg-muted transition-colors group/btn shrink-0"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <Plus className="w-4 h-4 text-muted-foreground group-hover/btn:text-primary transition-colors" />
-              </motion.button>
-              <motion.button
-                className="p-1.5 rounded-lg hover:bg-muted transition-colors cursor-grab active:cursor-grabbing shrink-0"
-                whileHover={{ scale: 1.1 }}
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  handleBlockDragStart(block.id, e.clientY);
+            <div key={block.id}>
+              <motion.div
+                key={`${block.id}-${block.type}`}
+                layout
+                data-block-id={block.id}
+                ref={(el) => { if (el) blockRefs.current.set(block.id, el); }}
+                initial={{ opacity: 0, y: -5 }}
+                animate={{
+                  opacity: draggedBlockId === block.id ? 0.5 : 1,
+                  y: 0,
+                  scale: draggedBlockId === block.id ? 0.98 : 1,
+                }}
+                transition={{ duration: 0.15, type: "spring", stiffness: 300, damping: 30 }}
+                className={`group relative flex items-start gap-1 rounded-lg transition-all w-full min-w-0
+                  ${draggedBlockId === block.id ? 'bg-primary/5 shadow-lg shadow-primary/20' : ''}
+                  ${dragOverBlockId === block.id && draggedBlockId !== block.id ? 'border-t-2 border-primary/50 pt-1' : ''}
+                  ${isSelected ? 'bg-primary/8 ring-1 ring-primary/30 ring-inset' : ''}
+                `}
+                onMouseEnter={() => {
+                  setActiveBlockId(block.id);
+                  if (draggedBlockId && draggedBlockId !== block.id) {
+                    setDragOverBlockId(block.id);
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (draggedBlockId !== block.id) {
+                    setActiveBlockId(null);
+                    if (dragOverBlockId === block.id) {
+                      setDragOverBlockId(null);
+                    }
+                  }
                 }}
               >
-                <GripVertical className="w-4 h-4 text-muted-foreground" />
-              </motion.button>
-            </motion.div>
-
-            {/* Block Content */}
-            <div className="flex-1 relative min-w-0">
-              {renderBlock(block)}
-
-              {/* Block Type Menu */}
-              <AnimatePresence>
-                {showMenu === block.id && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute left-0 top-full mt-2 z-50 bg-card border border-border rounded-xl shadow-2xl overflow-hidden min-w-70"
+                {/* Block Controls */}
+                <motion.div
+                  className={`hidden md:flex items-center gap-0.5 pt-1 transition-all shrink-0 duration-200 ${activeBlockId === block.id || isSelected ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-2'
+                    }`}
+                >
+                  <motion.button
+                    onClick={() => setShowMenu(showMenu === block.id ? null : block.id)}
+                    className="p-1.5 rounded-lg hover:bg-muted transition-colors group/btn shrink-0"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
                   >
-                    {/* Search Input */}
-                    <div className="p-2 border-b border-border">
-                      <input
-                        type="text"
-                        value={menuFilter}
-                        onChange={(e) => setMenuFilter(e.target.value)}
-                        placeholder="Filter blocks..."
-                        className="w-full px-3 py-2 text-sm bg-muted/50 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                        autoFocus
-                      />
-                    </div>
+                    <Plus className="w-4 h-4 text-muted-foreground group-hover/btn:text-primary transition-colors" />
+                  </motion.button>
+                  <motion.button
+                    className="p-1.5 rounded-lg hover:bg-muted transition-colors cursor-grab active:cursor-grabbing shrink-0"
+                    whileHover={{ scale: 1.1 }}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      handleBlockDragStart(block.id, e.clientY);
+                    }}
+                  >
+                    <GripVertical className="w-4 h-4 text-muted-foreground" />
+                  </motion.button>
+                </motion.div>
 
-                    <div className="p-1.5 max-h-87.5 overflow-y-auto scrollbar-thin">
-                      {/* Basic Blocks */}
-                      {filteredBlockTypes.filter(bt => bt.category === "basic").length > 0 && (
-                        <>
-                          <p className="px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-                            Basic
-                          </p>
-                          {filteredBlockTypes.filter(bt => bt.category === "basic").map((bt) => (
-                            <motion.button
-                              key={bt.type}
-                              onClick={() => {
-                                updateBlock(block.id, { type: bt.type, content: bt.type === "divider" ? "---" : block.content });
-                                setShowMenu(null);
-                                setMenuFilter("");
-                              }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-all text-left group/item"
-                              whileHover={{ x: 4 }}
-                            >
-                              <div className="p-2 rounded-lg bg-muted group-hover/item:bg-primary/10 transition-colors">
-                                <bt.icon className="w-4 h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
-                              </div>
-                              <div>
-                                <span className="text-sm font-medium block">{bt.label}</span>
-                                <span className="text-xs text-muted-foreground">{bt.description}</span>
-                              </div>
-                            </motion.button>
-                          ))}
-                        </>
-                      )}
+                {/* Block Content */}
+                <div className="flex-1 relative min-w-0">
+                  {renderBlock(block)}
 
-                      {/* Lists */}
-                      {filteredBlockTypes.filter(bt => bt.category === "lists").length > 0 && (
-                        <>
-                          <p className="px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider mt-2">
-                            Lists
-                          </p>
-                          {filteredBlockTypes.filter(bt => bt.category === "lists").map((bt) => (
-                            <motion.button
-                              key={bt.type}
-                              onClick={() => {
-                                updateBlock(block.id, {
-                                  type: bt.type,
-                                  content: block.content,
-                                  isExpanded: bt.type === "toggle" ? true : undefined,
-                                  toggleContent: bt.type === "toggle" ? "" : undefined,
-                                });
-                                setShowMenu(null);
-                                setMenuFilter("");
-                              }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-all text-left group/item"
-                              whileHover={{ x: 4 }}
-                            >
-                              <div className="p-2 rounded-lg bg-muted group-hover/item:bg-primary/10 transition-colors">
-                                <bt.icon className="w-4 h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
-                              </div>
-                              <div>
-                                <span className="text-sm font-medium block">{bt.label}</span>
-                                <span className="text-xs text-muted-foreground">{bt.description}</span>
-                              </div>
-                            </motion.button>
-                          ))}
-                        </>
-                      )}
-
-                      {/* Media & Embeds */}
-                      {filteredBlockTypes.filter(bt => bt.category === "media").length > 0 && (
-                        <>
-                          <p className="px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider mt-2">
-                            Media & Embeds
-                          </p>
-                          {filteredBlockTypes.filter(bt => bt.category === "media").map((bt) => (
-                            <motion.button
-                              key={bt.type}
-                              onClick={() => {
-                                const baseUpdate: Partial<NoteBlock> = { type: bt.type, content: "" };
-                                if (bt.type === "gallery") {
-                                  baseUpdate.galleryImages = [];
-                                } else if (bt.type === "imageText") {
-                                  baseUpdate.imageTextUrl = "";
-                                  baseUpdate.imageTextTitle = "";
-                                  baseUpdate.imageTextDescription = "";
-                                  baseUpdate.imageTextLayout = "imageLeft";
-                                }
-                                updateBlock(block.id, baseUpdate);
-                                setShowMenu(null);
-                                setMenuFilter("");
-                              }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-all text-left group/item"
-                              whileHover={{ x: 4 }}
-                            >
-                              <div className="p-2 rounded-lg bg-muted group-hover/item:bg-primary/10 transition-colors">
-                                <bt.icon className="w-4 h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
-                              </div>
-                              <div>
-                                <span className="text-sm font-medium block">{bt.label}</span>
-                                <span className="text-xs text-muted-foreground">{bt.description}</span>
-                              </div>
-                            </motion.button>
-                          ))}
-                        </>
-                      )}
-
-                      {/* Advanced */}
-                      {filteredBlockTypes.filter(bt => bt.category === "advanced").length > 0 && (
-                        <>
-                          <p className="px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider mt-2">
-                            Advanced
-                          </p>
-                          {filteredBlockTypes.filter(bt => bt.category === "advanced").map((bt) => (
-                            <motion.button
-                              key={bt.type}
-                              onClick={() => {
-                                const baseUpdate: Partial<NoteBlock> = { type: bt.type, content: "" };
-
-                                // Set default values for each advanced block type
-                                if (bt.type === "table") {
-                                  baseUpdate.tableData = [["", "", ""], ["", "", ""], ["", "", ""]];
-                                } else if (bt.type === "progress") {
-                                  baseUpdate.progressValue = 50;
-                                  baseUpdate.progressColor = "bg-blue-500";
-                                } else if (bt.type === "columns") {
-                                  baseUpdate.columns = [[{ id: crypto.randomUUID(), type: "text", content: "" }], [{ id: crypto.randomUUID(), type: "text", content: "" }]];
-                                  baseUpdate.columnTitles = ["Column 1", "Column 2"];
-                                } else if (bt.type === "timeline") {
-                                  baseUpdate.timelineItems = [{ id: crypto.randomUUID(), title: "Milestone 1", description: "Description", date: new Date().toISOString().split('T')[0], color: "bg-blue-500" }];
-                                } else if (bt.type === "kanban") {
-                                  baseUpdate.kanbanColumns = [
-                                    { id: crypto.randomUUID(), title: "To Do", cards: [{ id: crypto.randomUUID(), content: "New task" }] },
-                                    { id: crypto.randomUUID(), title: "In Progress", cards: [] },
-                                    { id: crypto.randomUUID(), title: "Done", cards: [] }
-                                  ];
-                                } else if (bt.type === "rating") {
-                                  baseUpdate.ratingValue = 3;
-                                  baseUpdate.ratingMax = 5;
-                                } else if (bt.type === "countdown") {
-                                  baseUpdate.countdownDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                                  baseUpdate.countdownTitle = "Countdown";
-                                } else if (bt.type === "database") {
-                                  baseUpdate.databaseRows = [{ id: crypto.randomUUID(), cells: { name: "", status: "", date: "" } }];
-                                  baseUpdate.databaseColumns = [
-                                    { id: "name", name: "Name", type: "text" },
-                                    { id: "status", name: "Status", type: "select" },
-                                    { id: "date", name: "Date", type: "date" }
-                                  ];
-                                } else if (bt.type === "mindmap") {
-                                  baseUpdate.mindMapNodes = [{ id: crypto.randomUUID(), text: "Central Idea", x: 150, y: 150, color: "bg-blue-500" }];
-                                  baseUpdate.mindMapConnections = [];
-                                } else if (bt.type === "flashcard") {
-                                  baseUpdate.flashcards = [];
-                                  baseUpdate.content = "Flashcards";
-                                } else if (bt.type === "swot") {
-                                  baseUpdate.swotStrengths = [""];
-                                  baseUpdate.swotWeaknesses = [""];
-                                  baseUpdate.swotOpportunities = [""];
-                                  baseUpdate.swotThreats = [""];
-                                }
-
-                                updateBlock(block.id, baseUpdate);
-                                setShowMenu(null);
-                                setMenuFilter("");
-                              }}
-                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-all text-left group/item"
-                              whileHover={{ x: 4 }}
-                            >
-                              <div className="p-2 rounded-lg bg-muted group-hover/item:bg-primary/10 transition-colors">
-                                <bt.icon className="w-4 h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
-                              </div>
-                              <div>
-                                <span className="text-sm font-medium block">{bt.label}</span>
-                                <span className="text-xs text-muted-foreground">{bt.description}</span>
-                              </div>
-                            </motion.button>
-                          ))}
-                        </>
-                      )}
-
-                      {filteredBlockTypes.length === 0 && (
-                        <p className="px-3 py-4 text-sm text-muted-foreground text-center">
-                          No blocks found
-                        </p>
-                      )}
-
-                      <div className="border-t border-border my-1.5" />
-                      <motion.button
-                        onClick={() => deleteBlock(block.id)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-destructive/10 transition-all text-left group/delete"
-                        whileHover={{ x: 4 }}
+                  {/* Block Type Menu */}
+                  <AnimatePresence>
+                    {showMenu === block.id && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute left-0 top-full mt-2 z-50 bg-card border border-border rounded-xl shadow-2xl overflow-hidden min-w-70"
                       >
-                        <div className="p-2 rounded-lg bg-destructive/10">
-                          <Trash2 className="w-4 h-4 text-destructive" />
+                        {/* Search Input */}
+                        <div className="p-2 border-b border-border">
+                          <input
+                            type="text"
+                            value={menuFilter}
+                            onChange={(e) => setMenuFilter(e.target.value)}
+                            placeholder="Filter blocks..."
+                            className="w-full px-3 py-2 text-sm bg-muted/50 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                            autoFocus
+                          />
                         </div>
-                        <div>
-                          <span className="text-sm font-medium text-destructive block">Delete</span>
-                          <span className="text-xs text-destructive/60">Remove this block</span>
+
+                        <div className="p-1.5 max-h-87.5 overflow-y-auto scrollbar-thin">
+                          {/* Basic Blocks */}
+                          {filteredBlockTypes.filter(bt => bt.category === "basic").length > 0 && (
+                            <>
+                              <p className="px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider">
+                                Basic
+                              </p>
+                              {filteredBlockTypes.filter(bt => bt.category === "basic").map((bt) => (
+                                <motion.button
+                                  key={bt.type}
+                                  onClick={() => {
+                                    updateBlock(block.id, { type: bt.type, content: bt.type === "divider" ? "---" : block.content });
+                                    setShowMenu(null);
+                                    setMenuFilter("");
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-all text-left group/item"
+                                  whileHover={{ x: 4 }}
+                                >
+                                  <div className="p-2 rounded-lg bg-muted group-hover/item:bg-primary/10 transition-colors">
+                                    <bt.icon className="w-4 h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                                  </div>
+                                  <div>
+                                    <span className="text-sm font-medium block">{bt.label}</span>
+                                    <span className="text-xs text-muted-foreground">{bt.description}</span>
+                                  </div>
+                                </motion.button>
+                              ))}
+                            </>
+                          )}
+
+                          {/* Lists */}
+                          {filteredBlockTypes.filter(bt => bt.category === "lists").length > 0 && (
+                            <>
+                              <p className="px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider mt-2">
+                                Lists
+                              </p>
+                              {filteredBlockTypes.filter(bt => bt.category === "lists").map((bt) => (
+                                <motion.button
+                                  key={bt.type}
+                                  onClick={() => {
+                                    updateBlock(block.id, {
+                                      type: bt.type,
+                                      content: block.content,
+                                      isExpanded: bt.type === "toggle" ? true : undefined,
+                                      toggleContent: bt.type === "toggle" ? "" : undefined,
+                                    });
+                                    setShowMenu(null);
+                                    setMenuFilter("");
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-all text-left group/item"
+                                  whileHover={{ x: 4 }}
+                                >
+                                  <div className="p-2 rounded-lg bg-muted group-hover/item:bg-primary/10 transition-colors">
+                                    <bt.icon className="w-4 h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                                  </div>
+                                  <div>
+                                    <span className="text-sm font-medium block">{bt.label}</span>
+                                    <span className="text-xs text-muted-foreground">{bt.description}</span>
+                                  </div>
+                                </motion.button>
+                              ))}
+                            </>
+                          )}
+
+                          {/* Media & Embeds */}
+                          {filteredBlockTypes.filter(bt => bt.category === "media").length > 0 && (
+                            <>
+                              <p className="px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider mt-2">
+                                Media & Embeds
+                              </p>
+                              {filteredBlockTypes.filter(bt => bt.category === "media").map((bt) => (
+                                <motion.button
+                                  key={bt.type}
+                                  onClick={() => {
+                                    const baseUpdate: Partial<NoteBlock> = { type: bt.type, content: "" };
+                                    if (bt.type === "gallery") {
+                                      baseUpdate.galleryImages = [];
+                                    } else if (bt.type === "imageText") {
+                                      baseUpdate.imageTextUrl = "";
+                                      baseUpdate.imageTextTitle = "";
+                                      baseUpdate.imageTextDescription = "";
+                                      baseUpdate.imageTextLayout = "imageLeft";
+                                    }
+                                    updateBlock(block.id, baseUpdate);
+                                    setShowMenu(null);
+                                    setMenuFilter("");
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-all text-left group/item"
+                                  whileHover={{ x: 4 }}
+                                >
+                                  <div className="p-2 rounded-lg bg-muted group-hover/item:bg-primary/10 transition-colors">
+                                    <bt.icon className="w-4 h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                                  </div>
+                                  <div>
+                                    <span className="text-sm font-medium block">{bt.label}</span>
+                                    <span className="text-xs text-muted-foreground">{bt.description}</span>
+                                  </div>
+                                </motion.button>
+                              ))}
+                            </>
+                          )}
+
+                          {/* Advanced */}
+                          {filteredBlockTypes.filter(bt => bt.category === "advanced").length > 0 && (
+                            <>
+                              <p className="px-3 py-2 text-xs text-muted-foreground font-semibold uppercase tracking-wider mt-2">
+                                Advanced
+                              </p>
+                              {filteredBlockTypes.filter(bt => bt.category === "advanced").map((bt) => (
+                                <motion.button
+                                  key={bt.type}
+                                  onClick={() => {
+                                    const baseUpdate: Partial<NoteBlock> = { type: bt.type, content: "" };
+
+                                    // Set default values for each advanced block type
+                                    if (bt.type === "table") {
+                                      baseUpdate.tableData = [["", "", ""], ["", "", ""], ["", "", ""]];
+                                    } else if (bt.type === "progress") {
+                                      baseUpdate.progressValue = 50;
+                                      baseUpdate.progressColor = "bg-blue-500";
+                                    } else if (bt.type === "columns") {
+                                      baseUpdate.columns = [[{ id: crypto.randomUUID(), type: "text", content: "" }], [{ id: crypto.randomUUID(), type: "text", content: "" }]];
+                                      baseUpdate.columnTitles = ["Column 1", "Column 2"];
+                                    } else if (bt.type === "timeline") {
+                                      baseUpdate.timelineItems = [{ id: crypto.randomUUID(), title: "Milestone 1", description: "Description", date: new Date().toISOString().split('T')[0], color: "bg-blue-500" }];
+                                    } else if (bt.type === "kanban") {
+                                      baseUpdate.kanbanColumns = [
+                                        { id: crypto.randomUUID(), title: "To Do", cards: [{ id: crypto.randomUUID(), content: "New task" }] },
+                                        { id: crypto.randomUUID(), title: "In Progress", cards: [] },
+                                        { id: crypto.randomUUID(), title: "Done", cards: [] }
+                                      ];
+                                    } else if (bt.type === "rating") {
+                                      baseUpdate.ratingValue = 3;
+                                      baseUpdate.ratingMax = 5;
+                                    } else if (bt.type === "countdown") {
+                                      baseUpdate.countdownDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                                      baseUpdate.countdownTitle = "Countdown";
+                                    } else if (bt.type === "database") {
+                                      baseUpdate.databaseRows = [{ id: crypto.randomUUID(), cells: { name: "", status: "", date: "" } }];
+                                      baseUpdate.databaseColumns = [
+                                        { id: "name", name: "Name", type: "text" },
+                                        { id: "status", name: "Status", type: "select" },
+                                        { id: "date", name: "Date", type: "date" }
+                                      ];
+                                    } else if (bt.type === "mindmap") {
+                                      baseUpdate.mindMapNodes = [{ id: crypto.randomUUID(), text: "Central Idea", x: 150, y: 150, color: "bg-blue-500" }];
+                                      baseUpdate.mindMapConnections = [];
+                                    } else if (bt.type === "flashcard") {
+                                      baseUpdate.flashcards = [];
+                                      baseUpdate.content = "Flashcards";
+                                    } else if (bt.type === "swot") {
+                                      baseUpdate.swotStrengths = [""];
+                                      baseUpdate.swotWeaknesses = [""];
+                                      baseUpdate.swotOpportunities = [""];
+                                      baseUpdate.swotThreats = [""];
+                                    }
+
+                                    updateBlock(block.id, baseUpdate);
+                                    setShowMenu(null);
+                                    setMenuFilter("");
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted transition-all text-left group/item"
+                                  whileHover={{ x: 4 }}
+                                >
+                                  <div className="p-2 rounded-lg bg-muted group-hover/item:bg-primary/10 transition-colors">
+                                    <bt.icon className="w-4 h-4 text-muted-foreground group-hover/item:text-primary transition-colors" />
+                                  </div>
+                                  <div>
+                                    <span className="text-sm font-medium block">{bt.label}</span>
+                                    <span className="text-xs text-muted-foreground">{bt.description}</span>
+                                  </div>
+                                </motion.button>
+                              ))}
+                            </>
+                          )}
+
+                          {filteredBlockTypes.length === 0 && (
+                            <p className="px-3 py-4 text-sm text-muted-foreground text-center">
+                              No blocks found
+                            </p>
+                          )}
+
+                          <div className="border-t border-border my-1.5" />
+                          <motion.button
+                            onClick={() => deleteBlock(block.id)}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-destructive/10 transition-all text-left group/delete"
+                            whileHover={{ x: 4 }}
+                          >
+                            <div className="p-2 rounded-lg bg-destructive/10">
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-destructive block">Delete</span>
+                              <span className="text-xs text-destructive/60">Remove this block</span>
+                            </div>
+                          </motion.button>
                         </div>
-                      </motion.button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+              {/* Inline inserter between blocks */}
+              {blockIndex < blocks.length - 1 && (
+                <InlineInserter onInsert={() => addBlockAfter(block.id, "text")} />
+              )}
             </div>
-          </motion.div>
           );
         })}
 

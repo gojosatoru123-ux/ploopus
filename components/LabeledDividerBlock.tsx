@@ -81,18 +81,31 @@ const LabeledDividerBlock = ({ label, style, onUpdate }: LabeledDividerBlockProp
     };
 
     return (
-        <div className="py-4 group">
-            <div className="flex items-center gap-3">
+        <div className="py-4 group w-full overflow-hidden select-none">
+            {/* flex-nowrap ensures items never wrap or push past the viewport bounds */}
+            <div className="flex items-center gap-1.5 sm:gap-3 w-full overflow-hidden flex-nowrap">
                 {renderLine("left")}
-                {renderDecoration()}
-                <input
-                    value={label}
-                    onChange={(e) => onUpdate({ dividerLabel: e.target.value })}
-                    className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/60 bg-transparent border-none outline-none text-center min-w-10 max-w-50 placeholder:text-muted-foreground/30"
-                    placeholder="LABEL"
-                    style={{ width: Math.max(40, label.length * 9) }}
-                />
-                {renderDecoration()}
+
+                {/* flex-shrink-0 prevents icons from being pushed off-screen and creating scrollbars */}
+                <div className="shrink-0">{renderDecoration()}</div>
+
+                {/* Locked responsive wrapper using viewport percentage constraint */}
+                <div className="inline-grid items-center justify-items-center relative min-w-10 max-w-[45vw] sm:max-w-[60vw] md:max-w-md overflow-hidden shrink-0">
+                    {/* Invisible text mirror dictating the exact dynamic layout width */}
+                    <span className="text-xs font-semibold uppercase tracking-[0.2em] px-1 invisible col-start-1 row-start-1 whitespace-pre truncate w-full text-center">
+                        {label || "LABEL"}
+                    </span>
+
+                    {/* w-0 min-w-full bypasses default mobile browser input width bugs entirely */}
+                    <input
+                        value={label}
+                        onChange={(e) => onUpdate({ dividerLabel: e.target.value })}
+                        className="w-0 min-w-full text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground/60 bg-transparent border-none outline-none text-center placeholder:text-muted-foreground/30 px-1 col-start-1 row-start-1 "
+                        placeholder="LABEL"
+                    />
+                </div>
+
+                <div className="shrink-0">{renderDecoration()}</div>
                 {renderLine("right")}
             </div>
 

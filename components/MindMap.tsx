@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   Plus, X, Palette, 
   ZoomIn, ZoomOut, RotateCcw, Square, Diamond, Circle,
@@ -69,6 +69,10 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [hoveredConnection, setHoveredConnection] = useState<string | null>(null);
+  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(null);
+  const [labelInputValue, setLabelInputValue] = useState("");
+  const [labelPopoverPos, setLabelPopoverPos] = useState({ x: 0, y: 0 });
+  const labelInputRef = useRef<HTMLInputElement>(null);
 
   const minZoom = 0.25;
   const maxZoom = 2;
@@ -83,6 +87,19 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
     if (onTitleChange && editableTitle.trim()) {
       onTitleChange(editableTitle.trim());
     }
+  };
+
+  const submitLabel = () => {
+    if (editingConnectionId) {
+      updateConnection(editingConnectionId, { label: labelInputValue.trim() });
+    }
+    setEditingConnectionId(null);
+    setLabelInputValue("");
+  };
+
+  const closeLabel = () => {
+    setEditingConnectionId(null);
+    setLabelInputValue("");
   };
 
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + zoomStep, maxZoom));
@@ -262,7 +279,8 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
 
   const handleMouseDown = (e: React.MouseEvent, nodeId: string) => {
     if (e.button !== 0) return;
-    e.stopPropagation();
+    e.stopPropagation(); // prevent editor drag-select from starting
+    e.preventDefault();  // prevent text selection during node drag
     
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;
@@ -276,51 +294,91 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
       return;
     }
     
+    draggingNodeRef.current = nodeId;
     setDraggingNode(nodeId);
     setShowColorPicker(null);
     setShowShapePicker(null);
     
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) {
-      setOffset({
+      const off = {
         x: e.clientX - rect.left - node.x * zoom - pan.x,
-        y: e.clientY - rect.top - node.y * zoom - pan.y,
-      });
+        y: e.clientY - rect.top  - node.y * zoom - pan.y,
+      };
+      offsetRef.current = off;
+      setOffset(off);
     }
   };
+
+
+  // ── Ref-based drag state ─────────────────────────────────────────────────────
+  // Using refs prevents stale closures in event handlers and ensures the
+  // editor's global drag-select listener never interferes with MindMap dragging.
+  const draggingNodeRef = useRef<string | null>(null);
+  const isPanningRef    = useRef(false);
+  const offsetRef       = useRef({ x: 0, y: 0 });
+  const panStartRef     = useRef({ x: 0, y: 0 });
+  const panRef          = useRef(pan);
+  const zoomRef         = useRef(zoom);
+  useEffect(() => { panRef.current  = pan;  }, [pan]);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) {
       setMousePos({
-        x: (e.clientX - rect.left - pan.x) / zoom,
-        y: (e.clientY - rect.top - pan.y) / zoom,
+        x: (e.clientX - rect.left - panRef.current.x) / zoomRef.current,
+        y: (e.clientY - rect.top  - panRef.current.y) / zoomRef.current,
       });
     }
-
-    if (draggingNode) {
+    if (draggingNodeRef.current) {
       if (!rect) return;
-      const newX = (e.clientX - rect.left - offset.x - pan.x) / zoom;
-      const newY = (e.clientY - rect.top - offset.y - pan.y) / zoom;
-      updateNode(draggingNode, { x: newX, y: newY });
-    } else if (isPanning) {
-      setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+      const newX = (e.clientX - rect.left - offsetRef.current.x - panRef.current.x) / zoomRef.current;
+      const newY = (e.clientY - rect.top  - offsetRef.current.y - panRef.current.y) / zoomRef.current;
+      updateNode(draggingNodeRef.current, { x: newX, y: newY });
+    } else if (isPanningRef.current) {
+      setPan({ x: e.clientX - panStartRef.current.x, y: e.clientY - panStartRef.current.y });
     }
-  }, [draggingNode, offset, updateNode, isPanning, panStart, zoom, pan]);
+  }, [updateNode]);
 
   const handleMouseUp = useCallback(() => {
+    draggingNodeRef.current = null;
+    isPanningRef.current    = false;
     setDraggingNode(null);
     setIsPanning(false);
   }, []);
 
+  useEffect(() => {
+    // Attach mousemove to the container (not window) so the editor's
+    // window-level drag-select listener never sees MindMap pointer events.
+    // mouseup goes to both container AND window so releasing outside still cleans up.
+    const container = containerRef.current;
+    if (!container) return;
+    container.addEventListener("mousemove", handleMouseMove);
+    container.addEventListener("mouseup",   handleMouseUp);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      container.removeEventListener("mousemove", handleMouseMove);
+      container.removeEventListener("mouseup",   handleMouseUp);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [handleMouseMove, handleMouseUp]);
+
   const handleContainerMouseDown = (e: React.MouseEvent) => {
+    // Dismiss label popover on any canvas click
+    if (editingConnectionId) {
+      setEditingConnectionId(null);
+      setLabelInputValue("");
+    }
+    // Stop this event from reaching the editor's document-level drag-select listener.
+    e.stopPropagation();
+
     const target = e.target as HTMLElement;
-    // Allow panning on canvas background (svg or canvas container)
-    const isCanvasArea = target === containerRef.current || 
+    const isCanvasArea = target === containerRef.current ||
       target.classList.contains('mindmap-canvas') ||
       target.tagName === 'svg' ||
-      target.closest('svg');
-    
+      !!target.closest('svg');
+
     if (isCanvasArea && !target.closest('.mindmap-node-wrapper')) {
       setShowColorPicker(null);
       setShowShapePicker(null);
@@ -329,19 +387,13 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
         setConnectingFromHandle(null);
         return;
       }
+      const ps = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+      panStartRef.current  = ps;
+      isPanningRef.current = true;
+      setPanStart(ps);
       setIsPanning(true);
-      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
     }
   };
-
-  useEffect(() => {
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [handleMouseMove, handleMouseUp]);
 
   const handleNodeDoubleClick = (e: React.MouseEvent, nodeId: string) => {
     e.stopPropagation();
@@ -427,9 +479,16 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                const next = window.prompt("Connection label", labelText);
-                if (next === null) return;
-                updateConnection(conn.id, { label: next.trim() });
+                // Convert SVG canvas coordinates → screen coordinates
+                const rect = containerRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const screenX = labelPos.x * zoom + pan.x + rect.left;
+                const screenY = labelPos.y * zoom + pan.y + rect.top;
+                setLabelPopoverPos({ x: screenX, y: screenY });
+                setLabelInputValue(labelText);
+                setEditingConnectionId(conn.id);
+                // Focus input on next tick
+                setTimeout(() => labelInputRef.current?.focus(), 30);
               }}
             >
               <rect
@@ -851,6 +910,7 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
       <div 
         ref={containerRef} 
         onMouseDown={handleContainerMouseDown}
+        data-no-drag-select
         className={`mindmap-canvas relative flex-1 rounded-xl border border-border overflow-hidden ${
           isPanning ? 'cursor-grabbing' : draggingNode ? 'cursor-move' : 'cursor-grab'
         } ${connectingFrom ? 'cursor-crosshair' : ''}`}
@@ -955,6 +1015,79 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
         <span className="text-muted-foreground/60">•</span>
         <span className="text-muted-foreground/60">Drag canvas to pan • Ctrl+scroll to zoom</span>
       </div>
+
+      {/* Custom label editor popover — fixed-positioned so it escapes any overflow:hidden */}
+      <AnimatePresence>
+        {editingConnectionId && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.95 }}
+            transition={{ duration: 0.15 }}
+            data-no-drag-select
+            onMouseDown={(e) => e.stopPropagation()}
+            className="fixed z-9999 w-68 rounded-xl border border-border bg-card shadow-2xl p-3"
+            style={{
+              left: Math.min(labelPopoverPos.x - 136, window.innerWidth - 288),
+              top:  labelPopoverPos.y + 14,
+            }}
+          >
+            <p className="text-xs text-muted-foreground mb-2 font-semibold uppercase tracking-wide">
+              Connection label
+            </p>
+
+            {/* Input row */}
+            <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 border border-border focus-within:border-primary transition-colors">
+              <svg className="w-3.5 h-3.5 text-muted-foreground shrink-0" fill="none" viewBox="0 0 16 16">
+                <path d="M2 8h12M8 2l4 6-4 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <input
+                ref={labelInputRef}
+                type="text"
+                value={labelInputValue}
+                onChange={(e) => setLabelInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter")  { e.preventDefault(); submitLabel(); }
+                  if (e.key === "Escape") { e.preventDefault(); closeLabel(); }
+                  e.stopPropagation(); // keep editor shortcuts from firing
+                }}
+                className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50"
+                placeholder="Label text…"
+              />
+              {labelInputValue && (
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => setLabelInputValue("")}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 mt-2.5">
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={closeLabel}
+                className="flex-1 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={submitLabel}
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16">
+                  <polyline points="2,8 6,12 14,4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Apply
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

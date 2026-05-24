@@ -180,6 +180,7 @@ const ChartBlock = ({
   const textColumns = columns.filter((c) => c.type === "text");
 
   // Sync data from linked table
+  // Sync data from linked table
   const handleSyncFromTable = () => {
     if (!linkedTableId || !blocks) return;
 
@@ -189,24 +190,55 @@ const ChartBlock = ({
 
     const tableData = tableBlock.tableData;
 
-    // Convert table data to chart format (same logic as in NotionEditor)
+    // Helper method to strip rendering markup tokens
+    const cleanText = (html: string) => {
+      if (!html) return "";
+      
+      let txt = html;
+      if (typeof window !== "undefined") {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        txt = doc.body.textContent || doc.body.innerText || html;
+      }
+    
+      txt = txt.replace(/<\/?(div|p)[^>]*>/gi, " ").replace(/<br\s*\/?>/gi, " ");
+      txt = txt.replace(/<[^>]*>/g, "");
+      
+      return txt.replace(/[\u00A0\s]+/g, " ").trim();
+    };
+
+    // Clean structural headers
+    const sanitizedHeaders = (tableData[0] || []).map((header, idx) => cleanText(header) || `col${idx}`);
+
+    // Convert table data to chart format safely
     const newChartRows = tableData.slice(1).map((row) => ({
       id: crypto.randomUUID(),
-      cells: row.reduce((acc, cell, idx) => ({
-        ...acc,
-        [tableData[0][idx] || `col${idx}`]: isNaN(Number(cell)) ? cell : Number(cell),
-      }), {}),
+      cells: row.reduce((acc, cell, idx) => {
+        const cleanedCell = cleanText(cell);
+        const key = sanitizedHeaders[idx];
+        return {
+          ...acc,
+          [key]: isNaN(Number(cleanedCell)) || cleanedCell === "" ? cleanedCell : Number(cleanedCell),
+        };
+      }, {}),
     }));
 
-    const newChartColumns = tableData[0].map((name, idx) => ({
-      id: `col${idx}`,
-      key: name || `col${idx}`,
-      type: /^\d+(\.\d+)?$/.test(tableData[1]?.[idx] || "") ? "number" as const : "text" as const,
-    }));
+    const newChartColumns = sanitizedHeaders.map((name, idx) => {
+      const firstRowValue = cleanText(tableData[1]?.[idx] || "");
+      return {
+        id: `col${idx}`,
+        key: name,
+        type: (/^\d+(\.\d+)?$/.test(firstRowValue) ? "number" as const : "text" as const),
+      };
+    });
 
-    // Update the chart
+    // Update the chart state structures safely
     setColumns(newChartColumns);
     setRows(newChartRows);
+
+    // Determine fallback keys if previous ones are invalidated
+    const newXAxis = newChartColumns.find((c) => c.type === "text")?.key || newChartColumns[0]?.key || "name";
+    setXAxisKey(newXAxis);
 
     // Update series colors for new columns
     const newColors: { [key: string]: string } = {};
@@ -223,6 +255,7 @@ const ChartBlock = ({
     onUpdate({
       chartColumns: newChartColumns,
       chartRows: newChartRows,
+      chartXAxisKey: newXAxis,
       chartSeriesColors: newColors,
       chartSelectedSeries: newSelectedSeries,
     });
@@ -426,19 +459,45 @@ const ChartBlock = ({
           </ResponsiveContainer>
         );
 
-      case "scatter":
-        return (
-          <ResponsiveContainer width="100%" height={280}>
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey={activeSeries[0] || "value"} type="number" name={activeSeries[0]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis dataKey={activeSeries[1] || activeSeries[0] || "value"} type="number" name={activeSeries[1] || activeSeries[0]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip cursor={{ strokeDasharray: "3 3" }} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
-              <Legend />
-              <Scatter name="Data" data={data} fill={seriesColors[activeSeries[0]] || defaultColors[0]} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        );
+        case "scatter":
+          return (
+            <ResponsiveContainer width="100%" height={280}>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                {/* Force numerical evaluation for coordinate mappings */}
+                <XAxis 
+                  type="number" 
+                  dataKey={activeSeries[0] || "value"} 
+                  name={activeSeries[0] || "X Axis"} 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={12}
+                  label={{ value: activeSeries[0], position: 'insideBottom', offset: -10, fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                />
+                <YAxis 
+                  type="number" 
+                  dataKey={activeSeries[1] || activeSeries[0] || "value"} 
+                  name={activeSeries[1] || activeSeries[0] || "Y Axis"} 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={12}
+                  label={{ value: activeSeries[1] || activeSeries[0], angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                />
+                <Tooltip 
+                  cursor={{ strokeDasharray: "3 3" }} 
+                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                />
+                <Legend />
+                {/* Dynamic rendering: Loop through rows to treat each line item as its own distinct colored, labeled point */}
+                {data.map((row, index) => (
+                  <Scatter
+                    key={row.id || index}
+                    name={String(row[xAxisKey] || `Point ${index + 1}`)}
+                    data={[row]}
+                    fill={defaultColors[index % defaultColors.length]}
+                  />
+                ))}
+              </ScatterChart>
+            </ResponsiveContainer>
+          );
 
       case "radar":
         return (
@@ -598,19 +657,43 @@ const ChartBlock = ({
           </ResponsiveContainer>
         );
 
-      case "scatter":
-        return (
-          <ResponsiveContainer width="100%" height={enlargedHeight}>
-            <ScatterChart>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey={activeSeries[0] || "value"} type="number" name={activeSeries[0]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <YAxis dataKey={activeSeries[1] || activeSeries[0] || "value"} type="number" name={activeSeries[1] || activeSeries[0]} stroke="hsl(var(--muted-foreground))" fontSize={12} />
-              <Tooltip cursor={{ strokeDasharray: "3 3" }} contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }} />
-              <Legend />
-              <Scatter name="Data" data={data} fill={seriesColors[activeSeries[0]] || defaultColors[0]} />
-            </ScatterChart>
-          </ResponsiveContainer>
-        );
+        case "scatter":
+          return (
+            <ResponsiveContainer width="100%" height={enlargedHeight}>
+              <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis 
+                  type="number" 
+                  dataKey={activeSeries[0] || "value"} 
+                  name={activeSeries[0] || "X Axis"} 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={12}
+                  label={{ value: activeSeries[0], position: 'insideBottom', offset: -10, fill: 'hsl(var(--muted-foreground))', fontSize: 14 }}
+                />
+                <YAxis 
+                  type="number" 
+                  dataKey={activeSeries[1] || activeSeries[0] || "value"} 
+                  name={activeSeries[1] || activeSeries[0] || "Y Axis"} 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={12}
+                  label={{ value: activeSeries[1] || activeSeries[0], angle: -90, position: 'insideLeft', fill: 'hsl(var(--muted-foreground))', fontSize: 14 }}
+                />
+                <Tooltip 
+                  cursor={{ strokeDasharray: "3 3" }} 
+                  contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px" }}
+                />
+                <Legend />
+                {data.map((row, index) => (
+                  <Scatter
+                    key={row.id || index}
+                    name={String(row[xAxisKey] || `Point ${index + 1}`)}
+                    data={[row]}
+                    fill={defaultColors[index % defaultColors.length]}
+                  />
+                ))}
+              </ScatterChart>
+            </ResponsiveContainer>
+          );
 
       case "radar":
         return (
@@ -895,7 +978,7 @@ const ChartBlock = ({
 
       {/* Enlarged Chart Dialog */}
       <Dialog open={isEnlarged} onOpenChange={setIsEnlarged}>
-        <DialogContent className="max-w-5xl w-full p-6">
+        <DialogContent className="max-w-5xl! w-full p-6">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold">{chartTitle}</DialogTitle>
           </DialogHeader>
