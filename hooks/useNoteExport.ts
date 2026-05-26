@@ -6,7 +6,8 @@ export type ExportFormat = "markdown" | "text" | "html" | "pdf" | "json";
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
 const esc = (s = "") =>
-  s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  s.replace(/ /g, " ").replace(/&nbsp;/gi, " ")
+   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // ── Tailwind class → hex color ────────────────────────────────────────────────
 // The app stores colors as Tailwind class strings (e.g. "bg-blue-500", "sage", "gold")
@@ -131,9 +132,32 @@ const sanitizeTag = (tag: string): string => {
 const renderInline = (raw: string): string => {
   if (!raw) return "";
 
-  // Step 1 — Markdown inline patterns → HTML
+  // Step 0 — Normalize contentEditable structural HTML into \n line breaks.
+  //
+  // When the user presses Enter in a contentEditable div, browsers insert:
+  //   Chrome/Edge: <div>next line</div>  (or <div><br></div> for empty lines)
+  //   Firefox:     <br>
+  //   Safari:      <div>next line</div>
+  // An &nbsp; / \xa0 is inserted to prevent empty divs from collapsing (zero height).
+  // Mid-text \xa0 is just a non-breaking space → regular space.
+  let s0 = raw
+    // Empty-line div: <div><br></div> or <div>&nbsp;</div> → newline
+    .replace(/<div[^>]*>\s*(?:<br\s*\/?>|&nbsp;|\xa0)\s*<\/div>/gi, "\n")
+    // Closing + opening div boundary → newline
+    .replace(/<\/div>\s*<div[^>]*>/gi, "\n")
+    // Lone opening <div> that starts a new line block → newline
+    .replace(/<div[^>]*>/gi, "\n")
+    // Closing </div> → nothing (boundary already handled above)
+    .replace(/<\/div>/gi, "")
+    // <br> / <br/> → newline
+    .replace(/<br\s*\/?>/gi, "\n")
+    // Mid-text &nbsp; / \xa0 → regular space
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\xa0/g, " ");
+
+  // // Step 1 — Markdown inline patterns → HTML
   // Order matters: process longer patterns first
-  let s = raw
+  let s = s0
     // **bold** or __bold__
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/__(.+?)__/g, "<strong>$1</strong>")
@@ -162,7 +186,9 @@ const renderInline = (raw: string): string => {
     return part
       .replace(/&(?!amp;|lt;|gt;|quot;|#)/g, "&amp;")
       .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+      .replace(/>/g, "&gt;")
+      // Restore \n → <br> so Enter-press line breaks render in HTML
+      .replace(/\n/g, "<br>");
   }).join("");
 };
 
@@ -244,93 +270,207 @@ const buildChartConfig = (block: NoteBlock): object | null => {
   });
   const labels = data.map(d => String(d[xKey] ?? ""));
 
-  const grid = "#f0f0f0";
-  const font = { family:"-apple-system,'SF Pro Text','Helvetica Neue',sans-serif", size:12 };
-  const tick = { color:"#6b7280", font };
-  const legend = { position:"bottom" as const, labels:{ padding:20, usePointStyle:true, font:{ size:12 } } };
-  const tooltip = {
-    backgroundColor:"rgba(255,255,255,0.97)", borderColor:"#e5e7eb", borderWidth:1,
-    titleColor:"#111827", bodyColor:"#374151", padding:12, cornerRadius:10, boxPadding:5,
+  // Hardcoded design tokens — no CSS variables (standalone HTML has no app theme)
+  const GRID_COLOR  = "#e5e7eb";
+  const TICK_COLOR  = "#6b7280";
+  const LABEL_COLOR = "#374151";
+  const FONT_FAMILY = "-apple-system,'SF Pro Text','Helvetica Neue',sans-serif";
+  const FONT_SIZE   = 12;
+  const baseFont = { family: FONT_FAMILY, size: FONT_SIZE };
+  const gridCfg  = { color: GRID_COLOR };
+  // Chart.js 4: use border object (not deprecated drawBorder)
+  const borderCfg = { display: false };
+  const tickCfg   = { color: TICK_COLOR, font: baseFont };
+
+  const legend = {
+    display: true,
+    position: "bottom" as const,
+    labels: {
+      padding: 20,
+      usePointStyle: true,
+      pointStyleWidth: 10,
+      color: LABEL_COLOR,
+      font: { family: FONT_FAMILY, size: 12 },
+    },
   };
-  const cartScales = (horizontal=false, stacked=false) => ({
-    x:{ grid:{color:grid,drawBorder:false}, ticks:tick, stacked:stacked||undefined,
-      ...(horizontal?{type:"linear",beginAtZero:true}:{}) },
-    y:{ grid:{color:grid,drawBorder:false}, ticks:tick, stacked:stacked||undefined, beginAtZero:true,
-      ...(horizontal?{type:"category"}:{}) },
+  const tooltip = {
+    backgroundColor: "rgba(255,255,255,0.97)",
+    borderColor: "#e5e7eb",
+    borderWidth: 1,
+    titleColor: "#111827",
+    bodyColor: "#374151",
+    padding: 12,
+    cornerRadius: 10,
+    boxPadding: 5,
+  };
+
+  const cartScales = (horizontal = false, stacked = false) => ({
+    x: {
+      type: horizontal ? "linear" as const : "category" as const,
+      grid: { color: GRID_COLOR, drawOnChartArea: horizontal },
+      border: { display: false },
+      ticks: { color: TICK_COLOR, font: baseFont, maxRotation: 45, autoSkip: true, autoSkipPadding: 12 },
+      stacked: stacked || undefined,
+      beginAtZero: horizontal ? true : undefined,
+    },
+    y: {
+      type: horizontal ? "category" as const : "linear" as const,
+      grid: { color: GRID_COLOR, drawOnChartArea: !horizontal },
+      border: { display: false },
+      ticks: { color: TICK_COLOR, font: baseFont },
+      stacked: stacked || undefined,
+      beginAtZero: !horizontal,
+    },
   });
 
   switch (type) {
-    case "bar": return { type:"bar", data:{ labels, datasets:active.map(k=>({
-      label:k, data:data.map(d=>Number(d[k]??0)),
-      backgroundColor:sColors[k], borderRadius:6, borderSkipped:false, borderWidth:0,
-    }))}, options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
-      plugins:{ legend, tooltip }, scales:cartScales() }};
+    case "bar": return {
+      type: "bar",
+      data: { labels, datasets: active.map(k => ({
+        label: k, data: data.map(d => Number(d[k]??0)),
+        backgroundColor: sColors[k], borderRadius: 6, borderSkipped: false, borderWidth: 0,
+      }))},
+      options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
+        plugins:{ legend, tooltip }, scales: cartScales() },
+    };
 
-    case "horizontalBar": return { type:"bar", data:{ labels, datasets:active.map(k=>({
-      label:k, data:data.map(d=>Number(d[k]??0)),
-      backgroundColor:sColors[k], borderRadius:6, borderSkipped:false,
-    }))}, options:{ indexAxis:"y", responsive:true, maintainAspectRatio:false, animation:{duration:400},
-      plugins:{ legend, tooltip }, scales:cartScales(true) }};
+    case "horizontalBar": return {
+      type: "bar",
+      data: { labels, datasets: active.map(k => ({
+        label: k, data: data.map(d => Number(d[k]??0)),
+        backgroundColor: sColors[k], borderRadius: 6, borderSkipped: false,
+      }))},
+      options: { indexAxis: "y", responsive:true, maintainAspectRatio:false, animation:{duration:400},
+        plugins:{ legend, tooltip }, scales: cartScales(true) },
+    };
 
-    case "stackedBar": return { type:"bar", data:{ labels, datasets:active.map(k=>({
-      label:k, data:data.map(d=>Number(d[k]??0)), backgroundColor:sColors[k], stack:"s",
-    }))}, options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
-      plugins:{ legend, tooltip:{...tooltip,mode:"index"} }, scales:cartScales(false,true) }};
+    case "stackedBar": return {
+      type: "bar",
+      data: { labels, datasets: active.map(k => ({
+        label: k, data: data.map(d => Number(d[k]??0)),
+        backgroundColor: sColors[k], stack: "s",
+      }))},
+      options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
+        plugins:{ legend, tooltip:{ ...tooltip, mode:"index" as const } },
+        scales: cartScales(false, true) },
+    };
 
-    case "line": return { type:"line", data:{ labels, datasets:active.map(k=>({
-      label:k, data:data.map(d=>Number(d[k]??0)),
-      borderColor:sColors[k], backgroundColor:sColors[k],
-      borderWidth:2.5, pointRadius:4, pointHoverRadius:7, tension:0, fill:false,
-    }))}, options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
-      plugins:{ legend, tooltip:{...tooltip,mode:"index"} }, scales:cartScales() }};
+    case "line": return {
+      type: "line",
+      data: { labels, datasets: active.map(k => ({
+        label: k, data: data.map(d => Number(d[k]??0)),
+        borderColor: sColors[k], backgroundColor: sColors[k],
+        borderWidth: 2.5,
+        pointRadius: 5, pointHoverRadius: 7,
+        pointBackgroundColor: sColors[k], pointBorderColor: "#fff", pointBorderWidth: 2,
+        tension: 0, fill: false,
+      }))},
+      options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
+        plugins:{ legend, tooltip:{ ...tooltip, mode:"index" as const } }, scales: cartScales() },
+    };
 
-    case "area": return { type:"line", data:{ labels, datasets:active.map(k=>({
-      label:k, data:data.map(d=>Number(d[k]??0)),
-      borderColor:sColors[k], backgroundColor:sColors[k]+"4d",
-      borderWidth:2.5, pointRadius:3, pointHoverRadius:6, tension:0, fill:true,
-    }))}, options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
-      plugins:{ legend, tooltip:{...tooltip,mode:"index"} }, scales:cartScales() }};
+    case "area": return {
+      type: "line",
+      data: { labels, datasets: active.map(k => ({
+        label: k, data: data.map(d => Number(d[k]??0)),
+        borderColor: sColors[k], backgroundColor: sColors[k]+"4d",
+        borderWidth: 2.5,
+        pointRadius: 4, pointHoverRadius: 6,
+        pointBackgroundColor: sColors[k], pointBorderColor: "#fff", pointBorderWidth: 2,
+        tension: 0, fill: true,
+      }))},
+      options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
+        plugins:{ legend, tooltip:{ ...tooltip, mode:"index" as const } }, scales: cartScales() },
+    };
 
-    case "pie": case "donut": {
+    case "pie":
+    case "donut": {
       const col = numericCols.find(c => active.includes(c.key)) ?? numericCols[0];
-      return { type:"doughnut",
-        data:{ labels, datasets:[{ data:data.map(d=>Number(d[col.key]??0)),
-          backgroundColor:data.map((_,i)=>pc(i)), borderColor:"#fff", borderWidth:3, hoverOffset:10 }]},
-        options:{ cutout:type==="donut"?"60%":"0%", responsive:true, maintainAspectRatio:false, animation:{duration:400},
-          plugins:{ legend, tooltip }}};
+      return {
+        type: "doughnut",
+        data: { labels, datasets:[{ data: data.map(d=>Number(d[col.key]??0)),
+          backgroundColor: data.map((_,i)=>pc(i)), borderColor:"#fff", borderWidth:3, hoverOffset:10 }]},
+        options: {
+          cutout: type==="donut"?"60%":"0%",
+          responsive:true, maintainAspectRatio:false, animation:{duration:400},
+          plugins:{
+            legend:{ display:true, position:"bottom" as const,
+              labels:{ padding:16, usePointStyle:true, pointStyle:"circle" as const,
+                color: LABEL_COLOR, font:{ family: FONT_FAMILY, size:12 } } },
+            tooltip,
+          },
+        },
+      };
     }
 
     case "scatter": {
       const xk = active[0] ?? numericCols[0]?.key;
       const yk = active[1] ?? active[0] ?? xk;
-      return { type:"scatter", data:{ datasets:[{
-        label:"Data", data:data.map(d=>({x:Number(d[xk]??0),y:Number(d[yk]??0)})),
-        backgroundColor:(sColors[xk]||pc(0))+"bb", borderColor:sColors[xk]||pc(0),
-        pointRadius:7, pointHoverRadius:9,
-      }]}, options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
-        plugins:{ legend, tooltip },
-        scales:{ x:{type:"linear",grid:{color:grid},ticks:tick,title:{display:true,text:xk,color:"#6b7280"}},
-          y:{grid:{color:grid},ticks:tick,title:{display:true,text:yk,color:"#6b7280"}} }}};
+      return {
+        type: "scatter",
+        data: { datasets:[{
+          label: "Data",
+          data: data.map(d=>({x:Number(d[xk]??0),y:Number(d[yk]??0)})),
+          backgroundColor: (sColors[xk]||pc(0))+"bb",
+          borderColor: sColors[xk]||pc(0),
+          borderWidth: 1.5,
+          pointRadius: 7, pointHoverRadius: 9,
+          pointBackgroundColor: sColors[xk]||pc(0),
+          pointBorderColor: "#fff", pointBorderWidth: 2,
+        }]},
+        options: {
+          responsive:true, maintainAspectRatio:false, animation:{duration:400},
+          plugins:{ legend, tooltip },
+          scales:{
+            x:{ type:"linear" as const, grid:gridCfg, border:borderCfg, ticks:tickCfg,
+              title:{ display:true, text:xk, color:LABEL_COLOR, font:baseFont } },
+            y:{ grid:gridCfg, border:borderCfg, ticks:tickCfg, beginAtZero:true,
+              title:{ display:true, text:yk, color:LABEL_COLOR, font:baseFont } },
+          },
+        },
+      };
     }
 
-    case "radar": return { type:"radar", data:{ labels, datasets:active.map(k=>({
-      label:k, data:data.map(d=>Number(d[k]??0)),
-      backgroundColor:sColors[k]+"4d", borderColor:sColors[k],
-      borderWidth:2.5, pointBackgroundColor:sColors[k], pointRadius:4,
-    }))}, options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
-      plugins:{ legend, tooltip },
-      scales:{ r:{ grid:{color:grid}, angleLines:{color:grid},
-        pointLabels:{color:"#374151",font:{size:12}}, ticks:{color:"#6b7280",backdropColor:"transparent"} }}}};
+    case "radar": return {
+      type: "radar",
+      data: { labels, datasets: active.map(k=>({
+        label:k, data:data.map(d=>Number(d[k]??0)),
+        backgroundColor:sColors[k]+"4d", borderColor:sColors[k],
+        borderWidth:2.5,
+        pointBackgroundColor:sColors[k], pointBorderColor:"#fff", pointBorderWidth:2,
+        pointRadius:5, pointHoverRadius:7,
+      }))},
+      options:{
+        responsive:true, maintainAspectRatio:false, animation:{duration:400},
+        plugins:{ legend, tooltip },
+        scales:{
+          r:{
+            grid:{ color:GRID_COLOR },
+            angleLines:{ color:GRID_COLOR, lineWidth:1 },
+            pointLabels:{ display:true, color:LABEL_COLOR, font:{ family:FONT_FAMILY, size:12 } },
+            ticks:{ display:true, color:TICK_COLOR, backdropColor:"transparent",
+              font:{ family:FONT_FAMILY, size:10 } },
+            beginAtZero:true,
+          },
+        },
+      },
+    };
 
-    case "combo": return { type:"bar", data:{ labels, datasets:active.map((k,idx)=>({
-      type:idx%2===0?"bar":"line",
-      label:k, data:data.map(d=>Number(d[k]??0)),
-      backgroundColor:idx%2===0?sColors[k]:sColors[k]+"33",
-      borderColor:sColors[k], borderWidth:idx%2===0?0:2.5,
-      borderRadius:idx%2===0?6:0, fill:false, tension:0,
-      pointRadius:idx%2===0?0:4, pointHoverRadius:idx%2===0?0:7,
-    }))}, options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
-      plugins:{ legend, tooltip:{...tooltip,mode:"index"} }, scales:cartScales() }};
+    case "combo": return {
+      type: "bar",
+      data: { labels, datasets: active.map((k,idx)=>({
+        type: idx%2===0?"bar" as const:"line" as const,
+        label:k, data:data.map(d=>Number(d[k]??0)),
+        backgroundColor:idx%2===0?sColors[k]:sColors[k]+"33",
+        borderColor:sColors[k], borderWidth:idx%2===0?0:2.5,
+        borderRadius:idx%2===0?6:0, fill:false, tension:0,
+        pointRadius:idx%2===0?0:5, pointHoverRadius:idx%2===0?0:7,
+        pointBackgroundColor:sColors[k], pointBorderColor:"#fff",
+        pointBorderWidth:idx%2===0?0:2,
+      }))},
+      options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
+        plugins:{ legend, tooltip:{ ...tooltip, mode:"index" as const } }, scales:cartScales() },
+    };
 
     default: return null;
   }
@@ -439,7 +579,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
     // ── Bookmark ──────────────────────────────────────────────────────────────
     case "bookmark":
       if (!block.bookmarkUrl) return "";
-      return `<a class="bookmark-card" href="${esc(block.bookmarkUrl)}" target="_blank" rel="noopener"><div class="bm-body"><div class="bm-title">${esc(block.bookmarkTitle||block.bookmarkUrl)}</div>${block.bookmarkDescription?`<div class="bm-desc">${esc(block.bookmarkDescription)}</div>`:""}<div class="bm-url">${esc(block.bookmarkUrl)}</div></div><span class="bm-arrow">↗</span></a>`;
+      return `<a class="bookmark-card" href="${esc(block.bookmarkUrl)}" target="_blank" rel="noopener"><div class="bm-body"><div class="bm-title">${renderInline(block.bookmarkTitle||block.bookmarkUrl)}</div>${block.bookmarkDescription?`<div class="bm-desc">${renderInline(block.bookmarkDescription)}</div>`:""}<div class="bm-url">${esc(block.bookmarkUrl)}</div></div><span class="bm-arrow">↗</span></a>`;
 
     // ── Embed ─────────────────────────────────────────────────────────────────
     case "embed":
@@ -480,8 +620,8 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
     // ── Table — with horizontal scroll + print-safe full width ───────────────
     case "table": {
       const rows = block.tableData??[]; if (!rows.length) return "";
-      const head = rows[0].map(c=>`<th>${esc(c)}</th>`).join("");
-      const body = rows.slice(1).map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join("")}</tr>`).join("");
+      const head = rows[0].map(c=>`<th>${renderInline(c)}</th>`).join("");
+      const body = rows.slice(1).map(r=>`<tr>${r.map(c=>`<td>${renderInline(c)}</td>`).join("")}</tr>`).join("");
       return `<div class="table-outer"><div class="table-scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`;
     }
 
@@ -489,7 +629,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
     case "database": {
       const c=block.databaseColumns??[],r=block.databaseRows??[]; if(!c.length) return "";
       const head=c.map(col=>`<th>${esc(col.name)}</th>`).join("");
-      const body=r.map(row=>`<tr>${c.map(col=>`<td>${esc(row.cells[col.id]??"")}</td>`).join("")}</tr>`).join("");
+      const body=r.map(row=>`<tr>${c.map(col=>`<td>${renderInline(String(row.cells[col.id]??""))}</td>`).join("")}</tr>`).join("");
       return `<div class="table-outer"><div class="table-scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`;
     }
 
@@ -504,7 +644,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       const items=block.timelineItems??[];
       return `<div class="timeline">${items.map((item,i)=>{
         const hex=toHex(item.color,"#6366f1");
-        return `<div class="tl-row${i===0?" tl-first":""}"><div class="tl-side"><div class="tl-dot" style="background:${hex};box-shadow:0 0 0 4px ${hex}22"></div><div class="tl-line" style="background:linear-gradient(${hex},${hex}44)"></div></div><div class="tl-content"><div class="tl-date">${esc(item.date)}</div><div class="tl-title">${esc(item.title)}</div>${item.description?`<div class="tl-desc">${esc(item.description)}</div>`:""}</div></div>`;
+        return `<div class="tl-row${i===0?" tl-first":""}"><div class="tl-side"><div class="tl-dot" style="background:${hex};box-shadow:0 0 0 4px ${hex}22"></div><div class="tl-line" style="background:linear-gradient(${hex},${hex}44)"></div></div><div class="tl-content"><div class="tl-date">${esc(item.date)}</div><div class="tl-title">${renderInline(item.title)}</div>${item.description?`<div class="tl-desc">${renderInline(item.description)}</div>`:""}</div></div>`;
       }).join("")}</div>`;
     }
 
@@ -517,7 +657,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
           const fname = img.url.split("/").pop() || "Image";
           return `<figure class="gal-item gal-local"><div class="gal-local-inner"><span class="gal-local-icon">🖼</span><span class="gal-local-name">${esc(fname)}</span><span class="gal-local-note">Local file</span></div>${img.caption?`<figcaption>${esc(img.caption)}</figcaption>`:""}</figure>`;
         }
-        return `<figure class="gal-item"><img src="${esc(img.url)}" alt="${esc(img.caption||"")}" loading="lazy">${img.caption?`<figcaption>${esc(img.caption)}</figcaption>`:""}</figure>`;
+        return `<figure class="gal-item"><img src="${esc(img.url)}" alt="${esc(img.caption||"")}" loading="lazy">${img.caption?`<figcaption>${renderInline(img.caption)}</figcaption>`:""}</figure>`;
       }).join("")}</div>`;
     }
 
@@ -877,7 +1017,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
     case "swot": {
       const q=(label:string,color:string,icon:string,items:string[])=>{
         const clean=items.filter(x=>x.trim());
-        return `<div class="swot-cell" style="--sc:${color}"><div class="swot-head"><span>${icon}</span><span>${label}</span></div><ul>${clean.map(x=>`<li>${esc(x)}</li>`).join("")||`<li class="swot-empty">None added</li>`}</ul></div>`;
+        return `<div class="swot-cell" style="--sc:${color}"><div class="swot-head"><span>${icon}</span><span>${label}</span></div><ul>${clean.map(x=>`<li>${renderInline(x)}</li>`).join("")||`<li class="swot-empty">None added</li>`}</ul></div>`;
       };
       return `<div class="swot">${q("Strengths","#22c55e","💪",block.swotStrengths??[])}${q("Weaknesses","#ef4444","⚠️",block.swotWeaknesses??[])}${q("Opportunities","#3b82f6","🚀",block.swotOpportunities??[])}${q("Threats","#f97316","🔥",block.swotThreats??[])}</div>`;
     }
@@ -902,10 +1042,10 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
         if (v==="yes") return `<span class="cmp-yes"><svg viewBox="0 0 16 16" fill="none" width="18" height="18"><circle cx="8" cy="8" r="7" fill="#22c55e"/><polyline points="5,8 7,10 11,6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
         if (v==="no") return `<span class="cmp-no"><svg viewBox="0 0 16 16" fill="none" width="18" height="18"><circle cx="8" cy="8" r="7" fill="#ef4444"/><line x1="5" y1="5" x2="11" y2="11" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="5" x2="5" y2="11" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></span>`;
         if (v==="partial") return `<span class="cmp-partial"><svg viewBox="0 0 16 16" fill="none" width="18" height="18"><circle cx="8" cy="8" r="7" fill="#f97316"/><line x1="5" y1="8" x2="11" y2="8" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg></span>`;
-        return v?`<span class="cmp-text">${esc(v)}</span>`:`<span class="cmp-empty">—</span>`;
+        return v?`<span class="cmp-text">${renderInline(v)}</span>`:`<span class="cmp-empty">—</span>`;
       };
       const head=`<thead><tr><th class="cmp-feature-col">Feature</th>${c.map(col=>`<th class="${col.highlighted?"cmp-hl":""}">${esc(col.name)}${col.highlighted?`<div class="cmp-popular">Popular</div>`:""}</th>`).join("")}</tr></thead>`;
-      const body=`<tbody>${r.map(row=>`<tr><td class="cmp-feat">${esc(row.feature)}</td>${c.map(col=>`<td class="${col.highlighted?"cmp-hlc":""}">${val(row.values[col.id]??"")}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      const body=`<tbody>${r.map(row=>`<tr><td class="cmp-feat">${renderInline(row.feature)}</td>${c.map(col=>`<td class="${col.highlighted?"cmp-hlc":""}">${val(row.values[col.id]??"")}</td>`).join("")}</tr>`).join("")}</tbody>`;
       return `<div class="table-outer"><div class="table-scroll"><table class="cmp-table">${head}${body}</table></div></div>`;
     }
 
@@ -929,7 +1069,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
     // ── Columns layout ────────────────────────────────────────────────────────
     case "columns": {
       const cols=block.columns??[];
-      return `<div class="col-layout" style="grid-template-columns:repeat(${cols.length},1fr)">${cols.map((col,i)=>`<div class="col-cell">${block.columnTitles?.[i]?`<div class="col-heading">${esc(block.columnTitles![i])}</div>`:""} ${col.map(b=>blockToHtml(b,depth+1,undefined,counter)).join("")}</div>`).join("")}</div>`;
+      return `<div class="col-layout" style="grid-template-columns:repeat(${cols.length},1fr)">${cols.map((col,i)=>`<div class="col-cell">${block.columnTitles?.[i]?`<div class="col-heading">${renderInline(block.columnTitles![i])}</div>`:""} ${col.map(b=>blockToHtml(b,depth+1,undefined,counter)).join("")}</div>`).join("")}</div>`;
     }
 
     default:
@@ -947,21 +1087,42 @@ const renderBlocks = (blocks: NoteBlock[], depth = 0): string => {
   }).filter(Boolean).join("\n");
 };
 
+// ── Plain-text content extractor ─────────────────────────────────────────────
+// Strips HTML tags from contentEditable-stored content, converting structural
+// tags (<div>, <br>) into newlines and decoding common entities.
+const stripHtml = (raw = ""): string =>
+  raw
+    .replace(/<div[^>]*>\s*(?:<br\s*\/?>|&nbsp;|\xa0)\s*<\/div>/gi, "\n")
+    .replace(/<\/div>\s*<div[^>]*>/gi, "\n")
+    .replace(/<div[^>]*>/gi, "\n")
+    .replace(/<\/div>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")          // strip all remaining tags
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\xa0/g, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .trim();
+
+
 // ─── Markdown renderer (unchanged from last version) ─────────────────────────
 
 const blockToMarkdown = (block: NoteBlock, depth = 0): string => {
   const ind = "  ".repeat(depth);
+  const c = stripHtml(block.content);  // strip contentEditable HTML → plain text
   switch (block.type) {
-    case "text":        return block.content||"";
-    case "heading1":    return `# ${block.content}`;
-    case "heading2":    return `## ${block.content}`;
-    case "heading3":    return `### ${block.content}`;
-    case "bullet":      return `${ind}- ${block.content}`;
-    case "numbered":    return `${ind}1. ${block.content}`;
-    case "todo":        return `${ind}- [${block.checked?"x":" "}] ${block.content}`;
-    case "quote":       return block.content.split("\n").map(l=>`> ${l}`).join("\n");
-    case "callout":     return `> 💡 ${block.content}`;
-    case "code":        return "```\n"+block.content+"\n```";
+    case "text":        return c||"";
+    case "heading1":    return `# ${c}`;
+    case "heading2":    return `## ${c}`;
+    case "heading3":    return `### ${c}`;
+    case "bullet":      return `${ind}- ${c}`;
+    case "numbered":    return `${ind}1. ${c}`;
+    case "todo":        return `${ind}- [${block.checked?"x":" "}] ${c}`;
+    case "quote":       return c.split("\n").map((l: string)=>`> ${l}`).join("\n");
+    case "callout":     return `> 💡 ${c}`;
+    case "code":        return "```\n"+c+"\n```";
     case "divider":     return "---";
     case "labeledDivider": return block.dividerLabel?`\n--- ${block.dividerLabel} ---\n`:"---";
     case "toggle":      return `<details>\n<summary>${block.content}</summary>\n\n${block.toggleContent||""}\n</details>`;
@@ -1016,14 +1177,15 @@ const blockToMarkdown = (block: NoteBlock, depth = 0): string => {
 };
 
 const blockToText = (block: NoteBlock, depth = 0): string => {
+  const c = stripHtml(block.content);  // strip contentEditable HTML → plain text
   switch (block.type) {
-    case "text":     return block.content||"";
-    case "heading1": return `\n${block.content}\n${"═".repeat(block.content.length||1)}`;
-    case "heading2": return `\n${block.content}\n${"─".repeat(block.content.length||1)}`;
-    case "heading3": return `\n${block.content}`;
-    case "bullet":   return `${"  ".repeat(depth)}• ${block.content}`;
-    case "numbered": return `${"  ".repeat(depth)}1. ${block.content}`;
-    case "todo":     return `[${block.checked?"✓":" "}] ${block.content}`;
+    case "text":     return c||"";
+    case "heading1": return `\n${c}\n${"═".repeat(c.length||1)}`;
+    case "heading2": return `\n${c}\n${"─".repeat(c.length||1)}`;
+    case "heading3": return `\n${c}`;
+    case "bullet":   return `${"  ".repeat(depth)}• ${c}`;
+    case "numbered": return `${"  ".repeat(depth)}1. ${c}`;
+    case "todo":     return `[${block.checked?"✓":" "}] ${c}`;
     case "quote":    return block.content.split("\n").map(l=>`  "${l}"`).join("\n");
     case "callout":  return `💡 ${block.content}`;
     case "code":     return block.content.split("\n").map(l=>`    ${l}`).join("\n");
@@ -1533,7 +1695,8 @@ ${hasCharts ? `
   function oneDone(){pending--;if(pending<=0)window.__chartsReady=true;}
   function renderCharts(){
     Chart.defaults.font.family="-apple-system,'SF Pro Text','Helvetica Neue',sans-serif";
-    Chart.defaults.color='#6e6e73';
+    Chart.defaults.color='#374151';
+    Chart.defaults.borderColor='#e5e7eb';
     configs.forEach(function(item){
       var el=document.getElementById(item.id);
       if(!el){oneDone();return;}
@@ -1546,10 +1709,12 @@ ${hasCharts ? `
         cfg.options.maintainAspectRatio=false;
         var ch=new Chart(el,cfg);
         if(${forPdf ? "true" : "false"}){
-          // In PDF mode, chart renders synchronously (animation:0) — mark done immediately
-          oneDone();
+          // PDF: animation disabled — use rAF to let browser flush canvas paint
+          requestAnimationFrame(function(){ requestAnimationFrame(function(){ oneDone(); }); });
         } else {
-          ch.options.animation={onComplete:function(){oneDone();}};
+          if(ch.options && ch.options.animation){
+            ch.options.animation.onComplete=function(){oneDone();};
+          }
           ch.update('none');
         }
       }catch(e){console.error('Chart['+item.id+']:',e);oneDone();}
@@ -1633,8 +1798,8 @@ const buildHtml = (note: Note, forPdf = false, mediaMap: MediaMap = new Map()): 
     table{min-width:unset!important;width:100%!important}
     th,td{white-space:normal!important}
     /* Charts: fixed height so canvas is visible */
-    .chart-canvas-wrap{height:280px!important;position:relative!important}
-    .chart-canvas-wrap canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
+    .chart-canvas-wrap{height:300px!important;position:relative!important;overflow:hidden!important}
+    .chart-canvas-wrap canvas{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important}
     .chart-card{break-inside:avoid!important}
     /* Force all details open */
     details{display:block!important}

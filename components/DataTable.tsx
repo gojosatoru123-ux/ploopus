@@ -21,16 +21,22 @@ const CellDiv = ({
   value,
   onCommit,
   onFocus,
+  onKeyDown,
   style,
   className,
   placeholder,
+  row,
+  col,
 }: {
   value: string;
   onCommit: (html: string) => void;
   onFocus: () => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLDivElement>) => void;
   style?: React.CSSProperties;
   className: string;
   placeholder: string;
+  row: number;
+  col: number;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const isFocused = useRef(false);
@@ -49,10 +55,13 @@ const CellDiv = ({
       contentEditable
       suppressContentEditableWarning
       data-placeholder={placeholder}
+      data-row={row}
+      data-col={col}
       style={style}
       onFocus={() => { isFocused.current = true; onFocus(); }}
       onBlur={(e) => { isFocused.current = false; onCommit(e.currentTarget.innerHTML); }}
       onInput={(e) => onCommit(e.currentTarget.innerHTML)}
+      onKeyDown={onKeyDown}
       className={`${className} outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/30 empty:before:pointer-events-none`}
     />
   );
@@ -71,32 +80,19 @@ const DataTable = ({ block, onUpdate, onCreateChart }: DataTableProps) => {
   const stripHtml = (html: string) => html.replace(/<[^>]*>/g, "");
 
   const getColumnWidth = (colIndex: number) => {
-
     const getMaxLineLength = (html: string) => {
-
       if (!html) return 0;
-
       let text = html;
-
-      // convert block elements to line breaks
       text = text.replace(/<\/?(div|p)[^>]*>/gi, "\n");
       text = text.replace(/<br\s*\/?>/gi, "\n");
-
-      // remove remaining html
       text = stripHtml(text);
-
-      // fix nbsp
       text = text.replace(/\u00A0/g, " ");
-
       const lines = text.split("\n");
-
       let longest = 0;
-
       for (const line of lines) {
         const len = line.trim().length;
         if (len > longest) longest = len;
       }
-
       return longest;
     };
 
@@ -104,10 +100,83 @@ const DataTable = ({ block, onUpdate, onCreateChart }: DataTableProps) => {
       getMaxLineLength(tableData[0]?.[colIndex] || ""),
       ...tableData.slice(1).map(row => getMaxLineLength(row[colIndex] || ""))
     );
-
     const baseWidth = Math.max(80, maxLength * 8 + 24);
-
     return `${baseWidth}px`;
+  };
+
+  // --- ARROW KEY NAVIGATION LOGIC ---
+  // --- ROBUST ARROW KEY NAVIGATION LOGIC ---
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>, currentRow: number, currentCol: number) => {
+    const totalRows = tableData.length;
+    const totalCols = tableData[0]?.length || 0;
+
+    let targetRow = currentRow;
+    let targetCol = currentCol;
+
+    // Get current cursor selection details safely
+    const selection = window.getSelection();
+    const isSelectionCollapsed = selection ? selection.isCollapsed : true;
+
+    switch (e.key) {
+      case "ArrowUp":
+        if (currentRow > 0) targetRow--;
+        break;
+      case "ArrowDown":
+        if (currentRow < totalRows - 1) targetRow++;
+        break;
+      case "ArrowLeft":
+        // Navigate if cell is empty, text is selected entirely, or cursor is at the very beginning
+        if (
+          !e.currentTarget.textContent || 
+          (isSelectionCollapsed && selection?.anchorOffset === 0)
+        ) {
+          if (currentCol > 0) targetCol--;
+        } else {
+          return; // Let the native cursor move left within the text
+        }
+        break;
+      case "ArrowRight":
+        // Fallback checks to find the actual end boundary of the contentEditable node
+        const textLength = e.currentTarget.textContent?.length || 0;
+        const isAtEnd = selection 
+          ? selection.anchorOffset === textLength || selection.anchorNode?.childNodes.length === selection.anchorOffset
+          : true;
+
+        if (!e.currentTarget.textContent || (isSelectionCollapsed && isAtEnd)) {
+          if (currentCol < totalCols - 1) targetCol++;
+        } else {
+          return; // Let the native cursor move right within the text
+        }
+        break;
+      default:
+        return; // Exit early for other keys
+    }
+
+    // If coordinates changed, break native behavior and shift focus cleanly
+    if (targetRow !== currentRow || targetCol !== currentCol) {
+      e.preventDefault();
+      
+      const nextCell = tableContainerRef.current?.querySelector(
+        `[data-row="${targetRow}"][data-col="${targetCol}"]`
+      ) as HTMLDivElement | null;
+
+      if (nextCell) {
+        nextCell.focus();
+        
+        // Ensure cursor behavior feels natural when arriving at the new cell
+        setTimeout(() => {
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.selectNodeContents(nextCell);
+          
+          // If moving left, place cursor at the end of the previous cell's text
+          // If moving right/up/down, place it at the end as well for immediate editing
+          range.collapse(false); 
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }, 0);
+      }
+    }
   };
 
   const updateCell = (rowIndex: number, colIndex: number, value: string) => {
@@ -181,8 +250,11 @@ const DataTable = ({ block, onUpdate, onCreateChart }: DataTableProps) => {
                 >
                   <CellDiv
                     value={header}
+                    row={0}
+                    col={colIndex}
                     onCommit={(val) => updateCell(0, colIndex, val)}
                     onFocus={() => setSelectedCell({ row: 0, col: colIndex })}
+                    onKeyDown={(e) => handleKeyDown(e, 0, colIndex)}
                     style={getCellStyle(getCellFormatting(0, colIndex))}
                     className="w-full bg-transparent font-semibold text-sm"
                     placeholder="Column..."
@@ -220,8 +292,11 @@ const DataTable = ({ block, onUpdate, onCreateChart }: DataTableProps) => {
                     >
                       <CellDiv
                         value={cell}
+                        row={rowIndex + 1}
+                        col={colIndex}
                         onCommit={(val) => updateCell(rowIndex + 1, colIndex, val)}
                         onFocus={() => setSelectedCell({ row: rowIndex + 1, col: colIndex })}
+                        onKeyDown={(e) => handleKeyDown(e, rowIndex + 1, colIndex)}
                         style={getCellStyle(formatting)}
                         className="w-full bg-transparent text-sm py-1 px-1 rounded"
                         placeholder="..."
