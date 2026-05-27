@@ -117,6 +117,11 @@ const DataTable = ({ block, onUpdate, onCreateChart }: DataTableProps) => {
     const selection = window.getSelection();
     const isSelectionCollapsed = selection ? selection.isCollapsed : true;
 
+    // Prevent arrow keys from bubbling to NotionEditor's cross-block navigation
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      e.stopPropagation();
+    }
+
     switch (e.key) {
       case "ArrowUp":
         if (currentRow > 0) targetRow--;

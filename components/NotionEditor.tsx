@@ -227,6 +227,8 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
   const [dragOverBlockId, setDragOverBlockId] = useState<string | null>(null);
   const blockRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const contentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // Focusable wrapper refs for non-editable special blocks (divider, chart, kanban, etc.)
+  const specialBlockNavRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const dragYRef = useRef(0);
 
   const updateBlock = (id: string, updates: Partial<NoteBlock>) => {
@@ -771,6 +773,97 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
 
   const isListType = (type: NoteBlock["type"]) => type === "bullet" || type === "numbered" || type === "todo";
 
+  // ── Arrow-key navigation helpers ─────────────────────────────────────────
+  /**
+   * Focus a block at the given index. For text-like blocks the contentEditable
+   * is focused; for special blocks the focusable nav wrapper is used instead.
+   * `edge` controls where the caret lands: "start" | "end" (default "start").
+   */
+  const focusBlock = (index: number, edge: "start" | "end" = "start") => {
+    if (index < 0 || index >= blocks.length) return;
+    const target = blocks[index];
+
+    // Try the special-block nav wrapper first
+    const navEl = specialBlockNavRefs.current.get(target.id);
+    if (navEl) {
+      navEl.focus();
+      return;
+    }
+
+    // Otherwise focus the contentEditable / input
+    const el = blockRefs.current.get(target.id);
+    if (!el) return;
+    const editable = el.querySelector<HTMLElement>('[contenteditable], input, textarea');
+    if (!editable) return;
+    editable.focus();
+
+    // Place caret at the correct edge
+    if (editable.isContentEditable) {
+      const sel = window.getSelection();
+      if (!sel) return;
+      const range = document.createRange();
+      if (edge === "end") {
+        range.selectNodeContents(editable);
+        range.collapse(false);
+      } else {
+        range.selectNodeContents(editable);
+        range.collapse(true);
+      }
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } else {
+      // <input> / <textarea>
+      const inp = editable as HTMLInputElement;
+      if (edge === "end") {
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+      } else {
+        inp.setSelectionRange(0, 0);
+      }
+    }
+  };
+
+  /** Returns true when the caret is on the very first visual line of a contentEditable. */
+  const isCaretAtFirstLine = (el: HTMLElement): boolean => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return false; // text is selected, not just a caret
+
+    // Get bounding rect of caret
+    const caretRange = range.cloneRange();
+    caretRange.collapse(true);
+    const caretRect = caretRange.getBoundingClientRect();
+    if (!caretRect || caretRect.height === 0) {
+      // Fallback: check if at offset 0
+      return range.startOffset === 0 && (range.startContainer === el || !el.contains(range.startContainer.previousSibling));
+    }
+    const elRect = el.getBoundingClientRect();
+    // Caret is on the first line if its top is within one line-height of the element top
+    return caretRect.top < elRect.top + caretRect.height * 1.5;
+  };
+
+  /** Returns true when the caret is on the very last visual line of a contentEditable. */
+  const isCaretAtLastLine = (el: HTMLElement): boolean => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return false;
+
+    const caretRange = range.cloneRange();
+    caretRange.collapse(false);
+    const caretRect = caretRange.getBoundingClientRect();
+    if (!caretRect || caretRect.height === 0) {
+      // Fallback: check if caret offset is at end of text
+      const node = range.startContainer;
+      const offset = range.startOffset;
+      const nodeText = node.textContent || "";
+      return offset === nodeText.length && !node.nextSibling?.textContent?.trim();
+    }
+    const elRect = el.getBoundingClientRect();
+    return caretRect.bottom > elRect.bottom - caretRect.height * 1.5;
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
   const handleKeyDown = (e: KeyboardEvent, block: NoteBlock) => {
     // Don't prevent formatting shortcuts
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
@@ -800,6 +893,32 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
       }
       return;
     }
+
+    // ── Arrow-key cross-block navigation ────────────────────────────────────
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      const blockIndex = blocks.findIndex((b) => b.id === block.id);
+
+      if (e.key === "ArrowUp") {
+        if (blockIndex > 0) {
+          const atFirst = contentEl ? isCaretAtFirstLine(contentEl) : true;
+          if (atFirst) {
+            e.preventDefault();
+            focusBlock(blockIndex - 1, "end");
+          }
+        }
+      } else {
+        // ArrowDown
+        if (blockIndex < blocks.length - 1) {
+          const atLast = contentEl ? isCaretAtLastLine(contentEl) : true;
+          if (atLast) {
+            e.preventDefault();
+            focusBlock(blockIndex + 1, "start");
+          }
+        }
+      }
+      return;
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     // Handle Enter key
     if (e.key === "Enter" && !e.shiftKey) {
@@ -2496,7 +2615,45 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
 
                 {/* Block Content */}
                 <div className="flex-1 relative min-w-0">
-                  {renderBlock(block)}
+                  {(() => {
+                    // Blocks that have their own contentEditable and already handle arrow keys
+                    const textLikeBlocks = new Set([
+                      "text", "heading1", "heading2", "heading3",
+                      "bullet", "numbered", "todo", "toggle",
+                      "quote", "code", "callout",
+                    ]);
+                    if (textLikeBlocks.has(block.type)) {
+                      return renderBlock(block);
+                    }
+                    // Special / widget blocks: wrap with a focusable div so ArrowUp/Down can navigate past them
+                    const blockIndex = blocks.findIndex((b) => b.id === block.id);
+                    return (
+                      <div
+                        ref={(el) => {
+                          if (el) specialBlockNavRefs.current.set(block.id, el);
+                          else specialBlockNavRefs.current.delete(block.id);
+                        }}
+                        tabIndex={0}
+                        data-special-block
+                        onKeyDown={(e) => {
+                          if (e.key === "ArrowUp") {
+                            if (blockIndex > 0) {
+                              e.preventDefault();
+                              focusBlock(blockIndex - 1, "end");
+                            }
+                          } else if (e.key === "ArrowDown") {
+                            if (blockIndex < blocks.length - 1) {
+                              e.preventDefault();
+                              focusBlock(blockIndex + 1, "start");
+                            }
+                          }
+                        }}
+                        className="outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 rounded-lg"
+                      >
+                        {renderBlock(block)}
+                      </div>
+                    );
+                  })()}
 
                   {/* Block Type Menu */}
                   <AnimatePresence>
