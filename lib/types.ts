@@ -12,7 +12,7 @@ export interface NoteBlock {
     | "code" | "callout" | "table" | "toggle" 
     | "image" | "bookmark" | "equation" | "progress" | "video" | "columns"
     // New block types
-    | "file" | "audio" | "timeline" | "kanban" | "rating" | "countdown" | "embed" | "database" | "mindmap" | "gallery"
+    | "file" | "audio" | "timeline" | "kanban" | "rating" | "embed" | "mindmap" | "gallery"
     // Flashcard block type
     | "flashcard"
     // Tabs block type
@@ -49,12 +49,8 @@ export interface NoteBlock {
   kanbanColumns?: { id: string; title: string; cards: { id: string; content: string }[] }[];
   ratingValue?: number;
   ratingMax?: number;
-  countdownDate?: string;
-  countdownTitle?: string;
   embedUrl?: string;
   embedType?: "spotify" | "twitter" | "figma" | "codepen" | "generic";
-  databaseRows?: { id: string; cells: { [key: string]: string } }[];
-  databaseColumns?: { id: string; name: string; type: "text" | "number" | "select" | "date" | "checkbox" }[];
   mermaidCode?: string;
   galleryImages?: { id: string; url: string; caption?: string }[];
   // Mind map data

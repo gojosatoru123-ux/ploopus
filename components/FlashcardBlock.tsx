@@ -75,7 +75,7 @@ const FlashcardBlock = ({ flashcards, title, onChange, onTitleChange, onOpenStud
   return (
     <div className="py-3">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-1">
         <div className="flex items-center gap-2">
           <Lightbulb className="w-5 h-5 text-yellow-500" />
           <input
@@ -85,9 +85,6 @@ const FlashcardBlock = ({ flashcards, title, onChange, onTitleChange, onOpenStud
             className="font-semibold text-lg bg-transparent border-none outline-none text-foreground"
             placeholder="Flashcards"
           />
-          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-            {flashcards.length} cards
-          </span>
         </div>
         {flashcards.length > 0 && (
           <motion.button

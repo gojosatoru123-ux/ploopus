@@ -60,7 +60,6 @@ import MindMap from "./MindMap";
 import FlashcardBlock from "./FlashcardBlock";
 import ChartBlock from "./ChartBlock";
 import EquationBlock from "./EquationBlock";
-import DatabaseBlock from "./DatabaseBlock";
 import DataTable from "./DataTable";
 import KanbanBlock from "./KanbanBlock";
 import FlashcardStudyMode from "./FlashcardStudyMode";
@@ -133,9 +132,7 @@ const blockTypes = [
   { type: "timeline" as const, icon: GitBranch, label: "Timeline", description: "Track milestones", category: "advanced" },
   { type: "kanban" as const, icon: Kanban, label: "Kanban", description: "Task board", category: "advanced" },
   { type: "rating" as const, icon: Star, label: "Rating", description: "Star rating", category: "advanced" },
-  { type: "countdown" as const, icon: Timer, label: "Countdown", description: "Timer to date", category: "advanced" },
   { type: "embed" as const, icon: Globe, label: "Embed", description: "External embed", category: "advanced" },
-  { type: "database" as const, icon: Database, label: "Database", description: "Mini database", category: "advanced" },
   { type: "mindmap" as const, icon: Share2, label: "Mind Map", description: "Interactive mind map", category: "advanced" },
   { type: "flashcard" as const, icon: Lightbulb, label: "Flashcards", description: "Quick revision cards", category: "advanced" },
   { type: "chart" as const, icon: BarChart3, label: "Chart", description: "Data visualization charts", category: "advanced" },
@@ -286,14 +283,6 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
       ] : undefined,
       ratingValue: type === "rating" ? 3 : undefined,
       ratingMax: type === "rating" ? 5 : undefined,
-      countdownDate: type === "countdown" ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
-      countdownTitle: type === "countdown" ? "Countdown" : undefined,
-      databaseRows: type === "database" ? [{ id: crypto.randomUUID(), cells: { name: "", status: "", date: "" } }] : undefined,
-      databaseColumns: type === "database" ? [
-        { id: "name", name: "Name", type: "text" },
-        { id: "status", name: "Status", type: "select" },
-        { id: "date", name: "Date", type: "date" }
-      ] : undefined,
       mindMapNodes: type === "mindmap" ? [{ id: crypto.randomUUID(), text: "Central Idea", x: 150, y: 150, color: "bg-blue-500" }] : undefined,
       mindMapConnections: type === "mindmap" ? [] : undefined,
       galleryImages: type === "gallery" ? [] : undefined,
@@ -466,16 +455,6 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
       if (clone.galleryImages) {
         clone.galleryImages = clone.galleryImages.map((img) => ({
           ...img, id: crypto.randomUUID(),
-        }));
-      }
-      if (clone.databaseRows) {
-        clone.databaseRows = clone.databaseRows.map((row) => ({
-          ...row, id: crypto.randomUUID(),
-        }));
-      }
-      if (clone.databaseColumns) {
-        clone.databaseColumns = clone.databaseColumns.map((col) => ({
-          ...col, id: crypto.randomUUID(),
         }));
       }
       if (clone.mindMapNodes) {
@@ -2183,82 +2162,6 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
           </div>
         );
 
-      case "countdown":
-        const CountdownDisplay = () => {
-          const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-
-          useEffect(() => {
-            const calculateTimeLeft = () => {
-              const target = new Date(block.countdownDate || Date.now()).getTime();
-              const now = Date.now();
-              const diff = target - now;
-
-              if (diff > 0) {
-                setTimeLeft({
-                  days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-                  hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
-                  minutes: Math.floor((diff / 1000 / 60) % 60),
-                  seconds: Math.floor((diff / 1000) % 60),
-                });
-              } else {
-                setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-              }
-            };
-
-            calculateTimeLeft();
-            const interval = setInterval(calculateTimeLeft, 1000);
-            return () => clearInterval(interval);
-          }, [block.countdownDate]);
-
-          return (
-            <div className="flex gap-3 justify-center">
-              {[
-                { label: "Days", value: timeLeft.days },
-                { label: "Hours", value: timeLeft.hours },
-                { label: "Minutes", value: timeLeft.minutes },
-                { label: "Seconds", value: timeLeft.seconds },
-              ].map((unit) => (
-                <div key={unit.label} className="text-center">
-                  <motion.div
-                    className="bg-primary/10 text-primary text-2xl font-bold px-4 py-3 rounded-lg min-w-15"
-                    key={unit.value}
-                    initial={{ scale: 1.1 }}
-                    animate={{ scale: 1 }}
-                  >
-                    {unit.value.toString().padStart(2, '0')}
-                  </motion.div>
-                  <p className="text-xs text-muted-foreground mt-1">{unit.label}</p>
-                </div>
-              ))}
-            </div>
-          );
-        };
-
-        return (
-          <div className="py-4">
-            <div className="bg-linear-to-r from-primary/5 to-primary/10 rounded-xl p-6 border border-primary/20">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Timer className="w-5 h-5 text-primary" />
-                  <input
-                    type="text"
-                    value={block.countdownTitle || "Countdown"}
-                    onChange={(e) => updateBlock(block.id, { countdownTitle: e.target.value })}
-                    className="font-medium bg-transparent outline-none"
-                  />
-                </div>
-                <input
-                  type="date"
-                  value={block.countdownDate || ""}
-                  onChange={(e) => updateBlock(block.id, { countdownDate: e.target.value })}
-                  className="text-sm bg-muted/50 px-3 py-1 rounded-lg outline-none"
-                />
-              </div>
-              <CountdownDisplay />
-            </div>
-          </div>
-        );
-
       case "embed":
         return (
           <div className="py-2">
@@ -2296,51 +2199,6 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
               </div>
             )}
           </div>
-        );
-
-      case "database":
-        return (
-          <DataTable
-            block={block}
-            onUpdate={(updates) => updateBlock(block.id, updates)}
-            onCreateChart={(tableId, columnNames) => {
-              // Add a new chart block after this database block
-              const index = blocks.findIndex((b) => b.id === block.id);
-              const tableData = block.tableData || [];
-
-              // Convert table data to chart format
-              const chartRows = tableData.slice(1).map((row) => ({
-                id: crypto.randomUUID(),
-                cells: row.reduce((acc, cell, idx) => ({
-                  ...acc,
-                  [tableData[0][idx] || `col${idx}`]: isNaN(Number(cell)) ? cell : Number(cell),
-                }), {}),
-              }));
-
-              const chartColumns: { id: string; key: string; type: "text" | "number" }[] = tableData[0].map((name, idx) => ({
-                id: `col${idx}`,
-                key: name || `col${idx}`,
-                type: (/^\d+(\.\d+)?$/.test(tableData[1]?.[idx] || "") ? "number" : "text") as "text" | "number",
-              }));
-
-              const chartBlock: NoteBlock = {
-                id: crypto.randomUUID(),
-                type: "chart",
-                content: "Chart from Table",
-                chartType: "bar",
-                chartTitle: `Chart from ${block.content || "Table"}`,
-                chartColumns,
-                chartRows,
-                chartXAxisKey: chartColumns[0]?.id,
-                chartSelectedSeries: chartColumns.filter(c => c.type === "number").map(c => c.id),
-                chartSeriesColors: {},
-                linkedTableId: tableId, // Link back to source table for live updates
-              };
-              const newBlocks = [...blocks];
-              newBlocks.splice(index + 1, 0, chartBlock);
-              onChange(newBlocks);
-            }}
-          />
         );
 
       case "mindmap":
@@ -2811,16 +2669,6 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
                                     } else if (bt.type === "rating") {
                                       baseUpdate.ratingValue = 3;
                                       baseUpdate.ratingMax = 5;
-                                    } else if (bt.type === "countdown") {
-                                      baseUpdate.countdownDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-                                      baseUpdate.countdownTitle = "Countdown";
-                                    } else if (bt.type === "database") {
-                                      baseUpdate.databaseRows = [{ id: crypto.randomUUID(), cells: { name: "", status: "", date: "" } }];
-                                      baseUpdate.databaseColumns = [
-                                        { id: "name", name: "Name", type: "text" },
-                                        { id: "status", name: "Status", type: "select" },
-                                        { id: "date", name: "Date", type: "date" }
-                                      ];
                                     } else if (bt.type === "mindmap") {
                                       baseUpdate.mindMapNodes = [{ id: crypto.randomUUID(), text: "Central Idea", x: 150, y: 150, color: "bg-blue-500" }];
                                       baseUpdate.mindMapConnections = [];
