@@ -36,7 +36,6 @@ interface MindMapProps {
   onTitleChange?: (title: string) => void;
 }
 
-// Beautiful, muted color palette matching app theme
 const nodeColors = [
   { name: "Sage", value: "sage", bg: "hsl(162 22% 42%)", border: "hsl(160 25% 50%)", text: "#ffffff" },
   { name: "Gold", value: "gold", bg: "hsl(40 75% 45%)", border: "hsl(42 80% 55%)", text: "#ffffff" },
@@ -77,6 +76,10 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
   const minZoom = 0.25;
   const maxZoom = 2;
   const zoomStep = 0.15;
+
+  // Mobile Pinch/Touch tracking refs
+  const initialTouchDistanceRef = useRef<number | null>(null);
+  const initialTouchZoomRef = useRef<number>(1);
 
   useEffect(() => {
     setEditableTitle(title);
@@ -168,17 +171,13 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
     );
   }, [nodes, connections, onChange]);
 
-  // Calculate node dimensions based on text content
   const getNodeDimensions = (node: MindMapNode) => {
     const shape = node.shape || 'rectangle';
     const textLength = node.text.length;
     
-    // Base dimensions
     let minWidth = 100;
     let maxWidth = 300;
-    let height = 50;
     
-    // Calculate width based on text
     const charWidth = 8;
     const calculatedWidth = Math.max(minWidth, Math.min(textLength * charWidth + 40, maxWidth));
     
@@ -188,7 +187,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
       case 'oval': 
         return { width: calculatedWidth, height: 50 };
       default: 
-        // Rectangle - allow height to grow with content
         const lines = Math.ceil(textLength / 30);
         return { width: calculatedWidth, height: Math.max(50, lines * 24 + 24) };
     }
@@ -211,28 +209,21 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
     };
   };
 
-  // Smooth bezier path for connections - creates natural curved lines
   const getBezierCurve = (from: { x: number; y: number }, to: { x: number; y: number }) => {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-
-    // Dynamic curvature based on distance - more curve for longer connections
     const curvature = Math.min(distance * 0.4, 120);
 
-    // Control points that create smooth, natural curves
     let cp1 = { x: from.x, y: from.y };
     let cp2 = { x: to.x, y: to.y };
 
-    // Adjust control points based on connection direction for smooth S-curves
     if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal-ish connection
       cp1 = { x: from.x + (dx > 0 ? curvature : -curvature), y: from.y };
       cp2 = { x: to.x + (dx > 0 ? -curvature : curvature), y: to.y };
     } else {
-      // Vertical-ish connection
       cp1 = { x: from.x, y: from.y + (dy > 0 ? curvature : -curvature) };
-      cp2 = { x: to.x, y: to.y + (dy > 0 ? -curvature : curvature) };
+      cp2 = { x: to.x + (dy > 0 ? -curvature : curvature), y: to.y };
     }
 
     const d = `M ${from.x} ${from.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${to.x} ${to.y}`;
@@ -264,7 +255,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
     p2: { x: number; y: number },
     p3: { x: number; y: number }
   ) => {
-    // B'(t) = 3(1-t)^2(p1-p0) + 6(1-t)t(p2-p1) + 3t^2(p3-p2)
     const u = 1 - t;
     const x =
       3 * u * u * (p1.x - p0.x) +
@@ -279,9 +269,21 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
 
   const handleMouseDown = (e: React.MouseEvent, nodeId: string) => {
     if (e.button !== 0) return;
-    e.stopPropagation(); // prevent editor drag-select from starting
-    e.preventDefault();  // prevent text selection during node drag
+    e.stopPropagation();
+    e.preventDefault();
     
+    startNodeDrag(nodeId, e.clientX, e.clientY);
+  };
+
+  // Node touch start mapping to identical drag logic
+  const handleTouchStartNode = (e: React.TouchEvent, nodeId: string) => {
+    e.stopPropagation();
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    startNodeDrag(nodeId, touch.clientX, touch.clientY);
+  };
+
+  const startNodeDrag = (nodeId: string, clientX: number, clientY: number) => {
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return;
     
@@ -302,18 +304,14 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
     const rect = containerRef.current?.getBoundingClientRect();
     if (rect) {
       const off = {
-        x: e.clientX - rect.left - node.x * zoom - pan.x,
-        y: e.clientY - rect.top  - node.y * zoom - pan.y,
+        x: clientX - rect.left - node.x * zoom - pan.x,
+        y: clientY - rect.top  - node.y * zoom - pan.y,
       };
       offsetRef.current = off;
       setOffset(off);
     }
   };
 
-
-  // ── Ref-based drag state ─────────────────────────────────────────────────────
-  // Using refs prevents stale closures in event handlers and ensures the
-  // editor's global drag-select listener never interferes with MindMap dragging.
   const draggingNodeRef = useRef<string | null>(null);
   const isPanningRef    = useRef(false);
   const offsetRef       = useRef({ x: 0, y: 0 });
@@ -341,6 +339,47 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
     }
   }, [updateNode]);
 
+  // Integrated Mobile Touch Move Handler (Handles both Touch Panning & Pinch to Zoom)
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    // 1. Double finger interaction: Pinch to Zoom
+    if (e.touches.length === 2) {
+      e.preventDefault(); // Stop native scrolling/zoom gestures
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+
+      if (initialTouchDistanceRef.current === null) {
+        initialTouchDistanceRef.current = currentDistance;
+        initialTouchZoomRef.current = zoomRef.current;
+      } else {
+        const scaleFactor = currentDistance / initialTouchDistanceRef.current;
+        const targetZoom = Math.min(Math.max(initialTouchZoomRef.current * scaleFactor, minZoom), maxZoom);
+        setZoom(targetZoom);
+      }
+      return;
+    }
+
+    // 2. Single finger interaction: Node Dragging or Canvas Panning
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      setMousePos({
+        x: (touch.clientX - rect.left - panRef.current.x) / zoomRef.current,
+        y: (touch.clientY - rect.top  - panRef.current.y) / zoomRef.current,
+      });
+
+      if (draggingNodeRef.current) {
+        const newX = (touch.clientX - rect.left - offsetRef.current.x - panRef.current.x) / zoomRef.current;
+        const newY = (touch.clientY - rect.top  - offsetRef.current.y - panRef.current.y) / zoomRef.current;
+        updateNode(draggingNodeRef.current, { x: newX, y: newY });
+      } else if (isPanningRef.current) {
+        setPan({ x: touch.clientX - panStartRef.current.x, y: touch.clientY - panStartRef.current.y });
+      }
+    }
+  }, [updateNode, minZoom, maxZoom]);
+
   const handleMouseUp = useCallback(() => {
     draggingNodeRef.current = null;
     isPanningRef.current    = false;
@@ -348,29 +387,45 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
     setIsPanning(false);
   }, []);
 
+  const handleTouchEnd = useCallback(() => {
+    draggingNodeRef.current = null;
+    isPanningRef.current    = false;
+    setDraggingNode(null);
+    setIsPanning(false);
+    // Reset pinch metrics when fingers lift
+    initialTouchDistanceRef.current = null;
+  }, []);
+
   useEffect(() => {
-    // Attach mousemove to the container (not window) so the editor's
-    // window-level drag-select listener never sees MindMap pointer events.
-    // mouseup goes to both container AND window so releasing outside still cleans up.
     const container = containerRef.current;
     if (!container) return;
+    
+    // Desktop Listeners
     container.addEventListener("mousemove", handleMouseMove);
     container.addEventListener("mouseup",   handleMouseUp);
     window.addEventListener("mouseup", handleMouseUp);
+    
+    // Mobile Touch Listeners (Set passive to false to ensure preventDefault functions properly during pitch zooming)
+    container.addEventListener("touchmove", handleTouchMove, { passive: false });
+    container.addEventListener("touchend", handleTouchEnd);
+    window.addEventListener("touchend", handleTouchEnd);
+    
     return () => {
       container.removeEventListener("mousemove", handleMouseMove);
       container.removeEventListener("mouseup",   handleMouseUp);
       window.removeEventListener("mouseup", handleMouseUp);
+      
+      container.removeEventListener("touchmove", handleTouchMove);
+      container.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [handleMouseMove, handleMouseUp]);
+  }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
   const handleContainerMouseDown = (e: React.MouseEvent) => {
-    // Dismiss label popover on any canvas click
     if (editingConnectionId) {
       setEditingConnectionId(null);
       setLabelInputValue("");
     }
-    // Stop this event from reaching the editor's document-level drag-select listener.
     e.stopPropagation();
 
     const target = e.target as HTMLElement;
@@ -387,12 +442,52 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
         setConnectingFromHandle(null);
         return;
       }
-      const ps = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-      panStartRef.current  = ps;
-      isPanningRef.current = true;
-      setPanStart(ps);
-      setIsPanning(true);
+      startCanvasPan(e.clientX, e.clientY);
     }
+  };
+
+  // Canvas Mobile Touch Start
+  const handleContainerTouchStart = (e: React.TouchEvent) => {
+    if (editingConnectionId) {
+      setEditingConnectionId(null);
+      setLabelInputValue("");
+    }
+    e.stopPropagation();
+
+    const target = e.target as HTMLElement;
+    const isCanvasArea = target === containerRef.current ||
+      target.classList.contains('mindmap-canvas') ||
+      target.tagName === 'svg' ||
+      !!target.closest('svg');
+
+    if (isCanvasArea && !target.closest('.mindmap-node-wrapper')) {
+      setShowColorPicker(null);
+      setShowShapePicker(null);
+      if (connectingFrom) {
+        setConnectingFrom(null);
+        setConnectingFromHandle(null);
+        return;
+      }
+      
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        startCanvasPan(touch.clientX, touch.clientY);
+      } else if (e.touches.length === 2) {
+        // Prepare pinch configuration context immediately
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        initialTouchDistanceRef.current = Math.hypot(touch2.clientX - touch1.clientX, touch2.clientY - touch1.clientY);
+        initialTouchZoomRef.current = zoomRef.current;
+      }
+    }
+  };
+
+  const startCanvasPan = (clientX: number, clientY: number) => {
+    const ps = { x: clientX - panRef.current.x, y: clientY - panRef.current.y };
+    panStartRef.current  = ps;
+    isPanningRef.current = true;
+    setPanStart(ps);
+    setIsPanning(true);
   };
 
   const handleNodeDoubleClick = (e: React.MouseEvent, nodeId: string) => {
@@ -400,9 +495,19 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
     setEditingNodeId(nodeId);
   };
 
-  const startConnection = (e: React.MouseEvent, nodeId: string, handle: 'top' | 'right' | 'bottom' | 'left') => {
-    e.stopPropagation();
-    e.preventDefault();
+  // Double tap handler for text editing on mobile viewports
+  const lastTapRef = useRef<{ [key: string]: number }>({});
+  const handleNodeTouchStart = (e: React.TouchEvent, nodeId: string) => {
+    const now = Date.now();
+    const DOUBLE_TAP_DELAY = 300;
+    if (lastTapRef.current[nodeId] && (now - lastTapRef.current[nodeId] < DOUBLE_TAP_DELAY)) {
+      e.stopPropagation();
+      setEditingNodeId(nodeId);
+    }
+    lastTapRef.current[nodeId] = now;
+  };
+
+  const startConnection = (clientX: number, clientY: number, nodeId: string, handle: 'top' | 'right' | 'bottom' | 'left') => {
     setConnectingFrom(nodeId);
     setConnectingFromHandle(handle);
   };
@@ -416,7 +521,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
       const fromHandles = getHandlePositions(fromNode);
       const toHandles = getHandlePositions(toNode);
       
-      // Find closest handles
       let minDist = Infinity;
       let bestFrom = fromHandles.right;
       let bestTo = toHandles.left;
@@ -456,9 +560,7 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
           onMouseLeave={() => setHoveredConnection(null)}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          {/* Hit area */}
           <path d={curve.d} stroke="transparent" strokeWidth="16" fill="none" />
-          {/* Main line */}
           <path
             d={curve.d}
             stroke={isHovered ? "hsl(var(--accent))" : "hsl(var(--primary))"}
@@ -469,17 +571,15 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
             markerEnd={isHovered ? "url(#mindmap-arrow-hover)" : "url(#mindmap-arrow)"}
           />
 
-          {/* Direction start dot */}
           <circle cx={bestFrom.x} cy={bestFrom.y} r="3" fill="hsl(var(--primary))" />
 
-          {/* Connection label */}
           {showLabel && (
             <g
               aria-label={displayLabel}
               onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
-                // Convert SVG canvas coordinates → screen coordinates
                 const rect = containerRef.current?.getBoundingClientRect();
                 if (!rect) return;
                 const screenX = labelPos.x * zoom + pan.x + rect.left;
@@ -487,7 +587,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
                 setLabelPopoverPos({ x: screenX, y: screenY });
                 setLabelInputValue(labelText);
                 setEditingConnectionId(conn.id);
-                // Focus input on next tick
                 setTimeout(() => labelInputRef.current?.focus(), 30);
               }}
             >
@@ -519,10 +618,10 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
             </g>
           )}
 
-          {/* Delete indicator on hover */}
           {isHovered && (
             <g
               onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 deleteConnection(conn.id);
@@ -545,7 +644,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
     });
   };
 
-  // Render connecting line preview
   const renderConnectingLine = () => {
     if (!connectingFrom) return null;
     const fromNode = nodes.find(n => n.id === connectingFrom);
@@ -594,7 +692,7 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
           left: node.x - 10, 
           top: node.y - 10, 
           width: dims.width + 20, 
-          height: dims.height + 60, // Extra space for toolbar below
+          height: dims.height + 60,
         }}
         onMouseEnter={() => setHoveredNode(node.id)}
         onMouseLeave={(e) => {
@@ -619,7 +717,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
             height: dims.height,
           }}
         >
-        {/* Connection handles - visible on hover */}
         {(isHovered || connectingFrom) && (['top', 'right', 'bottom', 'left'] as const).map((pos) => {
           const handlePos = handles[pos];
           const relX = handlePos.x - node.x;
@@ -629,7 +726,8 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
               key={pos}
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
-              onMouseDown={(e) => startConnection(e, node.id, pos)}
+              onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); startConnection(e.clientX, e.clientY, node.id, pos); }}
+              onTouchStart={(e) => { e.stopPropagation(); if (e.touches.length === 1) { const t = e.touches[0]; startConnection(t.clientX, t.clientY, node.id, pos); } }}
               onClick={(e) => {
                 e.stopPropagation();
                 if (connectingFrom && connectingFrom !== node.id) {
@@ -656,9 +754,9 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
           );
         })}
 
-        {/* Main node */}
         <div
           onMouseDown={(e) => handleMouseDown(e, node.id)}
+          onTouchStart={(e) => { handleTouchStartNode(e, node.id); handleTouchStartNode(e, node.id); }}
           onDoubleClick={(e) => handleNodeDoubleClick(e, node.id)}
           className={`group relative w-full h-full cursor-move transition-shadow duration-200 ${
             connectingFrom === node.id ? 'ring-2 ring-primary' : ''
@@ -672,12 +770,12 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
               : `0 2px 8px -2px ${colorConfig.bg}30`,
           }}
         >
-          {/* Delete button on hover */}
           {isHovered && !isEditing && (
             <motion.button
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               onClick={(e) => { e.stopPropagation(); deleteNode(node.id); }}
+              onTouchStart={(e) => e.stopPropagation()}
               className="absolute -top-2 -right-2 z-30 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center shadow-md hover:bg-destructive/90 transition-colors"
               whileHover={{ scale: 1.15 }}
               whileTap={{ scale: 0.9 }}
@@ -686,7 +784,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
             </motion.button>
           )}
 
-          {/* Node content */}
           <div className={`h-full flex items-center justify-center p-3 ${shape === 'diamond' ? 'p-4' : ''}`}>
             {isEditing ? (
               <textarea
@@ -702,6 +799,7 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
                 }}
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
                 autoFocus
                 className={`w-full bg-transparent text-sm outline-none text-center resize-none ${
                   node.bold ? 'font-bold' : 'font-medium'
@@ -727,12 +825,12 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
             )}
           </div>
 
-          {/* Bottom toolbar on hover */}
           {isHovered && !isEditing && (
             <motion.div 
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               className="absolute -bottom-9 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-card border border-border rounded-lg px-1.5 py-1 shadow-lg z-40"
+              onTouchStart={(e) => e.stopPropagation()}
             >
               <button 
                 onClick={(e) => { e.stopPropagation(); updateNode(node.id, { bold: !node.bold }); }}
@@ -770,13 +868,13 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
             </motion.div>
           )}
 
-          {/* Shape picker */}
           {showShapePicker === node.id && (
             <motion.div 
               initial={{ opacity: 0, y: -5 }} 
               animate={{ opacity: 1, y: 0 }}
               className="absolute top-full left-1/2 -translate-x-1/2 mt-11 p-1.5 bg-card border border-border rounded-lg shadow-lg z-50 flex gap-1"
               onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
             >
               {shapeIcons.map(({ shape: s, icon: Icon }) => (
                 <button 
@@ -790,13 +888,13 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
             </motion.div>
           )}
 
-          {/* Color picker */}
           {showColorPicker === node.id && (
             <motion.div 
               initial={{ opacity: 0, y: -5 }} 
               animate={{ opacity: 1, y: 0 }}
               className="absolute top-full left-1/2 -translate-x-1/2 mt-11 p-2 bg-card border border-border rounded-lg shadow-lg z-50 flex gap-1.5 flex-wrap max-w-35"
               onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
             >
               {nodeColors.map((color) => (
                 <button 
@@ -906,10 +1004,11 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
         </div>
       </div>
 
-      {/* Infinite Canvas */}
+      {/* Canvas Layer Container */}
       <div 
         ref={containerRef} 
         onMouseDown={handleContainerMouseDown}
+        onTouchStart={handleContainerTouchStart}
         data-no-drag-select
         className={`mindmap-canvas relative flex-1 rounded-xl border border-border overflow-hidden ${
           isPanning ? 'cursor-grabbing' : draggingNode ? 'cursor-move' : 'cursor-grab'
@@ -920,7 +1019,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
           touchAction: 'none',
         }}
       >
-        {/* Infinite dot grid pattern - follows pan position */}
         <div 
           className="absolute inset-0 pointer-events-none" 
           style={{
@@ -930,12 +1028,10 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
           }} 
         />
         
-        {/* Coordinate indicator */}
         <div className="absolute bottom-2 left-2 text-[10px] text-muted-foreground/50 font-mono pointer-events-none select-none">
           {Math.round(-pan.x / zoom)}, {Math.round(-pan.y / zoom)}
         </div>
 
-        {/* Transform container for nodes - no fixed size for infinite feel */}
         <div 
           className="absolute origin-top-left"
           style={{ 
@@ -1013,10 +1109,10 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
         <span>{nodes.length} nodes</span>
         <span>{connections.length} connections</span>
         <span className="text-muted-foreground/60">•</span>
-        <span className="text-muted-foreground/60">Drag canvas to pan • Ctrl+scroll to zoom</span>
+        <span className="text-muted-foreground/60">Drag canvas to pan • Pinch or Ctrl+scroll to zoom</span>
       </div>
 
-      {/* Custom label editor popover — fixed-positioned so it escapes any overflow:hidden */}
+      {/* Label Edit Popover */}
       <AnimatePresence>
         {editingConnectionId && (
           <motion.div
@@ -1026,6 +1122,7 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
             transition={{ duration: 0.15 }}
             data-no-drag-select
             onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             className="fixed z-9999 w-68 rounded-xl border border-border bg-card shadow-2xl p-3"
             style={{
               left: Math.min(labelPopoverPos.x - 136, window.innerWidth - 288),
@@ -1036,7 +1133,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
               Connection label
             </p>
 
-            {/* Input row */}
             <div className="flex items-center gap-2 bg-muted rounded-lg px-3 py-2 border border-border focus-within:border-primary transition-colors">
               <svg className="w-3.5 h-3.5 text-muted-foreground shrink-0" fill="none" viewBox="0 0 16 16">
                 <path d="M2 8h12M8 2l4 6-4 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1049,7 +1145,7 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
                 onKeyDown={(e) => {
                   if (e.key === "Enter")  { e.preventDefault(); submitLabel(); }
                   if (e.key === "Escape") { e.preventDefault(); closeLabel(); }
-                  e.stopPropagation(); // keep editor shortcuts from firing
+                  e.stopPropagation();
                 }}
                 className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/50"
                 placeholder="Label text…"
@@ -1065,7 +1161,6 @@ const MindMap = ({ nodes, connections, onChange, title = "Mind Map", onTitleChan
               )}
             </div>
 
-            {/* Action buttons */}
             <div className="flex gap-2 mt-2.5">
               <button
                 onMouseDown={(e) => e.preventDefault()}
