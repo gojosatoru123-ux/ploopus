@@ -1005,24 +1005,11 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       return `<div class="rating">${Array.from({length:m},(_,i)=>`<span class="${i<v?"star-on":"star-off"}">★</span>`).join("")}<span class="rating-label">${v}/${m}</span></div>`;
     }
 
-    // ── Countdown ─────────────────────────────────────────────────────────────
-    case "countdown":
-      return block.countdownDate
-        ? `<div class="countdown"><div class="cd-label">${esc(block.countdownTitle||"Countdown")}</div><div class="cd-date">${esc(block.countdownDate)}</div></div>` : "";
-
     // ── Table — with horizontal scroll + print-safe full width ───────────────
     case "table": {
       const rows = block.tableData??[]; if (!rows.length) return "";
       const head = rows[0].map(c=>`<th>${renderInline(c)}</th>`).join("");
       const body = rows.slice(1).map(r=>`<tr>${r.map(c=>`<td>${renderInline(c)}</td>`).join("")}</tr>`).join("");
-      return `<div class="table-outer"><div class="table-scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`;
-    }
-
-    // ── Database ──────────────────────────────────────────────────────────────
-    case "database": {
-      const c=block.databaseColumns??[],r=block.databaseRows??[]; if(!c.length) return "";
-      const head=c.map(col=>`<th>${esc(col.name)}</th>`).join("");
-      const body=r.map(row=>`<tr>${c.map(col=>`<td>${renderInline(String(row.cells[col.id]??""))}</td>`).join("")}</tr>`).join("");
       return `<div class="table-outer"><div class="table-scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`;
     }
 
@@ -1655,14 +1642,9 @@ const blockToMarkdown = (block: NoteBlock, depth = 0): string => {
       const v=block.ratingValue??0,m=block.ratingMax??5;
       return `**Rating:** ${"★".repeat(v)}${"☆".repeat(Math.max(0,m-v))} (${v}/${m})`;
     }
-    case "countdown":   return block.countdownDate?`**${block.countdownTitle||"Countdown"}:** ${block.countdownDate}`:"";
     case "table": {
       const r=block.tableData;if(!r?.length)return"";
       return [`| ${r[0].join(" | ")} |`,`| ${r[0].map(()=>"---").join(" | ")} |`,...r.slice(1).map(row=>`| ${row.join(" | ")} |`)].join("\n");
-    }
-    case "database": {
-      const c=block.databaseColumns??[],r=block.databaseRows??[];if(!c.length)return"";
-      return [`| ${c.map(x=>x.name).join(" | ")} |`,`| ${c.map(()=>"---").join(" | ")} |`,...r.map(row=>`| ${c.map(x=>row.cells[x.id]??"").join(" | ")} |`)].join("\n");
     }
     case "kanban":      return (block.kanbanColumns??[]).map(col=>`**${col.title}**\n${col.cards.map(c=>`  - ${c.content}`).join("\n")||"  *(empty)*"}`).join("\n\n");
     case "timeline":    return (block.timelineItems??[]).map(item=>`- **${item.date}** — **${item.title}**${item.description?`\n  ${item.description}`:""}`).join("\n");
@@ -1714,7 +1696,6 @@ const blockToText = (block: NoteBlock, depth = 0): string => {
     case "equation": return `∫ ${block.content}`;
     case "progress": { const v=block.progressValue??0; return `Progress: [${"█".repeat(Math.round(v/5))}${"░".repeat(20-Math.round(v/5))}] ${v}%`; }
     case "rating":   { const v=block.ratingValue??0,m=block.ratingMax??5; return `Rating: ${"★".repeat(v)}${"☆".repeat(Math.max(0,m-v))} (${v}/${m})`; }
-    case "countdown": return block.countdownDate?`${block.countdownTitle||"Countdown"}: ${block.countdownDate}`:"";
     case "table":    { const r=block.tableData??[];if(!r.length)return"";const w=r[0].map((_,ci)=>Math.max(...r.map(row=>(row[ci]??"").length)));return r.map(row=>row.map((c,ci)=>c.padEnd(w[ci])).join("  │  ")).join("\n"); }
     case "kanban":   return (block.kanbanColumns??[]).map(col=>`[ ${col.title} ]\n${col.cards.map(c=>`  • ${c.content}`).join("\n")||"  (empty)"}`).join("\n\n");
     case "timeline": return (block.timelineItems??[]).map(item=>`◆ ${item.date}  ${item.title}${item.description?`\n  ${item.description}`:""}`).join("\n");
@@ -2201,15 +2182,6 @@ code{font-family:var(--font-mono)}
 .rating{display:flex;align-items:center;gap:2px;margin:.6em 0;font-size:1.4rem}
 .star-on{color:#d4954a}.star-off{color:var(--border)}
 .rating-label{font-size:.79rem;color:var(--ink4);margin-left:8px;font-weight:600}
-
-/* ── Countdown ── */
-.countdown{
-  text-align:center;padding:30px 22px;
-  background:linear-gradient(135deg,var(--rose-l),#fff8f8);
-  border:1px solid var(--rose-m);border-radius:var(--r20);margin:.8em 0;box-shadow:var(--sh0);
-}
-.cd-label{font-size:.68rem;font-weight:800;color:var(--rose);text-transform:uppercase;letter-spacing:.13em;margin-bottom:8px}
-.cd-date{font-family:var(--font-serif);font-size:1.5rem;font-weight:700;color:var(--ink);letter-spacing:-.02em}
 
 /* ── Tables ── */
 .table-outer{margin:.9em 0;border-radius:var(--r16);border:1px solid var(--border2);box-shadow:var(--sh1);overflow:hidden;background:var(--surface)}
