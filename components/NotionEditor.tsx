@@ -470,7 +470,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
             ...conn,
             id: crypto.randomUUID(),
             from: nodeIdMap.get(conn.from) ?? conn.from,
-            to:   nodeIdMap.get(conn.to)   ?? conn.to,
+            to: nodeIdMap.get(conn.to) ?? conn.to,
           }));
         }
       }
@@ -548,7 +548,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
     if (!ordered.length) return;
     setBlockClipboard(ordered, false);
     const text = ordered.map((b) => b.content || "").filter(Boolean).join("\n");
-    navigator.clipboard.writeText(text).catch(() => {/* ignore */});
+    navigator.clipboard.writeText(text).catch(() => {/* ignore */ });
     showToolbarFeedback("copied");
   };
 
@@ -557,7 +557,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
     if (!ordered.length) return;
     setBlockClipboard(ordered, true);
     const text = ordered.map((b) => b.content || "").filter(Boolean).join("\n");
-    navigator.clipboard.writeText(text).catch(() => {/* ignore */});
+    navigator.clipboard.writeText(text).catch(() => {/* ignore */ });
     showToolbarFeedback("cut");
     onChange(blocks.filter((b) => !selectedBlockIds.has(b.id)));
     clearSelection();
@@ -665,7 +665,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
 
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocks, selectedBlockIds]);
 
   // ── Drag-to-select mouse logic ─────────────────────────────────────────────
@@ -675,9 +675,9 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
 
     // Helper: get the rect of the drag selection box
     const getSelectionRect = (ds: NonNullable<typeof dragSelect>) => ({
-      left:   Math.min(ds.startX, ds.curX),
-      top:    Math.min(ds.startY, ds.curY),
-      right:  Math.max(ds.startX, ds.curX),
+      left: Math.min(ds.startX, ds.curX),
+      top: Math.min(ds.startY, ds.curY),
+      right: Math.max(ds.startX, ds.curX),
       bottom: Math.max(ds.startY, ds.curY),
     });
 
@@ -710,9 +710,9 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
           setDragSelect({ startX, startY, curX: me.clientX, curY: me.clientY, active: true });
 
           const selRect = {
-            left:   Math.min(startX, me.clientX),
-            top:    Math.min(startY, me.clientY),
-            right:  Math.max(startX, me.clientX),
+            left: Math.min(startX, me.clientX),
+            top: Math.min(startY, me.clientY),
+            right: Math.max(startX, me.clientX),
             bottom: Math.max(startY, me.clientY),
           };
 
@@ -747,7 +747,7 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
 
     root.addEventListener("mousedown", onMouseDown);
     return () => root.removeEventListener("mousedown", onMouseDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocks]);
 
   const isListType = (type: NoteBlock["type"]) => type === "bullet" || type === "numbered" || type === "todo";
@@ -1686,290 +1686,290 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
           />
         );
 
-        case "columns":
-          const columnTitles = block.columnTitles || ["Column 1", "Column 2"];
-  
-          // Add a new text block after blockIndex and focus it
-          const addNestedBlock = (colIndex: number, afterIndex: number) => {
-            const newBlock: NoteBlock = { id: crypto.randomUUID(), type: "text", content: "" };
-            const newColumns = [...(block.columns || [[], []])];
-            newColumns[colIndex] = [
-              ...newColumns[colIndex].slice(0, afterIndex + 1),
-              newBlock,
-              ...newColumns[colIndex].slice(afterIndex + 1),
-            ];
-            updateBlock(block.id, { columns: newColumns });
-            // Focus the new block after React re-renders
-            setTimeout(() => {
-              const el = contentRefs.current.get(newBlock.id);
-              el?.focus();
-            }, 20);
-          };
-  
-          // Delete block at blockIndex and focus the previous one (or next if first)
-          const deleteNestedBlock = (colIndex: number, blockIndex: number) => {
-            const col = block.columns?.[colIndex] || [];
-            if (col.length <= 1) return; // keep at least one block
-            const focusId = blockIndex > 0
-              ? col[blockIndex - 1].id
-              : col[blockIndex + 1]?.id;
-            const newColumns = [...(block.columns || [[], []])];
-            newColumns[colIndex] = newColumns[colIndex].filter((_, i) => i !== blockIndex);
-            updateBlock(block.id, { columns: newColumns });
-            setTimeout(() => {
-              if (focusId) {
-                const el = contentRefs.current.get(focusId);
-                el?.focus();
-                // Move cursor to end
-                const range = document.createRange();
-                const sel = window.getSelection();
-                range.selectNodeContents(el!);
-                range.collapse(false);
-                sel?.removeAllRanges();
-                sel?.addRange(range);
-              }
-            }, 20);
-          };
-  
-          const handleNestedKeyDown = (
-            e: React.KeyboardEvent<HTMLDivElement>,
-            colIndex: number,
-            blockIndex: number,
-            nestedBlock: NoteBlock
-          ) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              // Save current content first
-              const html = e.currentTarget.innerHTML || "";
-              updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
-              addNestedBlock(colIndex, blockIndex);
-            } else if (e.key === "Backspace") {
-              const isEmpty = e.currentTarget.innerHTML === "" || e.currentTarget.innerHTML === "<br>";
-              if (isEmpty) {
-                e.preventDefault();
-                deleteNestedBlock(colIndex, blockIndex);
-              }
-            }
-          };
-  
-          return (
-            <div className="py-2">
-              <div className="grid grid-cols-2 gap-4">
-                {(block.columns || [[], []]).map((column, colIndex) => (
-                  <div key={colIndex} className="min-h-25 border border-dashed border-muted-foreground/20 rounded-lg p-3">
-                    <div
-                      ref={(el) => {
-                        if (el) {
-                          // Create a unique key for the title ref using the block ID and column index
-                          const titleKey = `${block.id}-title-${colIndex}`;
-                          contentRefs.current.set(titleKey, el);
-                          if (!initializedRefs.current.has(titleKey)) {
-                            el.innerHTML = columnTitles[colIndex] || `Column ${colIndex + 1}`;
-                            initializedRefs.current.add(titleKey);
-                          }
-                        }
-                      }}
-                      contentEditable
-                      suppressContentEditableWarning
-                      data-placeholder={`Column ${colIndex + 1}`}
-                      onBlur={(e) => {
-                        const html = e.currentTarget.innerHTML || "";
-                        if (html !== columnTitles[colIndex]) {
-                          const newTitles = [...columnTitles];
-                          newTitles[colIndex] = html;
-                          updateBlock(block.id, { columnTitles: newTitles });
-                        }
-                      }}
-                      onInput={(e) => {
-                        // Optional: Keep this if you need instant state sync for other parts of the UI,
-                        // but remove dangerouslySetInnerHTML to prevent the cursor jump.
-                        const newTitles = [...columnTitles];
-                        newTitles[colIndex] = e.currentTarget.innerHTML;
-                        updateBlock(block.id, { columnTitles: newTitles });
-                      }}
-                      className="text-sm font-semibold mb-3 bg-muted/40 outline-none focus:bg-muted focus:text-foreground transition-colors w-full px-2 py-1 rounded border border-transparent focus:border-primary/30 text-foreground empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
-                    />
-                    <div className="space-y-2">
-                      {(column || []).map((nestedBlock, blockIndex) => (
-                        <div key={nestedBlock.id || blockIndex} className="relative group/nested">
-                          {nestedBlock.type === "text" && (
-                            <div
-                              ref={(el) => {
-                                if (el) {
-                                  contentRefs.current.set(nestedBlock.id, el);
-                                  if (!initializedRefs.current.has(nestedBlock.id)) {
-                                    el.innerHTML = nestedBlock.content || "";
-                                    initializedRefs.current.add(nestedBlock.id);
-                                  }
-                                }
-                              }}
-                              contentEditable
-                              suppressContentEditableWarning
-                              onBlur={(e) => {
-                                const html = e.currentTarget.innerHTML || "";
-                                if (html !== nestedBlock.content) {
-                                  updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
-                                }
-                              }}
-                              onKeyDown={(e) => handleNestedKeyDown(e, colIndex, blockIndex, nestedBlock)}
-                              className="outline-none py-1 text-sm empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
-                              data-placeholder="Type here..."
-                            />
-                          )}
-                          {nestedBlock.type === "bullet" && (
-                            <div className="flex items-start gap-3 py-1">
-                              <span className="mt-2.5 w-2 h-2 rounded-full bg-primary/60 shrink-0" />
-                              <div
-                                ref={(el) => {
-                                  if (el) {
-                                    contentRefs.current.set(nestedBlock.id, el);
-                                    if (!initializedRefs.current.has(nestedBlock.id)) {
-                                      el.innerHTML = nestedBlock.content || "";
-                                      initializedRefs.current.add(nestedBlock.id);
-                                    }
-                                  }
-                                }}
-                                contentEditable
-                                suppressContentEditableWarning
-                                onBlur={(e) => {
-                                  const html = e.currentTarget.innerHTML || "";
-                                  if (html !== nestedBlock.content) {
-                                    updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
-                                  }
-                                }}
-                                onKeyDown={(e) => handleNestedKeyDown(e, colIndex, blockIndex, nestedBlock)}
-                                className="flex-1 outline-none text-sm"
-                                data-placeholder="List item"
-                              />
-                            </div>
-                          )}
-                          {nestedBlock.type === "heading1" && (
-                            <div
-                              ref={(el) => {
-                                if (el) {
-                                  contentRefs.current.set(nestedBlock.id, el);
-                                  if (!initializedRefs.current.has(nestedBlock.id)) {
-                                    el.innerHTML = nestedBlock.content || "";
-                                    initializedRefs.current.add(nestedBlock.id);
-                                  }
-                                }
-                              }}
-                              contentEditable
-                              suppressContentEditableWarning
-                              onBlur={(e) => {
-                                const html = e.currentTarget.innerHTML || "";
-                                if (html !== nestedBlock.content) {
-                                  updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
-                                }
-                              }}
-                              onKeyDown={(e) => handleNestedKeyDown(e, colIndex, blockIndex, nestedBlock)}
-                              className="outline-none text-2xl font-bold empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
-                              data-placeholder="Heading 1"
-                            />
-                          )}
-                          <button
-                            onClick={() => {
-                              const newColumns = [...(block.columns || [])];
-                              newColumns[colIndex] = newColumns[colIndex].filter((_, idx) => idx !== blockIndex);
-                              updateBlock(block.id, { columns: newColumns });
-                            }}
-                            className="absolute top-0 right-0 opacity-0 group-hover/nested:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity"
-                            title="Delete"
-                          >
-                            <X className="w-3 h-3 text-destructive" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => {
-                        const newColumns = [...(block.columns || [])];
-                        newColumns[colIndex].push({ id: crypto.randomUUID(), type: "text", content: "" });
-                        updateBlock(block.id, { columns: newColumns });
-                      }}
-                      className="mt-2 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
-                    >
-                      + Add content
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
+      case "columns":
+        const columnTitles = block.columnTitles || ["Column 1", "Column 2"];
 
-          case "table":
-            return (
-              <DataTable
-                block={block}
-                onUpdate={(updates) => updateBlock(block.id, updates)}
-                onCreateChart={(tableId, columnNames) => {
-                  const index = blocks.findIndex((b) => b.id === block.id);
-                  const tableData = block.tableData || [];
-          
-                  // Helper to strip out all internal HTML elements cleanly
-                  const cleanText = (html: string) => {
-                    if (!html) return "";
-                    
-                    // Create a temporary element to let the browser natively decode entities like &nbsp;
-                    let txt = html;
-                    if (typeof window !== "undefined") {
-                      const parser = new DOMParser();
-                      const doc = parser.parseFromString(html, "text/html");
-                      txt = doc.body.textContent || doc.body.innerText || html;
-                    }
-                  
-                    // Sanitize formatting tags and line breaks
-                    txt = txt.replace(/<\/?(div|p)[^>]*>/gi, " ").replace(/<br\s*\/?>/gi, " ");
-                    txt = txt.replace(/<[^>]*>/g, "");
-                    
-                    // Normalize both standard spaces and unicode non-breaking spaces
-                    return txt.replace(/[\u00A0\s]+/g, " ").trim();
+        // Add a new text block after blockIndex and focus it
+        const addNestedBlock = (colIndex: number, afterIndex: number) => {
+          const newBlock: NoteBlock = { id: crypto.randomUUID(), type: "text", content: "" };
+          const newColumns = [...(block.columns || [[], []])];
+          newColumns[colIndex] = [
+            ...newColumns[colIndex].slice(0, afterIndex + 1),
+            newBlock,
+            ...newColumns[colIndex].slice(afterIndex + 1),
+          ];
+          updateBlock(block.id, { columns: newColumns });
+          // Focus the new block after React re-renders
+          setTimeout(() => {
+            const el = contentRefs.current.get(newBlock.id);
+            el?.focus();
+          }, 20);
+        };
+
+        // Delete block at blockIndex and focus the previous one (or next if first)
+        const deleteNestedBlock = (colIndex: number, blockIndex: number) => {
+          const col = block.columns?.[colIndex] || [];
+          if (col.length <= 1) return; // keep at least one block
+          const focusId = blockIndex > 0
+            ? col[blockIndex - 1].id
+            : col[blockIndex + 1]?.id;
+          const newColumns = [...(block.columns || [[], []])];
+          newColumns[colIndex] = newColumns[colIndex].filter((_, i) => i !== blockIndex);
+          updateBlock(block.id, { columns: newColumns });
+          setTimeout(() => {
+            if (focusId) {
+              const el = contentRefs.current.get(focusId);
+              el?.focus();
+              // Move cursor to end
+              const range = document.createRange();
+              const sel = window.getSelection();
+              range.selectNodeContents(el!);
+              range.collapse(false);
+              sel?.removeAllRanges();
+              sel?.addRange(range);
+            }
+          }, 20);
+        };
+
+        const handleNestedKeyDown = (
+          e: React.KeyboardEvent<HTMLDivElement>,
+          colIndex: number,
+          blockIndex: number,
+          nestedBlock: NoteBlock
+        ) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            // Save current content first
+            const html = e.currentTarget.innerHTML || "";
+            updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
+            addNestedBlock(colIndex, blockIndex);
+          } else if (e.key === "Backspace") {
+            const isEmpty = e.currentTarget.innerHTML === "" || e.currentTarget.innerHTML === "<br>";
+            if (isEmpty) {
+              e.preventDefault();
+              deleteNestedBlock(colIndex, blockIndex);
+            }
+          }
+        };
+
+        return (
+          <div className="py-2">
+            <div className="grid grid-cols-2 gap-4">
+              {(block.columns || [[], []]).map((column, colIndex) => (
+                <div key={colIndex} className="min-h-25 border border-dashed border-muted-foreground/20 rounded-lg p-3">
+                  <div
+                    ref={(el) => {
+                      if (el) {
+                        // Create a unique key for the title ref using the block ID and column index
+                        const titleKey = `${block.id}-title-${colIndex}`;
+                        contentRefs.current.set(titleKey, el);
+                        if (!initializedRefs.current.has(titleKey)) {
+                          el.innerHTML = columnTitles[colIndex] || `Column ${colIndex + 1}`;
+                          initializedRefs.current.add(titleKey);
+                        }
+                      }
+                    }}
+                    contentEditable
+                    suppressContentEditableWarning
+                    data-placeholder={`Column ${colIndex + 1}`}
+                    onBlur={(e) => {
+                      const html = e.currentTarget.innerHTML || "";
+                      if (html !== columnTitles[colIndex]) {
+                        const newTitles = [...columnTitles];
+                        newTitles[colIndex] = html;
+                        updateBlock(block.id, { columnTitles: newTitles });
+                      }
+                    }}
+                    onInput={(e) => {
+                      // Optional: Keep this if you need instant state sync for other parts of the UI,
+                      // but remove dangerouslySetInnerHTML to prevent the cursor jump.
+                      const newTitles = [...columnTitles];
+                      newTitles[colIndex] = e.currentTarget.innerHTML;
+                      updateBlock(block.id, { columnTitles: newTitles });
+                    }}
+                    className="text-sm font-semibold mb-3 bg-muted/40 outline-none focus:bg-muted focus:text-foreground transition-colors w-full px-2 py-1 rounded border border-transparent focus:border-primary/30 text-foreground empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
+                  />
+                  <div className="space-y-2">
+                    {(column || []).map((nestedBlock, blockIndex) => (
+                      <div key={nestedBlock.id || blockIndex} className="relative group/nested">
+                        {nestedBlock.type === "text" && (
+                          <div
+                            ref={(el) => {
+                              if (el) {
+                                contentRefs.current.set(nestedBlock.id, el);
+                                if (!initializedRefs.current.has(nestedBlock.id)) {
+                                  el.innerHTML = nestedBlock.content || "";
+                                  initializedRefs.current.add(nestedBlock.id);
+                                }
+                              }
+                            }}
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => {
+                              const html = e.currentTarget.innerHTML || "";
+                              if (html !== nestedBlock.content) {
+                                updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
+                              }
+                            }}
+                            onKeyDown={(e) => handleNestedKeyDown(e, colIndex, blockIndex, nestedBlock)}
+                            className="outline-none py-1 text-sm empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
+                            data-placeholder="Type here..."
+                          />
+                        )}
+                        {nestedBlock.type === "bullet" && (
+                          <div className="flex items-start gap-3 py-1">
+                            <span className="mt-2.5 w-2 h-2 rounded-full bg-primary/60 shrink-0" />
+                            <div
+                              ref={(el) => {
+                                if (el) {
+                                  contentRefs.current.set(nestedBlock.id, el);
+                                  if (!initializedRefs.current.has(nestedBlock.id)) {
+                                    el.innerHTML = nestedBlock.content || "";
+                                    initializedRefs.current.add(nestedBlock.id);
+                                  }
+                                }
+                              }}
+                              contentEditable
+                              suppressContentEditableWarning
+                              onBlur={(e) => {
+                                const html = e.currentTarget.innerHTML || "";
+                                if (html !== nestedBlock.content) {
+                                  updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
+                                }
+                              }}
+                              onKeyDown={(e) => handleNestedKeyDown(e, colIndex, blockIndex, nestedBlock)}
+                              className="flex-1 outline-none text-sm"
+                              data-placeholder="List item"
+                            />
+                          </div>
+                        )}
+                        {nestedBlock.type === "heading1" && (
+                          <div
+                            ref={(el) => {
+                              if (el) {
+                                contentRefs.current.set(nestedBlock.id, el);
+                                if (!initializedRefs.current.has(nestedBlock.id)) {
+                                  el.innerHTML = nestedBlock.content || "";
+                                  initializedRefs.current.add(nestedBlock.id);
+                                }
+                              }
+                            }}
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={(e) => {
+                              const html = e.currentTarget.innerHTML || "";
+                              if (html !== nestedBlock.content) {
+                                updateNestedBlock(block.id, colIndex, nestedBlock.id, { content: html });
+                              }
+                            }}
+                            onKeyDown={(e) => handleNestedKeyDown(e, colIndex, blockIndex, nestedBlock)}
+                            className="outline-none text-2xl font-bold empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40"
+                            data-placeholder="Heading 1"
+                          />
+                        )}
+                        <button
+                          onClick={() => {
+                            const newColumns = [...(block.columns || [])];
+                            newColumns[colIndex] = newColumns[colIndex].filter((_, idx) => idx !== blockIndex);
+                            updateBlock(block.id, { columns: newColumns });
+                          }}
+                          className="absolute top-0 right-0 opacity-0 group-hover/nested:opacity-100 p-1 rounded hover:bg-destructive/10 transition-opacity"
+                          title="Delete"
+                        >
+                          <X className="w-3 h-3 text-destructive" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newColumns = [...(block.columns || [])];
+                      newColumns[colIndex].push({ id: crypto.randomUUID(), type: "text", content: "" });
+                      updateBlock(block.id, { columns: newColumns });
+                    }}
+                    className="mt-2 text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-muted transition-colors"
+                  >
+                    + Add content
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case "table":
+        return (
+          <DataTable
+            block={block}
+            onUpdate={(updates) => updateBlock(block.id, updates)}
+            onCreateChart={(tableId, columnNames) => {
+              const index = blocks.findIndex((b) => b.id === block.id);
+              const tableData = block.tableData || [];
+
+              // Helper to strip out all internal HTML elements cleanly
+              const cleanText = (html: string) => {
+                if (!html) return "";
+
+                // Create a temporary element to let the browser natively decode entities like &nbsp;
+                let txt = html;
+                if (typeof window !== "undefined") {
+                  const parser = new DOMParser();
+                  const doc = parser.parseFromString(html, "text/html");
+                  txt = doc.body.textContent || doc.body.innerText || html;
+                }
+
+                // Sanitize formatting tags and line breaks
+                txt = txt.replace(/<\/?(div|p)[^>]*>/gi, " ").replace(/<br\s*\/?>/gi, " ");
+                txt = txt.replace(/<[^>]*>/g, "");
+
+                // Normalize both standard spaces and unicode non-breaking spaces
+                return txt.replace(/[\u00A0\s]+/g, " ").trim();
+              };
+
+              // Clean headers cleanly so Recharts keys won't contain active HTML syntax
+              const sanitizedHeaders = (tableData[0] || []).map((header, idx) => cleanText(header) || `col${idx}`);
+
+              // Convert table data to chart format with stripped content keys and numbers
+              const chartRows = tableData.slice(1).map((row) => ({
+                id: crypto.randomUUID(),
+                cells: row.reduce((acc, cell, idx) => {
+                  const cleanedCell = cleanText(cell);
+                  const key = sanitizedHeaders[idx];
+                  return {
+                    ...acc,
+                    [key]: isNaN(Number(cleanedCell)) || cleanedCell === "" ? cleanedCell : Number(cleanedCell),
                   };
-          
-                  // Clean headers cleanly so Recharts keys won't contain active HTML syntax
-                  const sanitizedHeaders = (tableData[0] || []).map((header, idx) => cleanText(header) || `col${idx}`);
-          
-                  // Convert table data to chart format with stripped content keys and numbers
-                  const chartRows = tableData.slice(1).map((row) => ({
-                    id: crypto.randomUUID(),
-                    cells: row.reduce((acc, cell, idx) => {
-                      const cleanedCell = cleanText(cell);
-                      const key = sanitizedHeaders[idx];
-                      return {
-                        ...acc,
-                        [key]: isNaN(Number(cleanedCell)) || cleanedCell === "" ? cleanedCell : Number(cleanedCell),
-                      };
-                    }, {}),
-                  }));
-          
-                  const chartColumns: { id: string; key: string; type: "text" | "number" }[] = sanitizedHeaders.map((name, idx) => {
-                    const firstRowValue = cleanText(tableData[1]?.[idx] || "");
-                    return {
-                      id: `col${idx}`,
-                      key: name,
-                      type: (/^\d+(\.\d+)?$/.test(firstRowValue) ? "number" : "text") as "text" | "number",
-                    };
-                  });
-          
-                  const chartBlock: NoteBlock = {
-                    id: crypto.randomUUID(),
-                    type: "chart",
-                    content: "Chart from Table",
-                    chartType: "bar",
-                    chartTitle: "My Chart",
-                    chartColumns,
-                    chartRows,
-                    chartXAxisKey: chartColumns[0]?.key, // Sync directly to the sanitized key string
-                    chartSelectedSeries: chartColumns.filter(c => c.type === "number").map(c => c.key),
-                    chartSeriesColors: {},
-                    linkedTableId: tableId,
-                  };
-                  const newBlocks = [...blocks];
-                  newBlocks.splice(index + 1, 0, chartBlock);
-                  onChange(newBlocks);
-                }}
-              />
-            );
+                }, {}),
+              }));
+
+              const chartColumns: { id: string; key: string; type: "text" | "number" }[] = sanitizedHeaders.map((name, idx) => {
+                const firstRowValue = cleanText(tableData[1]?.[idx] || "");
+                return {
+                  id: `col${idx}`,
+                  key: name,
+                  type: (/^\d+(\.\d+)?$/.test(firstRowValue) ? "number" : "text") as "text" | "number",
+                };
+              });
+
+              const chartBlock: NoteBlock = {
+                id: crypto.randomUUID(),
+                type: "chart",
+                content: "Chart from Table",
+                chartType: "bar",
+                chartTitle: "My Chart",
+                chartColumns,
+                chartRows,
+                chartXAxisKey: chartColumns[0]?.key, // Sync directly to the sanitized key string
+                chartSelectedSeries: chartColumns.filter(c => c.type === "number").map(c => c.key),
+                chartSeriesColors: {},
+                linkedTableId: tableId,
+              };
+              const newBlocks = [...blocks];
+              newBlocks.splice(index + 1, 0, chartBlock);
+              onChange(newBlocks);
+            }}
+          />
+        );
 
       case "file":
         return (
@@ -2402,16 +2402,16 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
           <div
             className="fixed pointer-events-none z-40 border border-primary/60 bg-primary/10 rounded"
             style={{
-              left:   Math.min(dragSelect.startX, dragSelect.curX),
-              top:    Math.min(dragSelect.startY, dragSelect.curY),
-              width:  Math.abs(dragSelect.curX - dragSelect.startX),
+              left: Math.min(dragSelect.startX, dragSelect.curX),
+              top: Math.min(dragSelect.startY, dragSelect.curY),
+              width: Math.abs(dragSelect.curX - dragSelect.startX),
               height: Math.abs(dragSelect.curY - dragSelect.startY),
             }}
           />
         )}
-        {blocks.map((block,blockIndex) => {
+        {blocks.map((block, blockIndex) => {
           const isSelected = selectedBlockIds.has(block.id);
-          
+
           return (
             <div key={block.id}>
               <motion.div
@@ -2760,11 +2760,10 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
           <button
             onClick={copySelectedBlocks}
             title="Copy (Ctrl+C)"
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              toolbarFeedback === "copied"
-                ? "bg-green-500/15 text-green-600 dark:text-green-400"
-                : "hover:bg-muted text-foreground"
-            }`}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${toolbarFeedback === "copied"
+              ? "bg-green-500/15 text-green-600 dark:text-green-400"
+              : "hover:bg-muted text-foreground"
+              }`}
           >
             {toolbarFeedback === "copied"
               ? <><Check className="w-3.5 h-3.5" /> Copied!</>
@@ -2774,11 +2773,10 @@ const NotionEditor = ({ blocks, onChange }: NotionEditorProps) => {
           <button
             onClick={cutSelectedBlocks}
             title="Cut (Ctrl+X)"
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              toolbarFeedback === "cut"
-                ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
-                : "hover:bg-muted text-foreground"
-            }`}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${toolbarFeedback === "cut"
+              ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+              : "hover:bg-muted text-foreground"
+              }`}
           >
             {toolbarFeedback === "cut"
               ? <><Check className="w-3.5 h-3.5" /> Cut!</>
