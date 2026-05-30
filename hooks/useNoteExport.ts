@@ -440,6 +440,11 @@ let _charts: ChartEntry[] = [];
 let _cid = 0;
 const nextCid = () => `ch${++_cid}`;
 
+// ── Per-export context flag ───────────────────────────────────────────────────
+// Set by buildHtml so blockToHtml can render format-specific variants without
+// threading an extra parameter through every recursive call.
+let _forPdf = false;
+
 // Chart.js 4 palette (same as ChartBlock.tsx defaultColors)
 const PAL = ["#3b82f6","#22c55e","#a855f7","#f97316","#ec4899","#14b8a6","#eab308","#ef4444","#6366f1","#84cc16"];
 const pc = (i: number) => PAL[i % PAL.length];
@@ -735,28 +740,39 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
     case "toggle":
       return `<details class="toggle" open><summary class="toggle-summary">${renderInline(block.content)}</summary><div class="toggle-body">${renderInline(block.toggleContent||"")}</div></details>`;
 
-    // ── Image — local shows note with download hint, external shows inline ───
+    // ── Image — local images are inlined as base64 in HTML & PDF exports ────────
     case "image": {
       if (!block.imageUrl) return "";
       const local = isLocal(block.imageUrl);
       if (local) {
-        return `<div class="media-local-card"><span class="media-icon">🖼</span><div class="media-info"><span class="media-label">Image (local file)</span><span class="media-url">${esc(block.imageUrl.split("/").pop() || block.imageUrl)}</span><span class="file-note">This image is stored locally — it will appear when opened on the original device.</span></div></div>`;
+        // Always emit an <img> — the mediaMap post-pass will replace src with
+        // a base64 data URI. If the fetch failed (map has originalUrl→originalUrl),
+        // the img will simply show browser's broken-image glyph instead of nothing.
+        return `<figure class="img-fig"><img src="${esc(block.imageUrl)}" alt="Image" loading="lazy"></figure>`;
       }
       return `<figure class="img-fig"><img src="${esc(block.imageUrl)}" alt="Image" loading="lazy"></figure>`;
     }
 
-    // ── Video — local card / YT+Vimeo thumbnail card / native file ────────────
+    // ── Video — local: base64 native player (HTML) or sleek card (PDF) ──────────
     case "video": {
       if (!block.videoUrl) return "";
       if (isLocal(block.videoUrl)) {
         const fname = block.videoUrl.split("/").pop() || "video";
-        return `<div class="media-local-card">
+        if (_forPdf) {
+          // PDF/print: iframes & <video> don't render — show a polished info card
+          return `<div class="media-local-card">
   <div class="mlc-icon">🎬</div>
   <div class="mlc-body">
-    <div class="mlc-label">Local Video</div>
+    <div class="mlc-label">Local Video <span class="local-badge">local</span></div>
     <div class="mlc-name">${esc(fname)}</div>
-    <div class="mlc-hint">This video is stored on your device — it won't play in exported HTML.</div>
+    <div class="mlc-hint">Video stored on your device — not available in PDF export.</div>
   </div>
+</div>`;
+        }
+        // HTML export: emit native <video> — mediaMap will inline src as base64
+        return `<div class="embed-block">
+  <div class="embed-bar"><span class="svc-badge svc-badge-default">🎬 Video</span><span class="embed-filename">${esc(fname)}</span></div>
+  <video controls class="native-video" preload="metadata" style="display:block;width:100%"><source src="${esc(block.videoUrl)}"><p class="media-fallback">Your browser cannot play this video.</p></video>
 </div>`;
       }
       const vr = resolveVideo(block.videoUrl);
@@ -800,10 +816,18 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 </a>`;
       }
 
-      // Native video file
+      // Native video file (external URL)
       if (vr.type === "native-video") {
+        if (_forPdf) {
+          // PDF: can't play video, show a link card
+          return `<a class="media-link-card pdf-ext-card" href="${esc(block.videoUrl)}" target="_blank" rel="noopener">
+  <span class="media-icon">🎬</span>
+  <div class="media-info"><span class="media-label">Video</span><span class="media-url">${esc(block.videoUrl)}</span></div>
+  <span class="mlc-arrow pdf-ext-arrow">↗</span>
+</a>`;
+        }
         return `<div class="embed-block">
-  <div class="embed-bar">${serviceBadge("Video")}<a href="${esc(block.videoUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Open ↗</a></div>
+  <div class="embed-bar"><span class="svc-badge svc-badge-default">Video</span><a href="${esc(block.videoUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Open ↗</a></div>
   <video controls class="native-video" preload="metadata" style="display:block;width:100%"><source src="${esc(block.videoUrl)}"><p class="media-fallback">Your browser cannot play this video. <a href="${esc(block.videoUrl)}" download>Download</a></p></video>
 </div>`;
       }
@@ -816,35 +840,73 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 </a>`;
     }
 
-    // ── Audio — local / Spotify / SoundCloud / Apple Music / native <audio> ────
+    // ── Audio — local: base64 native player (HTML) or sleek card (PDF) ──────────
     case "audio": {
       if (!block.audioUrl) return "";
       const fname = decodeURIComponent(block.audioUrl.split("?")[0].split("/").pop() || "Audio");
 
       // Local file
       if (isLocal(block.audioUrl)) {
-        return `<div class="media-local-card">
+        if (_forPdf) {
+          // PDF/print: audio can't play — show polished info card
+          return `<div class="media-local-card">
   <div class="mlc-icon">🎵</div>
   <div class="mlc-body">
-    <div class="mlc-label">Local Audio</div>
+    <div class="mlc-label">Local Audio <span class="local-badge">local</span></div>
     <div class="mlc-name">${esc(fname)}</div>
-    <div class="mlc-hint">This audio file is stored on your device — it won't play in exported HTML.</div>
+    <div class="mlc-hint">Audio stored on your device — not available in PDF export.</div>
+  </div>
+</div>`;
+        }
+        // HTML export: emit native <audio> — mediaMap will inline src as base64
+        const ext = block.audioUrl.split("?")[0].split(".").pop()?.toLowerCase() || "";
+        const mimeMap: Record<string,string> = {
+          mp3:"audio/mpeg", wav:"audio/wav", ogg:"audio/ogg", oga:"audio/ogg",
+          aac:"audio/aac", flac:"audio/flac", opus:"audio/ogg;codecs=opus",
+          m4a:"audio/mp4", weba:"audio/webm", webm:"audio/webm",
+        };
+        const mimeHint = mimeMap[ext];
+        const srcTag = mimeHint
+          ? `<source src="${esc(block.audioUrl)}" type="${esc(mimeHint)}">`
+          : `<source src="${esc(block.audioUrl)}">`;
+        return `<div class="audio-card">
+  <div class="audio-card-icon">🎵</div>
+  <div class="audio-inner">
+    <span class="audio-name">${esc(fname)}</span>
+    <audio controls preload="metadata" class="audio-player">
+      ${srcTag}
+      <p class="media-fallback">Can't play this audio.</p>
+    </audio>
   </div>
 </div>`;
       }
 
       const ar = resolveAudio(block.audioUrl);
 
-      // Spotify track / episode — compact 152px iframe
+      // Spotify track / episode
       if (ar.type === "spotify-track") {
+        if (_forPdf) {
+          return `<a class="media-link-card pdf-ext-card" href="${esc(block.audioUrl)}" target="_blank" rel="noopener">
+  ${serviceBadge("Spotify")}
+  <div class="media-info"><span class="media-label">Spotify Track</span><span class="media-url">${esc(block.audioUrl)}</span></div>
+  <span class="mlc-arrow pdf-ext-arrow">↗</span>
+</a>`;
+        }
         return `<div class="embed-block embed-block-audio">
   <div class="embed-bar">${serviceBadge("Spotify")}<a href="${esc(block.audioUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Open in Spotify ↗</a></div>
   <iframe src="${esc(ar.src)}" width="100%" height="152" frameborder="0" allowtransparency="true" allow="autoplay;clipboard-write;encrypted-media;fullscreen;picture-in-picture" loading="lazy" style="display:block;border-radius:0 0 var(--r14) var(--r14)"></iframe>
 </div>`;
       }
 
-      // Spotify playlist / album / show — taller iframe
+      // Spotify playlist / album / show
       if (ar.type === "spotify-playlist") {
+        if (_forPdf) {
+          return `<a class="media-link-card pdf-ext-card" href="${esc(block.audioUrl)}" target="_blank" rel="noopener">
+  ${serviceBadge("Spotify")}
+  <div class="media-info"><span class="media-label">Spotify Playlist</span><span class="media-url">${esc(block.audioUrl)}</span></div>
+  <span class="mlc-arrow pdf-ext-arrow">↗</span>
+</a>`;
+        }
         return `<div class="embed-block embed-block-audio">
   <div class="embed-bar">${serviceBadge("Spotify")}<a href="${esc(block.audioUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Open in Spotify ↗</a></div>
   <iframe src="${esc(ar.src)}" width="100%" height="352" frameborder="0" allowtransparency="true" allow="autoplay;clipboard-write;encrypted-media;fullscreen;picture-in-picture" loading="lazy" style="display:block;border-radius:0 0 var(--r14) var(--r14)"></iframe>
@@ -853,6 +915,13 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
       // SoundCloud — waveform visual player
       if (ar.type === "soundcloud") {
+        if (_forPdf) {
+          return `<a class="media-link-card pdf-ext-card" href="${esc(block.audioUrl)}" target="_blank" rel="noopener">
+  ${serviceBadge("SoundCloud")}
+  <div class="media-info"><span class="media-label">SoundCloud</span><span class="media-url">${esc(block.audioUrl)}</span></div>
+  <span class="mlc-arrow pdf-ext-arrow">↗</span>
+</a>`;
+        }
         return `<div class="embed-block embed-block-audio">
   <div class="embed-bar">${serviceBadge("SoundCloud")}<a href="${esc(block.audioUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Open on SoundCloud ↗</a></div>
   <iframe width="100%" height="166" scrolling="no" frameborder="no" allow="autoplay" src="${esc(ar.src)}" loading="lazy" style="display:block;border-radius:0 0 var(--r14) var(--r14)"></iframe>
@@ -861,16 +930,29 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
       // Apple Music / Podcasts
       if (ar.type === "apple") {
+        if (_forPdf) {
+          return `<a class="media-link-card pdf-ext-card" href="${esc(block.audioUrl)}" target="_blank" rel="noopener">
+  ${serviceBadge("Apple Music")}
+  <div class="media-info"><span class="media-label">Apple Music</span><span class="media-url">${esc(block.audioUrl)}</span></div>
+  <span class="mlc-arrow pdf-ext-arrow">↗</span>
+</a>`;
+        }
         return `<div class="embed-block embed-block-audio">
   <div class="embed-bar">${serviceBadge("Apple Music")}<a href="${esc(block.audioUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Open in Apple Music ↗</a></div>
   <iframe allow="autoplay *; encrypted-media *; fullscreen *" frameborder="0" height="175" sandbox="allow-forms allow-popups allow-same-origin allow-scripts allow-storage-access-by-user-activation allow-top-navigation-by-user-activation" src="${esc(ar.src)}" loading="lazy" style="width:100%;display:block;border-radius:0 0 var(--r14) var(--r14)"></iframe>
 </div>`;
       }
 
-      // Native <audio> — for direct files AND any unknown external URL.
-      // The browser will try to fetch & play; if it can't (wrong MIME / CORS),
-      // the <a> fallback inside is shown automatically.
+      // Native <audio> — direct files & unknown external URLs
       if (ar.type === "native") {
+        if (_forPdf) {
+          // PDF: audio can't play, show a link card
+          return `<a class="media-link-card pdf-ext-card" href="${esc(block.audioUrl)}" target="_blank" rel="noopener">
+  <span class="media-icon">🎵</span>
+  <div class="media-info"><span class="media-label">Audio</span><span class="media-url">${esc(fname !== "Audio" ? fname : (ar.label || block.audioUrl))}</span></div>
+  <span class="mlc-arrow pdf-ext-arrow">↗</span>
+</a>`;
+        }
         const srcTag = ar.mimeHint
           ? `<source src="${esc(block.audioUrl)}" type="${esc(ar.mimeHint)}">`
           : `<source src="${esc(block.audioUrl)}">`;
@@ -898,27 +980,50 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 </a>`;
     }
 
-    // ── File — local badge / PDF iframe / GDoc / Office / CodePen / Figma / etc ─
+    // ── File — local: base64 download link (HTML) or sleek card (PDF) ───────────
     case "file": {
       if (!block.fileUrl) return "";
       const name = block.fileName || block.fileUrl.split("/").pop() || "File";
       const icon = fileIcon(block.fileName || "", block.fileUrl);
       const fr = resolveFile(block.fileUrl, name);
 
-      // Local file — can't display, show a clear card
+      // Local file
       if (fr.type === "local") {
-        return `<div class="media-local-card">
+        if (_forPdf) {
+          return `<div class="media-local-card">
   <div class="mlc-icon">${icon}</div>
   <div class="mlc-body">
     <div class="mlc-label">Local File <span class="local-badge">local</span></div>
     <div class="mlc-name">${esc(name)}</div>
-    <div class="mlc-hint">This file is stored on your device and can't be previewed in the export.</div>
+    <div class="mlc-hint">File stored on your device — not available in PDF export.</div>
+  </div>
+</div>`;
+        }
+        // HTML export: emit a download link — mediaMap will inline href as base64 data URI
+        return `<div class="file-card">
+  <div class="file-icon-lg">${icon}</div>
+  <div class="file-info">
+    <span class="file-name">${esc(name)}</span>
+    <a href="${esc(block.fileUrl)}" download="${esc(name)}" class="file-link">Download file ↓</a>
+    <span class="file-note">Local file — embedded in this HTML export.</span>
   </div>
 </div>`;
       }
 
       // Embeddable (PDF, GDoc, GSheet, GSlide, Office, CodePen, Figma, etc.)
       if (fr.iframeSrc) {
+        if (_forPdf) {
+          // PDF: iframes won't render — show a polished link card
+          return `<a class="media-link-card pdf-ext-card" href="${esc(block.fileUrl)}" target="_blank" rel="noopener">
+  <div class="file-icon-lg" style="font-size:1.1em;width:40px;height:40px">${icon}</div>
+  <div class="media-info">
+    ${serviceBadge(fr.label)}
+    <span class="media-label" style="margin-top:4px">${esc(name)}</span>
+    <span class="media-url">${esc(block.fileUrl)}</span>
+  </div>
+  <span class="mlc-arrow pdf-ext-arrow">↗</span>
+</a>`;
+        }
         const isCode  = ["codepen","codesandbox","stackblitz","jsfiddle","replit"].includes(fr.type);
         const isDesign = fr.type === "figma";
         const iframeH = isCode ? "460px" : isDesign ? "500px" : fr.type === "gslide" ? "480px" : "520px";
@@ -952,9 +1057,29 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
     // ── Embed — CodePen / CodeSandbox / StackBlitz / Figma / GDoc / YT card / etc
     case "embed": {
       if (!block.embedUrl) return "";
+
+      // Local URL in an embed block — treat like a local file
+      if (isLocal(block.embedUrl)) {
+        if (_forPdf) {
+          return `<div class="media-local-card">
+  <div class="mlc-icon">🔗</div>
+  <div class="mlc-body">
+    <div class="mlc-label">Local Embed <span class="local-badge">local</span></div>
+    <div class="mlc-name">${esc(block.embedUrl.split("/").pop() || block.embedUrl)}</div>
+    <div class="mlc-hint">Local resource — not available in PDF export.</div>
+  </div>
+</div>`;
+        }
+        return `<a class="media-link-card" href="${esc(block.embedUrl)}" target="_blank" rel="noopener">
+  <span class="media-icon">🔗</span>
+  <div class="media-info"><span class="media-label">Embed</span><span class="media-url">${esc(block.embedUrl)}</span></div>
+  <span class="mlc-arrow">↗</span>
+</a>`;
+      }
+
       const er = resolveEmbed(block.embedUrl);
       if (er.type === "vid-card") {
-        // YouTube/Vimeo thumbnail card (same as video block)
+        // YouTube/Vimeo thumbnail card — works in HTML & PDF (no iframe needed)
         return `<div class="embed-block">
   <div class="embed-bar">${serviceBadge(er.label)}<a href="${esc(er.watchUrl||block.embedUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Watch on ${esc(er.label)} ↗</a></div>
   <a class="vid-thumb-card" href="${esc(er.watchUrl||block.embedUrl)}" target="_blank" rel="noopener">
@@ -964,6 +1089,14 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 </div>`;
       }
       if (er.type === "iframe") {
+        if (_forPdf) {
+          // PDF: iframes don't render — show a polished link card
+          return `<a class="media-link-card pdf-ext-card" href="${esc(block.embedUrl)}" target="_blank" rel="noopener">
+  ${serviceBadge(er.label)}
+  <div class="media-info"><span class="media-label">Embedded content</span><span class="media-url">${esc(block.embedUrl)}</span></div>
+  <span class="mlc-arrow pdf-ext-arrow">↗</span>
+</a>`;
+        }
         const h = er.tall ? "480px" : "360px";
         return `<div class="embed-block">
   <div class="embed-bar">${serviceBadge(er.label)}<a href="${esc(block.embedUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Open ↗</a></div>
@@ -1028,15 +1161,17 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       }).join("")}</div>`;
     }
 
-    // ── Gallery — local images show placeholder, external render inline ─────
+    // ── Gallery — local images inlined as base64; external render inline ────────
     case "gallery": {
       const imgs = block.galleryImages ?? [];
       return `<div class="gallery">${imgs.map(img => {
         const local = isLocal(img.url);
-        if (local) {
-          const fname = img.url.split("/").pop() || "Image";
-          return `<figure class="gal-item gal-local"><div class="gal-local-inner"><span class="gal-local-icon">🖼</span><span class="gal-local-name">${esc(fname)}</span><span class="gal-local-note">Local file</span></div>${img.caption?`<figcaption>${esc(img.caption)}</figcaption>`:""}</figure>`;
+        if (local && _forPdf) {
+          // PDF and mediaMap fetch failed (would be replaced if fetch succeeded)
+          // We still emit the img tag — mediaMap post-pass handles success.
+          // This fallback only shows if mediaMap has no entry for this url.
         }
+        // Always emit img — mediaMap will swap local src to base64
         return `<figure class="gal-item"><img src="${esc(img.url)}" alt="${esc(img.caption||"")}" loading="lazy">${img.caption?`<figcaption>${renderInline(img.caption)}</figcaption>`:""}</figure>`;
       }).join("")}</div>`;
     }
@@ -1550,18 +1685,13 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       return `<div class="table-outer"><div class="table-scroll"><table class="cmp-table">${head}${body}</table></div></div>`;
     }
 
-    // ── Image + text — local image shows info card, external renders inline ──
+    // ── Image + text — local image inlined as base64; external renders inline ────
     case "imageText": {
       const dir = block.imageTextLayout === "imageRight" ? "row-reverse" : "row";
       let imgPart = "";
       if (block.imageTextUrl) {
-        const local = isLocal(block.imageTextUrl);
-        if (local) {
-          const fname = block.imageTextUrl.split("/").pop() || "Image";
-          imgPart = `<div class="it-img it-img-local"><span class="gal-local-icon">🖼</span><span class="gal-local-name">${esc(fname)}</span><span class="gal-local-note">Local file — not visible in export</span></div>`;
-        } else {
-          imgPart = `<div class="it-img"><img src="${esc(block.imageTextUrl)}" alt="${esc(block.imageTextTitle||"")}" loading="lazy"></div>`;
-        }
+        // Always emit img — mediaMap will swap local src to base64 data URI
+        imgPart = `<div class="it-img"><img src="${esc(block.imageTextUrl)}" alt="${esc(block.imageTextTitle||"")}" loading="lazy"></div>`;
       }
       const txt = `<div class="it-body">${block.imageTextTitle?`<h3 class="it-title">${renderInline(block.imageTextTitle)}</h3>`:""}${block.imageTextDescription?`<p class="it-desc">${renderInline(block.imageTextDescription)}</p>`:""}</div>`;
       return `<div class="image-text" style="flex-direction:${dir}">${imgPart}${txt}</div>`;
@@ -1818,7 +1948,7 @@ a{color:var(--sage)}a:hover{text-decoration:underline}
 .ab-btn svg{flex-shrink:0;opacity:.85}
 
 /* ── Page shell ── */
-.page{max-width:760px;margin:0 auto;padding:48px 36px 120px}
+.page{max-width:1200px;margin:0 auto;padding:48px 36px 120px}
 
 /* ── Screen/print visibility helpers ── */
 .screen-only{display:block}
@@ -1994,6 +2124,12 @@ code{font-family:var(--font-mono)}
   border-radius:var(--r14);margin:.7em 0;box-shadow:var(--sh0);
 }
 .audio-card audio{flex:1;height:34px}
+.audio-card-icon{
+  font-size:1.3em;flex-shrink:0;width:42px;height:42px;border-radius:var(--r10);
+  background:linear-gradient(135deg,var(--sage-l),#e8f3e9);
+  border:1px solid var(--sage-m);
+  display:flex;align-items:center;justify-content:center;
+}
 .media-icon{
   font-size:1.1em;flex-shrink:0;width:38px;height:38px;border-radius:var(--r10);
   background:var(--sage-l);border:1px solid var(--sage-m);
@@ -2119,12 +2255,28 @@ code{font-family:var(--font-mono)}
   background:linear-gradient(135deg,#2a2a2a,#1a1a1a);
   color:#fff;display:flex;align-items:center;justify-content:center;
 }
+.media-link-card{
   display:flex;align-items:center;gap:14px;padding:14px 18px;
   background:var(--surface2);border:1px solid var(--border2);
   border-radius:var(--r14);margin:.7em 0;box-shadow:var(--sh0);
   text-decoration:none;color:inherit;transition:box-shadow .15s,transform .15s;
 }
 .media-link-card:hover{box-shadow:var(--sh1);transform:translateY(-1px);text-decoration:none}
+
+/* ── PDF external link card — shown in PDF/print in place of iframes ── */
+.pdf-ext-card{
+  display:flex;align-items:center;gap:14px;padding:14px 20px;
+  background:linear-gradient(135deg,var(--blue-l),#f4f6ff);
+  border:1px solid var(--blue-m);border-left:3px solid #4f8ef7;
+  border-radius:var(--r14);margin:.7em 0;
+  text-decoration:none;color:inherit;
+}
+.pdf-ext-arrow{
+  font-size:.9em;color:#4f8ef7;flex-shrink:0;
+  width:28px;height:28px;border-radius:50%;
+  background:var(--blue-l);border:1px solid var(--blue-m);
+  display:flex;align-items:center;justify-content:center;
+}
 
 /* ── Audio card (native file player) ── */
 .audio-inner{display:flex;flex-direction:column;gap:6px;flex:1;min-width:0}
@@ -2604,6 +2756,7 @@ if(pb)pb.addEventListener('click',function(){window.print();});
 const buildHtml = (note: Note, forPdf = false, mediaMap: MediaMap = new Map()): string => {
   _charts = [];
   _cid = 0;
+  _forPdf = forPdf;
 
   const body = renderBlocks(note.blocks);
   const hasCharts = _charts.length > 0;
@@ -2777,23 +2930,125 @@ const safeName = (t: string) => t.replace(/[^a-z0-9]/gi,"_").slice(0,50)||"note"
 
 type MediaMap = Map<string, string>; // original URL → data URI (or original if fetch fails)
 
-/** Fetch a URL and return a base64 data URI. Returns the original URL on failure. */
+// ── OPFS helpers ──────────────────────────────────────────────────────────────
+//
+// Files uploaded inside the app are stored in the Origin Private File System
+// (navigator.storage.getDirectory). The URL stored in a block is one of:
+//   • "opfs://<filename>"      — explicit OPFS scheme used by some storage layers
+//   • "<filename>" or "<path>" — bare name / relative path with no http/blob prefix
+//
+// Regular fetch() cannot access OPFS files, so we must use the File System
+// Access API: navigator.storage.getDirectory() → getFileHandle() → getFile().
+//
+// We try OPFS first for any URL that looks local (no http/blob/data prefix),
+// and fall back to fetch() for same-origin relative paths that might be
+// served from the web server (e.g. /uploads/…).
+
+/** Extract the filename/path to use when looking up a file in OPFS. */
+const opfsName = (url: string): string => {
+  if (url.startsWith("opfs://")) return url.slice(7);
+  // Strip any leading slash or relative prefix so it matches the OPFS file name
+  return url.replace(/^\/+/, "");
+};
+
+/** Return true for URLs that are definitely OPFS-only (not fetchable). */
+const isOpfsUrl = (url: string): boolean =>
+  url.startsWith("opfs://") ||
+  // blob: and data: are handled elsewhere; http* is always fetchable
+  (!url.startsWith("blob:") &&
+   !url.startsWith("data:") &&
+   !url.startsWith("http://") &&
+   !url.startsWith("https://") &&
+   !url.startsWith("//") &&
+   !url.startsWith("file:"));
+
+/**
+ * Read a file from OPFS by name, trying nested sub-directories if needed.
+ * Returns a File object or null if not found.
+ */
+const readFromOpfs = async (filename: string): Promise<File | null> => {
+  if (!navigator?.storage?.getDirectory) return null;
+  try {
+    const root = await navigator.storage.getDirectory();
+    // Try the name directly at the root level
+    try {
+      const handle = await root.getFileHandle(filename, { create: false });
+      return await handle.getFile();
+    } catch { /* not at root — try sub-directories */ }
+    // Common sub-directory names used by note apps for media storage
+    const subDirs = ["images", "media", "uploads", "files", "attachments", "assets"];
+    for (const dir of subDirs) {
+      try {
+        const dirHandle = await root.getDirectoryHandle(dir, { create: false });
+        try {
+          const handle = await dirHandle.getFileHandle(filename, { create: false });
+          return await handle.getFile();
+        } catch { /* not in this sub-dir */ }
+      } catch { /* sub-dir doesn't exist */ }
+    }
+    // Try stripping any path prefix (e.g. "images/foo.jpg" → look for "foo.jpg")
+    const basename = filename.split("/").pop();
+    if (basename && basename !== filename) {
+      try {
+        const handle = await root.getFileHandle(basename, { create: false });
+        return await handle.getFile();
+      } catch { /* not at root with basename */ }
+      for (const dir of subDirs) {
+        try {
+          const dirHandle = await root.getDirectoryHandle(dir, { create: false });
+          try {
+            const handle = await dirHandle.getFileHandle(basename, { create: false });
+            return await handle.getFile();
+          } catch { /* not here */ }
+        } catch { /* sub-dir doesn't exist */ }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/** Convert a File/Blob to a base64 data URI. */
+const blobToDataUri = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("FileReader failed"));
+    reader.readAsDataURL(blob);
+  });
+
+/**
+ * Resolve any local/OPFS/blob URL to a base64 data URI.
+ *
+ * Priority:
+ *   1. Already a data URI → return as-is.
+ *   2. opfs:// scheme or bare relative path → try OPFS File System Access API.
+ *   3. blob: / same-origin http → try fetch().
+ *   4. All failures → return original URL (will show broken image / silence).
+ */
 const urlToDataUri = async (url: string): Promise<string> => {
   if (!url) return url;
-  // Already a data URI — nothing to do
   if (url.startsWith("data:")) return url;
+
+  // ── Path 1: OPFS (bare relative path or opfs:// scheme) ──────────────────
+  if (isOpfsUrl(url)) {
+    const filename = opfsName(url);
+    const file = await readFromOpfs(filename);
+    if (file) {
+      try { return await blobToDataUri(file); } catch { /* fall through */ }
+    }
+    // If not found in OPFS, try fetch in case it's served as a static file
+  }
+
+  // ── Path 2: blob: / relative path served from web server ─────────────────
   try {
     const res = await fetch(url);
     if (!res.ok) return url;
     const blob = await res.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("FileReader failed"));
-      reader.readAsDataURL(blob);
-    });
+    return await blobToDataUri(blob);
   } catch {
-    return url; // Network error or CORS — keep original, may not show but won't crash
+    return url; // Network error or CORS — keep original
   }
 };
 
@@ -2805,19 +3060,24 @@ const urlToDataUri = async (url: string): Promise<string> => {
 const inlineNoteMedia = async (note: Note): Promise<MediaMap> => {
   const map: MediaMap = new Map();
 
-  // Decide if a URL needs inlining: local files, blob: URLs, and same-host URLs
+  // Decide if a URL needs inlining:
+  //   • opfs:// scheme — always (OPFS, not fetchable)
+  //   • blob: / file: — always
+  //   • Bare relative path (no protocol) — always (could be OPFS or same-origin)
+  //   • Same-host http URL — yes (blob: origin can't reach same-origin)
   const needsInline = (url: string | undefined): url is string => {
     if (!url) return false;
-    if (url.startsWith("data:")) return false; // already inlined
+    if (url.startsWith("data:")) return false; // already a data URI
+    if (url.startsWith("opfs://")) return true; // explicit OPFS scheme
     if (url.startsWith("blob:")) return true;
     if (url.startsWith("file:")) return true;
-    // Relative paths (no protocol)
+    // Bare relative paths (no protocol) — treat as OPFS / same-origin
     if (!url.startsWith("http://") && !url.startsWith("https://") && !url.startsWith("//")) return true;
     // Same host as the app (e.g. http://localhost:3000/uploads/…)
     try {
       const parsed = new URL(url);
       if (parsed.hostname === window.location.hostname) return true;
-    } catch { /* not a valid absolute URL — treat as relative */ return true; }
+    } catch { return true; }
     return false;
   };
 
@@ -2898,9 +3158,12 @@ export const useNoteExport = () => {
         dl(`${note.title}\n${"═".repeat(note.title.length||1)}\n\n${body}${tags}`, `${name}.txt`, "text/plain");
         break;
       }
-      case "html":
-        dl(buildHtml(note, false), `${name}.html`, "text/html");
+      case "html": {
+        // Inline local media as base64 so the standalone HTML file is self-contained
+        const mediaMap = await inlineNoteMedia(note);
+        dl(buildHtml(note, false, mediaMap), `${name}.html`, "text/html");
         break;
+      }
       case "pdf":
         await exportPdf(note);
         break;
