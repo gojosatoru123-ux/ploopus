@@ -1014,6 +1014,36 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       const audioUrl = block.audioUrl;
       const fname = decodeURIComponent(audioUrl.split("?")[0].split("/").pop() || "Audio");
 
+      // Shared mime-type helper used by both local and external native audio
+      const audioExt = audioUrl.split("?")[0].split(".").pop()?.toLowerCase() || "";
+      const audioMimeMap: Record<string,string> = {
+        mp3:"audio/mpeg", wav:"audio/wav", ogg:"audio/ogg", oga:"audio/ogg",
+        aac:"audio/aac", flac:"audio/flac", opus:"audio/ogg;codecs=opus",
+        m4a:"audio/mp4", weba:"audio/webm", webm:"audio/webm",
+      };
+      const audioMime = audioMimeMap[audioExt] || "";
+
+      // ── Helper: build the native <audio> player card ─────────────────────────
+      // Layout: icon | (name on top, player below) — all fully inline-styled
+      // so no external CSS interference. Raw URL in src (no esc()) so mediaMap
+      // post-pass can do string-replace of src="ORIGINAL_URL" → base64 data URI.
+      const makeAudioCard = (srcUrl: string, displayName: string, mime: string, isLocal = false) => {
+        const srcAttr = mime ? ` type="${mime}"` : "";
+        const fallback = isLocal
+          ? `<p style="font-size:.78rem;color:#888;margin:4px 0 0">Can't play this audio.</p>`
+          : `<p style="font-size:.78rem;color:#888;margin:4px 0 0">Can't play · <a href="${esc(srcUrl)}" target="_blank" rel="noopener">Open ↗</a></p>`;
+        return `<div style="display:flex;align-items:flex-start;gap:12px;padding:14px 18px;background:var(--surface2,#f9f7f4);border:1px solid var(--border2,#e8e0d8);border-radius:12px;margin:.7em 0;box-shadow:0 1px 3px rgba(0,0,0,.06)">
+  <div style="flex-shrink:0;width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,#e6f0e8,#e8f3e9);border:1px solid #c3dbc6;display:flex;align-items:center;justify-content:center;font-size:1.2em">🎵</div>
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+    <span style="font-size:.84rem;font-weight:700;color:var(--ink,#2d2a27);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(displayName)}</span>
+    <audio controls preload="metadata" style="width:100%;height:40px;display:block;min-height:40px">
+      <source src="${srcUrl}"${srcAttr}>
+      ${fallback}
+    </audio>
+  </div>
+</div>`;
+      };
+
       // ── Local file ────────────────────────────────────────────────────────────
       if (isLocal(audioUrl)) {
         if (_forPdf) {
@@ -1026,26 +1056,8 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
   </div>
 </div>`;
         }
-        const ext = audioUrl.split("?")[0].split(".").pop()?.toLowerCase() || "";
-        const mimeMap: Record<string,string> = {
-          mp3:"audio/mpeg", wav:"audio/wav", ogg:"audio/ogg", oga:"audio/ogg",
-          aac:"audio/aac", flac:"audio/flac", opus:"audio/ogg;codecs=opus",
-          m4a:"audio/mp4", weba:"audio/webm", webm:"audio/webm",
-        };
-        const mimeHint = mimeMap[ext];
-        const srcTag = mimeHint
-          ? `<source src="${esc(audioUrl)}" type="${esc(mimeHint)}">`
-          : `<source src="${esc(audioUrl)}">`;
-        return `<div class="audio-card">
-  <div class="audio-card-icon">🎵</div>
-  <div class="audio-inner">
-    <span class="audio-name">${esc(fname)}</span>
-    <audio controls preload="metadata" class="audio-player">
-      ${srcTag}
-      <p class="media-fallback">Can't play this audio.</p>
-    </audio>
-  </div>
-</div>`;
+        // Raw audioUrl in src — mediaMap replaces src="ORIGINAL_URL" → base64 data URI
+        return makeAudioCard(audioUrl, fname, audioMime, true);
       }
 
       // ── External URL — PDF: always show redirect card ─────────────────────────
@@ -1055,7 +1067,14 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
         return pdfRedirectCard(audioUrl, "🎵", label, "Click to listen", "#1db954");
       }
 
-      // ── HTML export: try getAudioEmbedUrl first ────────────────────────────────
+      // ── HTML export: direct audio file (.mp3, .wav, etc.) — native player ────
+      // Check extension BEFORE trying streaming embed so cdn.com/file.mp3 always
+      // gets a real <audio> element, never a broken iframe attempt.
+      if (audioMime || /\.(mp3|wav|ogg|oga|aac|flac|opus|m4a|weba|webm)(\?|#|$)/i.test(audioUrl)) {
+        return makeAudioCard(audioUrl, fname, audioMime, false);
+      }
+
+      // ── HTML export: streaming services — embedded iframe player ─────────────
       const audioEmbedSrc = getAudioEmbedUrl(audioUrl);
       if (audioEmbedSrc) {
         const ar = resolveAudio(audioUrl);
@@ -1083,40 +1102,11 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 </div>`;
       }
 
-      // Native audio file
-      const ar2 = resolveAudio(audioUrl);
-      if (ar2.type === "native") {
-        const srcTag2 = ar2.mimeHint
-          ? `<source src="${esc(audioUrl)}" type="${esc(ar2.mimeHint)}">`
-          : `<source src="${esc(audioUrl)}">`;
-        const displayName = fname !== "Audio" ? fname : (ar2.label || "Audio");
-        return `<div class="audio-card">
-  <div class="audio-card-icon">🎵</div>
-  <div class="audio-inner screen-only">
-    <span class="audio-name">${esc(displayName)}</span>
-    <audio controls preload="metadata" class="audio-player">
-      ${srcTag2}
-      <p class="media-fallback">Can't play this audio. <a href="${esc(audioUrl)}" target="_blank" rel="noopener">Open ↗</a></p>
-    </audio>
-  </div>
-  <a class="pdf-redirect-card print-only" href="${esc(audioUrl)}" target="_blank" rel="noopener" style="--prc-accent:#1db954;margin:0;border:none;background:none;padding:0;flex:1;min-width:0">
-    <div class="prc-body" style="flex:1;min-width:0">
-      <div class="prc-label">Audio</div>
-      <div class="prc-sublabel">${esc(displayName)}</div>
-      <div class="prc-url">${esc(audioUrl.length > 80 ? audioUrl.slice(0, 77) + "…" : audioUrl)}</div>
-    </div>
-    <div class="prc-arrow-wrap" style="margin-left:auto">
-      <svg viewBox="0 0 16 16" fill="none" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
-    </div>
-  </a>
-</div>`;
-      }
-
-      // Known-incompatible streaming service — link card
+      // ── Fallback: link card for services with no embeddable player ────────────
       return `<a class="media-link-card" href="${esc(audioUrl)}" target="_blank" rel="noopener">
   <span class="media-icon">🎵</span>
   <div class="media-info">
-    <span class="media-label">Audio — ${esc(ar2.label||urlHost(audioUrl)||"")}</span>
+    <span class="media-label">Audio — ${esc(urlHost(audioUrl) || fname)}</span>
     <span class="media-url">${esc(audioUrl)}</span>
   </div>
   <span class="mlc-arrow">↗</span>
@@ -2333,6 +2323,8 @@ code{font-family:var(--font-mono)}
 .media-block{margin:.9em 0}
 .video-embed-wrap{position:relative;width:100%;padding-bottom:56.25%;border-radius:var(--r20);overflow:hidden;box-shadow:var(--sh2);background:#1e1b18}
 .video-embed-wrap iframe{position:absolute;inset:0;width:100%;height:100%}
+/* Ensure <audio> is always visible and has layout in HTML export */
+audio{display:block;width:100%;min-height:40px}
 .native-video{width:100%;border-radius:var(--r14);box-shadow:var(--sh2)}
 .audio-card{
   display:flex;align-items:center;gap:14px;padding:14px 18px;
@@ -3143,18 +3135,33 @@ ${body}
 </html>`;
 
   // ── Inline media: swap every local URL in src/href attributes with its data URI ──
-  // This is done on the raw HTML string so it catches ALL blocks including
-  // nested ones inside columns, tabs, gallery, imageText etc.
   if (mediaMap.size > 0) {
     mediaMap.forEach((dataUri, originalUrl) => {
       if (dataUri === originalUrl) return; // fetch failed — leave as-is
-      // Escape the URL for use in a regex (handles blob:, ?query=, etc.)
-      const escaped = originalUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      // Replace in src="..." and href="..." attributes
+
+      // Build two regex patterns: one for the raw URL, one for the HTML-entity-encoded form.
+      // This handles cases where esc() was applied to the URL before emitting the HTML,
+      // e.g. & → &amp; in filenames. We try both so the replacement is always found.
+      const rawEscaped = originalUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const htmlEncoded = originalUrl
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+      const htmlEscaped = htmlEncoded.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      // Replace raw form first
       finalHtml = finalHtml.replace(
-        new RegExp(`(src|href)="${escaped}"`, "g"),
+        new RegExp(`(src|href)="${rawEscaped}"`, "g"),
         `$1="${dataUri}"`
       );
+      // Also replace HTML-encoded form (if different)
+      if (htmlEncoded !== originalUrl) {
+        finalHtml = finalHtml.replace(
+          new RegExp(`(src|href)="${htmlEscaped}"`, "g"),
+          `$1="${dataUri}"`
+        );
+      }
     });
   }
 
