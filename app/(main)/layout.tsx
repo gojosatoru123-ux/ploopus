@@ -5,6 +5,7 @@ import { NotesProvider } from "@/contexts/NotesContext";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/app-sidebar";
 import { StorageEngine } from "@/lib/storage-engine";
+import AuthGuard from "@/components/AuthGuard";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -12,15 +13,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <NotesProvider>
-      <SidebarProvider>
-        <div className="flex h-screen w-screen overflow-hidden bg-background">
-          <AppSidebar />
-          <SidebarInset className="flex flex-1 flex-col overflow-hidden">
-            {children}
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
-    </NotesProvider>
+    <AuthGuard>
+      <NotesProvider>
+        <SidebarProvider>
+          <div className="flex h-screen w-screen overflow-hidden bg-background">
+            <AppSidebar />
+            <SidebarInset className="flex flex-1 flex-col overflow-hidden">
+              {children}
+            </SidebarInset>
+          </div>
+        </SidebarProvider>
+      </NotesProvider>
+    </AuthGuard>
   );
 }
