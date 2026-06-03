@@ -205,6 +205,15 @@ const AppSidebar = () => {
                 className="absolute bottom-full left-4 right-4 mb-2 bg-black/80 backdrop-blur-2xl border border-white/15 rounded-2xl overflow-hidden shadow-2xl z-50"
               >
                 <div className="p-2 space-y-1">
+                  <MotionLink
+                    href={"/billings"}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 `}
+                    whileHover={{ x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <CreditCard className={`w-5 h-5`} />
+                    <span>Billings</span>
+                  </MotionLink>
                   <motion.button
                     onClick={logout}
                     className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-colors text-red-400 hover:bg-red-500/10"

@@ -148,12 +148,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isPending && !session) {
-      router.push("/");
+      router.replace("/");
     }
   }, [session, isPending, router]);
 
   // While checking auth or redirecting, smoothly display the dashboard's structural layout
-  if (isPending || !session) {
+  if (isPending) {
     return (
       <div className="flex h-screen w-screen bg-background overflow-hidden">
         <DashboardSkeleton />

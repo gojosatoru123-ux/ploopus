@@ -8,7 +8,8 @@ import {
     FolderOpen,
     ArrowRight,
     Sparkles,
-    Calendar
+    Calendar,
+    Users
 } from "lucide-react";
 import JSZip from "jszip";
 import { useNotesContext } from "@/contexts/NotesContext";
@@ -23,6 +24,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NoteIndex, Folder, FlashcardItem, CalendarEvent, FlashcardDeck } from "@/lib/types";
 import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, SLIDEDECK_FILE } from "@/lib/contants";
 import { authClient } from "@/lib/auth-client";
+import Link from "next/link";
 
 type SyncStatus = 'added' | 'updated' | 'skipped';
 interface SyncLogEntry { id: string; title: string; status: SyncStatus; }
@@ -61,6 +63,12 @@ const Settings = () => {
     const [isPurging, setIsPurging] = useState(false);
     const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
     const [opfsSize, setOpfsSize] = useState<string>("---");
+    const {
+        data: session,
+        isPending, //loading state
+        error, //error object
+        refetch //refetch the session
+      } = authClient.useSession()
 
     const updateStorageEstimate = useCallback(async () => {
         try {
@@ -391,6 +399,45 @@ const Settings = () => {
         { label: "Folders", value: folders.length, icon: FolderOpen },
     ];
 
+    const plan = session?.subscription?.planName?.toLowerCase() || "free";
+    const expiresDate = session?.subscription?.expiresAt 
+        ? new Date(session?.subscription.expiresAt).toLocaleDateString('en-GB', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          })
+        : "N/A";
+        
+    const joinYear = session?.subscription?.createdAt
+        ? new Date(session?.subscription.createdAt).getFullYear()
+        : new Date().getFullYear();
+
+    const planConfig = {
+        free: {
+            badgeText: "Free",
+            badgeStyles: "bg-zinc-600 text-white",
+            title: "Basic Account Status",
+            icon: Calendar,
+            showExpiry: false,
+        },
+        pro: {
+            badgeText: "Premium",
+            badgeStyles: "bg-amber-400 text-black",
+            title: "Pro Account Status",
+            icon: Sparkles,
+            showExpiry: true,
+        },
+        team: {
+            badgeText: "Team Enterprise",
+            badgeStyles: "bg-blue-500 text-white",
+            title: "Team Account Status",
+            icon: Users,
+            showExpiry: true,
+        }
+    };
+    const currentConfig = planConfig[plan as keyof typeof planConfig] || planConfig.free;
+    const BackgroundIcon = currentConfig.icon;
+
     return (
         <div className="flex-1 h-full bg-background overflow-y-auto scrollbar-thin">
             <AnimatePresence>
@@ -470,25 +517,38 @@ const Settings = () => {
                         whileHover={{ y: -4 }}
                         className="col-span-2 bg-[#1a1c1a] text-white rounded-2xl p-6 border border-[#2e312e] flex flex-col justify-between relative overflow-hidden group shadow-lg"
                     >
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <Sparkles className="w-20 h-20" />
+                        {/* Background Decorative Icon */}
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
+                            <BackgroundIcon className="w-20 h-20" />
                         </div>
+
+                        {/* Top Badges */}
                         <div className="flex items-center gap-2 mb-2">
-                            <div className="bg-amber-400 text-black px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest">
-                                Premium
+                            <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${currentConfig.badgeStyles}`}>
+                                {currentConfig.badgeText}
                             </div>
-                            <p className="text-sm font-bold opacity-80">Member since 2026</p>
+                            <p className="text-sm font-bold opacity-80">Member since {joinYear}</p>
                         </div>
-                        <div className="flex items-end justify-between relative z-10">
+
+                        {/* Bottom Content Area */}
+                        <div className="flex items-end justify-between relative z-10 mt-4">
                             <div>
-                                <h3 className="text-lg font-bold">Pro Account Status</h3>
-                                <p className="text-xs opacity-60 flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" /> Expires: 26 Feb, 2027
-                                </p>
+                                <h3 className="text-lg font-bold">{currentConfig.title}</h3>
+                                
+                                {currentConfig.showExpiry ? (
+                                    <p className="text-xs opacity-60 flex items-center gap-1 mt-1">
+                                        <Calendar className="w-3 h-3" /> Expires: {expiresDate}
+                                    </p>
+                                ) : (
+                                    <p className="text-xs opacity-60 flex items-center gap-1 mt-1">
+                                        Upgrade for premium features
+                                    </p>
+                                )}
                             </div>
-                            <Button variant="ghost" className="text-white hover:bg-white/10 rounded-full h-10 w-10 p-0">
+                            
+                            <Link href='/billings' className="flex justify-center items-center text-white hover:bg-white/10 rounded-full h-10 w-10 p-0">
                                 <ArrowRight className="w-5 h-5" />
-                            </Button>
+                            </Link>
                         </div>
                     </motion.div>
                 </div>

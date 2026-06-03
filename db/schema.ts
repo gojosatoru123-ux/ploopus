@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, integer } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -73,9 +73,36 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
+// ==========================================
+// 2. PRODUCTION SUBSCRIPTION TABLE
+// ==========================================
+
+export const userSubscription = pgTable(
+  "user_subscription",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    razorpayOrderId: text("razorpay_order_id").notNull().unique(),
+    razorpayPaymentId: text("razorpay_payment_id").unique(),
+    planName: text("plan_name").notNull(), 
+    amount: integer("amount").notNull(),  
+    status: text("status").notNull().default("active"), // Only successful payments get here!
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").$onUpdate(() => new Date()).notNull(),
+  },
+  (table) => [
+    index("subscription_userId_idx").on(table.userId),
+    index("subscription_orderId_idx").on(table.razorpayOrderId),
+  ]
+);
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
+  subscriptions: many(userSubscription),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -92,5 +119,9 @@ export const accountRelations = relations(account, ({ one }) => ({
   }),
 }));
 
+export const userSubscriptionRelations = relations(userSubscription, ({ one }) => ({
+  user: one(user, { fields: [userSubscription.userId], references: [user.id] }),
+}));
 
-export const schema = {user, session, account, verification};
+
+export const schema = {user, session, account, verification, userSubscription};

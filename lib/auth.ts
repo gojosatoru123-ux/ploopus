@@ -3,6 +3,8 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/db/drizzle"; // your drizzle instance
 import { nextCookies } from "better-auth/next-js";
 import { schema } from "@/db/schema";
+import { customSession } from "better-auth/plugins";
+import { eq } from "drizzle-orm";
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL, 
@@ -17,5 +19,14 @@ export const auth = betterAuth({
         provider: "pg", // or "mysql", "sqlite"
         schema,
     }),
-    plugins: [nextCookies()] // make sure this is the last plugin in the array
+    plugins: [
+        customSession(async ({ user, session }) => {
+            const subscription = await db.select().from(schema.userSubscription).where(eq(schema.userSubscription.userId,user.id)).limit(1)
+            return {
+                subscription: subscription[0] || null, // add subscription to the session
+                user,
+                session
+            };
+        }),
+        nextCookies()] // make sure this is the last plugin in the array
 });
