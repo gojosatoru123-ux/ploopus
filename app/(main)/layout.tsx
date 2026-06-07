@@ -13,7 +13,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    // <AuthGuard>
+    <AuthGuard>
       <NotesProvider>
         <SidebarProvider>
           <div className="flex h-screen w-screen overflow-hidden bg-background">
@@ -24,6 +24,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarProvider>
       </NotesProvider>
-    // </AuthGuard>
+    </AuthGuard>
   );
 }
