@@ -30,7 +30,7 @@ const HeroSection = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                 className="relative mb-4 inline-flex items-center gap-2 rounded-full bg-[hsl(var(--green-light))] px-3 py-1.5 border border-[hsl(var(--green-badge))]/20 sm:mb-6 sm:px-4 sm:py-2"
             >
                 <Sparkles className="h-3.5 w-3.5 text-[hsl(var(--green-badge))] sm:h-4 sm:w-4" />
-                <span className="text-xs font-medium text-[hsl(var(--green-badge))] sm:text-sm">Zero Latency. Total Privacy. 100% Offline.</span>
+                <span className="text-xs font-medium text-[hsl(var(--green-badge))] sm:text-sm">Your Second Brain. Stored On Your Device.</span>
             </motion.div>
 
             <motion.h1
@@ -41,7 +41,7 @@ const HeroSection = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
             >
                 Your Ideas Deserve the{" "}
                 <span className="relative inline-block">
-                    <span className="relative z-10">Speed of Thought</span>
+                    <span className="relative z-10">Second Brain</span>
                     <motion.span
                         initial={{ scaleX: 0 }}
                         animate={{ scaleX: 1 }}
@@ -56,7 +56,7 @@ const HeroSection = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                 transition={{ duration: 0.6, delay: 0.15 }}
                 className="relative mx-auto mt-4 max-w-lg text-sm text-muted-foreground sm:mt-6 sm:text-lg"
             >
-                Escape the cloud lag. Use 50+ formatting blocks and 30+ ready-to-go templates in a workspace that lives entirely on your device.
+                Capture ideas, connect knowledge, study smarter, and manage projects in one beautiful workspace. Notes, mind maps, flashcards, calendars, and knowledge tools — all stored locally on your device.
             </motion.p>
 
             <motion.div
@@ -66,7 +66,7 @@ const HeroSection = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                 className="relative mt-6 flex flex-col items-center justify-center gap-3 sm:mt-8 sm:flex-row"
             >
                 <button onClick={signinwithgoogle} className="cursor-pointer inline-flex w-full items-center justify-center rounded-full bg-[hsl(var(--green-badge))] px-6 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200 hover:scale-105 active:scale-95 sm:w-auto">
-                    Start taking notes instantly
+                    Build Your Knowledge System
                 </button>
             </motion.div>
 
@@ -93,7 +93,7 @@ const HeroSection = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                         <span className="text-[10px] text-muted-foreground sm:text-xs">Dynamic<br />Blocks</span>
                     </div>
                     <div className="mt-1 flex items-center gap-1 text-xs font-bold text-[hsl(var(--green-badge))] sm:text-sm">
-                        <Zap className="h-3 w-3" /> Zero Lag
+                        <Zap className="h-3 w-3" /> Think Faster
                     </div>
                 </motion.div>
 
@@ -114,15 +114,24 @@ const HeroSection = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                     className="absolute -right-1 bottom-4 hidden items-center gap-1.5 rounded-full bg-[hsl(var(--peach-bg))] px-2 py-1 shadow-lg border border-destructive/10 sm:flex sm:px-3 sm:py-1.5 md:-right-12 md:bottom-8 hover:scale-105 transition-transform duration-200"
                 >
                     <ShieldCheck className="h-3 w-3 text-destructive sm:h-3.5 sm:w-3.5" />
-                    <span className="text-xs font-semibold sm:text-sm">Local Storage Only</span>
+                    <span className="text-xs font-semibold sm:text-sm">You Own Everything</span>
                 </motion.div>
             </motion.div>
 
             {/* Trusted by */}
             <div className="relative mt-12 sm:mt-20">
-                <p className="mb-6 text-xs text-muted-foreground sm:mb-8 sm:text-sm">The preferred choice for deep work and high-output creators</p>
+                <p className="mb-6 text-xs text-muted-foreground sm:mb-8 sm:text-sm">Built for students, creators, researchers, founders, and lifelong learners</p>
                 <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-8">
-                    {["Privacy", "Speed", "Templates", "Offline", "Local-First", "Markdown", "Blocks", "Custom"].map(
+                    {[
+                        "Notes",
+                        "Mind Maps",
+                        "Flashcards",
+                        "Study Mode",
+                        "Knowledge Graph",
+                        "Projects",
+                        "Offline",
+                        "Local-First"
+                    ].map(
                         (brand) => (
                             <motion.span
                                 key={brand}

@@ -13,31 +13,103 @@ const SpiralSVG = ({ className }: { className?: string }) => (
 
 const tiers = [
     {
-        name: "Free", price: "$0", period: "forever",
-        description: "For personal use — capture ideas offline with zero friction.",
-        features: ["Unlimited notes & pages", "Offline-first editing", "Rich text & markdown", "Basic mind maps", "3 Google Drive backups/day", "Single device sync"],
-        cta: "Get Started Free", highlighted: false,
-        cardBg: "bg-[hsl(var(--green-light))] border-[hsl(var(--green-badge))]/15",
-        btnBg: "bg-[hsl(var(--green-badge))] text-white",
-        checkColor: "text-[hsl(var(--green-badge))]",
+        name: "Free",
+        price: "$0",
+        period: "forever",
+        description:
+            "Everything you need for personal knowledge management. Free forever.",
+
+        features: [
+            "Unlimited notes",
+            "Unlimited folders",
+            "Unlimited mind maps",
+            "Unlimited flashcards",
+            "38+ editing blocks",
+            "PDF, HTML, MD & TXT exports",
+            "Knowledge graph",
+            "100% offline workspace",
+            "Single device"
+        ],
+
+        cta: "Start Free",
+        highlighted: false,
+
+        cardBg:
+            "bg-[hsl(var(--green-light))] border-[hsl(var(--green-badge))]/15",
+
+        btnBg:
+            "bg-[hsl(var(--green-badge))] text-white",
+
+        checkColor:
+            "text-[hsl(var(--green-badge))]",
     },
+
     {
-        name: "Pro", price: "$8", period: "/month",
-        description: "For power users — unlock full formatting, unlimited sync, and team features.",
-        features: ["Everything in Free", "Unlimited Google Drive sync", "Advanced mind maps & kanban", "Databases & tables", "Multi-device real-time sync", "Version history (30 days)", "Priority support", "Custom templates"],
-        cta: "Start 14-Day Trial", highlighted: true,
-        cardBg: "bg-gradient-to-br from-[hsl(var(--green-badge))] to-[hsl(var(--green-badge))]/80 border-[hsl(var(--green-badge))]",
-        btnBg: "bg-[hsl(var(--yellow-light))] text-accent-foreground",
-        checkColor: "text-[hsl(var(--yellow-tag))]",
+        name: "Pro",
+        price: "$2",
+        period: "/month",
+
+        description:
+            "For people who want automatic backup, sync, and a seamless experience across devices.",
+
+        features: [
+            "Everything in Free",
+            "Unlimited cloud backups",
+            "Multi-device sync",
+            "Version history",
+            "Premium templates",
+            "Priority support",
+            "Early access features",
+            "Advanced workspace analytics"
+        ],
+
+        cta: "Try Free For 60 Days",
+
+        highlighted: true,
+
+        cardBg:
+            "bg-gradient-to-br from-[hsl(var(--green-badge))] to-[hsl(var(--green-badge))]/80 border-[hsl(var(--green-badge))]",
+
+        btnBg:
+            "bg-[hsl(var(--yellow-light))] text-accent-foreground",
+
+        checkColor:
+            "text-[hsl(var(--yellow-tag))]",
     },
+
     {
-        name: "Team", price: "$16", period: "/user/month",
-        description: "For teams — collaborate with shared workspaces and admin controls.",
-        features: ["Everything in Pro", "Shared workspaces", "Admin & permission controls", "Team templates library", "Unlimited version history", "SSO & SAML", "Dedicated support"],
-        cta: "Contact Sales", highlighted: false,
-        cardBg: "bg-[hsl(var(--yellow-light))] border-accent/20",
-        btnBg: "bg-accent text-accent-foreground",
-        checkColor: "text-accent-foreground",
+        name: "Team",
+
+        price: "$6",
+
+        period: "/user/month",
+
+        description:
+            "For teams that need shared knowledge, permissions, and collaborative workspaces.",
+
+        features: [
+            "Everything in Pro",
+            "Shared workspaces",
+            "Team permissions",
+            "Admin controls",
+            "Centralized backups",
+            "Unlimited version history",
+            "Team templates",
+            "Priority onboarding"
+        ],
+
+        cta: "Contact Sales",
+
+        highlighted: false,
+
+        cardBg:
+            "bg-[hsl(var(--yellow-light))] border-accent/20",
+
+        btnBg:
+            "bg-accent text-accent-foreground",
+
+        checkColor:
+            "text-accent-foreground",
     },
 ];
 
@@ -67,10 +139,10 @@ const PricingSection = () => {
                         PRICING
                     </span>
                     <h2 className="mt-4 text-3xl font-bold text-foreground sm:text-4xl md:text-5xl">
-                        Simple, transparent pricing
+                        Use Ploopus Free. <br /> Upgrade Only If You Need Sync.
                     </h2>
                     <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground sm:mt-4 sm:text-base">
-                        Start free. Upgrade when you need more power. No hidden fees, cancel anytime.
+                        Your notes should never be trapped behind a paywall. Core note-taking is free forever. Upgrade only for cloud backup, sync, and advanced workspace features.
                     </p>
                 </motion.div>
 
@@ -94,7 +166,7 @@ const PricingSection = () => {
                                     transition={{ delay: 0.5, type: "spring" }}
                                     className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-accent px-4 py-1 text-xs font-semibold text-accent-foreground shadow-md"
                                 >
-                                    Most Popular
+                                    Best Value
                                 </motion.div>
                             )}
 
@@ -140,6 +212,20 @@ const PricingSection = () => {
                             </ul>
                         </motion.div>
                     ))}
+                </div>
+                <div className="mt-12 rounded-2xl border border-[hsl(var(--green-badge))]/15 bg-card p-6 text-center">
+                    <p className="text-lg font-semibold text-foreground">
+                        Your notes belong to you.
+                    </p>
+
+                    <p className="mt-2 text-sm text-muted-foreground">
+                        No ads. No tracking. No data harvesting.
+                        Core note-taking stays free forever.
+                    </p>
+
+                    <p className="mt-3 text-sm font-medium text-[hsl(var(--green-badge))]">
+                        Pay only if you want cloud backup and sync.
+                    </p>
                 </div>
             </div>
         </section>

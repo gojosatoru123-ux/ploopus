@@ -18,61 +18,55 @@ interface Feature {
     obsidian: string;
 }
 
-const ComparisonDifferenceSection = ({signinwithgoogle}:{signinwithgoogle: () => {} }) => {
+const ComparisonDifferenceSection = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
     const features: Feature[] = [
         {
-            label: "Data Location",
-            ploopus: "Local device only",
-            notion: "Cloud-dependent",
-            obsidian: "Local or cloud sync",
+            label: "Mind Maps",
+            ploopus: "Built-in",
+            notion: "Not available",
+            obsidian: "Plugin required",
         },
         {
-            label: "Offline Access",
-            ploopus: "100% functional offline",
-            notion: "Limited without internet",
-            obsidian: "Full access offline",
+            label: "Flashcards",
+            ploopus: "Built-in study system",
+            notion: "Templates needed",
+            obsidian: "Plugin required",
         },
         {
-            label: "Flashcard Decks",
-            ploopus: "Built-in study mode",
-            notion: "Requires complex templates",
-            obsidian: "Requires third-party community plugins",
-        },
-        {
-            label: "Latency",
-            ploopus: "Zero latency",
-            notion: "Variable cloud delays",
-            obsidian: "Instant local access",
-        },
-        {
-            label: "Privacy",
-            ploopus: "No server storage",
-            notion: "Stored on servers",
-            obsidian: "Local by default",
-        },
-        {
-            label: "Formatting Power",
-            ploopus: "50+ dynamic blocks",
-            notion: "40+ blocks",
-            obsidian: "Limited native blocks",
-        },
-        {
-            label: "Ready-to-use Templates",
-            ploopus: "30+ pre-built templates",
-            notion: "Community templates",
-            obsidian: "Requires setup",
+            label: "Study Mode",
+            ploopus: "Included",
+            notion: "Not available",
+            obsidian: "Plugin required",
         },
         {
             label: "Knowledge Graph",
-            ploopus: "Built-in visualization",
-            notion: "Limited connections",
-            obsidian: "Available in premium",
+            ploopus: "Built-in",
+            notion: "Limited",
+            obsidian: "Available",
         },
         {
-            label: "Free Export",
-            ploopus: "PDF & HTML (free)",
-            notion: "Limited or paid",
-            obsidian: "PDF export",
+            label: "Offline Access",
+            ploopus: "Fully offline",
+            notion: "Limited",
+            obsidian: "Fully offline",
+        },
+        {
+            label: "Data Ownership",
+            ploopus: "100% yours",
+            notion: "Cloud-based",
+            obsidian: "Local-first",
+        },
+        {
+            label: "Exports",
+            ploopus: "PDF, HTML, MD, TXT",
+            notion: "Limited",
+            obsidian: "PDF, MD",
+        },
+        {
+            label: "Templates",
+            ploopus: "Ready-to-use",
+            notion: "Community templates",
+            obsidian: "Manual setup",
         },
     ];
 
@@ -138,10 +132,10 @@ const ComparisonDifferenceSection = ({signinwithgoogle}:{signinwithgoogle: () =>
                     className="text-center mb-12 sm:mb-16"
                 >
                     <span className="inline-flex items-center rounded-full bg-[hsl(var(--green-badge))]/15 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-[hsl(var(--green-badge))] border border-[hsl(var(--green-badge))]/20 sm:px-4 sm:py-1.5 sm:text-xs">
-                        WHY PLOOPUS STANDS OUT
+                        WHY PEOPLE SWITCH
                     </span>
                     <h2 className="mt-4 text-3xl font-bold text-foreground sm:text-4xl md:text-5xl">
-                        Built differently,<br />for your actual needs
+                        One Workspace For<br />Thinking, Learning & Creating
                     </h2>
                     <p className="mt-4 max-w-2xl mx-auto text-sm text-muted-foreground sm:text-base">
                         We didn't try to be everything to everyone. Ploopus is purpose-built for writers, thinkers, and creators who need speed and control.
@@ -182,7 +176,7 @@ const ComparisonDifferenceSection = ({signinwithgoogle}:{signinwithgoogle: () =>
                     className="mt-12 sm:mt-16"
                 >
                     <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-8 text-center">
-                        How Ploopus Compares
+                        Why People Choose Ploopus
                     </h3>
 
                     <div className="overflow-x-auto rounded-2xl border border-border/50 bg-card">
@@ -233,14 +227,14 @@ const ComparisonDifferenceSection = ({signinwithgoogle}:{signinwithgoogle: () =>
                     className="mt-12 sm:mt-16 text-center"
                 >
                     <p className="text-muted-foreground mb-6 text-sm sm:text-base">
-                        Stop waiting for cloud servers. Start thinking at speed.
+                        Build a knowledge system that grows with you.
                     </p>
                     <div className="flex flex-col sm:flex-row gap-4 justify-center">
                         <button onClick={signinwithgoogle} className="inline-flex cursor-pointer items-center justify-center rounded-full bg-[hsl(var(--green-badge))] px-6 py-3 text-sm font-medium text-white shadow-lg transition-all duration-200 hover:scale-105 active:scale-95">
-                            Try Ploopus Free
+                            Build Your Second Brain
                         </button>
                         <Link href='/docs' className="inline-flex items-center justify-center rounded-full border border-[hsl(var(--green-badge))]/30 px-6 py-3 text-sm font-medium text-foreground hover:bg-muted transition-all duration-200">
-                            Learn More
+                            Explore Features
                         </Link>
                     </div>
                 </motion.div>

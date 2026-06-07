@@ -1,7 +1,7 @@
 'use client'
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
-import { Smartphone, Monitor, Tablet, HardDrive, Share2, Cpu } from "lucide-react";
+import { Smartphone, Monitor, Tablet, HardDrive, Share2, Cpu, LockIcon } from "lucide-react";
 import SyncDashboardMockup from "./mockups/SyncDashboardMockup";
 
 const SpiralSVG = ({ className }: { className?: string }) => (
@@ -38,20 +38,20 @@ const GoLiveSection = () => {
                         className="text-center md:text-left"
                     >
                         <span className="inline-flex items-center rounded-full bg-accent/30 px-3 py-1 text-xs font-semibold text-accent-foreground">
-                            Step 2
+                            Local-First Architecture
                         </span>
                         <h3 className="mt-4 text-2xl font-bold text-foreground sm:text-4xl md:text-5xl">
-                            Works wherever<br />you work
+                            Built For Ownership,<br />Not Dependence.
                         </h3>
                         <p className="mt-4 mx-auto max-w-sm text-sm text-muted-foreground leading-relaxed sm:text-base md:mx-0">
-                            Your notes are yours. Every change is instantly saved to your device, giving you a lightning-fast experience across every platform.
+                            Every note, flashcard, mind map, and project lives on your device first. No waiting for cloud servers. No internet dependency. No losing access when a service goes down.
                         </p>
 
                         <div className="mt-6 flex items-center justify-center gap-3 sm:mt-8 sm:gap-4 md:justify-start">
                             {[
-                                { icon: Monitor, label: "Web" },
-                                { icon: Smartphone, label: "Mobile" },
-                                { icon: HardDrive, label: "Native" },
+                                { icon: HardDrive, label: "Local First" },
+                                { icon: Cpu, label: "Secure" },
+                                { icon: Share2, label: "Export Anytime" },
                             ].map((item, i) => (
                                 <motion.div
                                     key={item.label}
@@ -67,6 +67,52 @@ const GoLiveSection = () => {
                                 </motion.div>
                             ))}
                         </div>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            whileInView={{ opacity: 1 }}
+                            viewport={{ once: true }}
+                            transition={{ delay: 0.6 }}
+                            className="mt-8 rounded-2xl border border-[hsl(var(--green-badge))]/15 bg-card p-4"
+                        >
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">
+                                    Storage Health
+                                </span>
+
+                                <span className="font-semibold text-[hsl(var(--green-badge))]">
+                                    100% Local
+                                </span>
+                            </div>
+
+                            <div className="mt-3 space-y-2">
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">
+                                        Server Access
+                                    </span>
+                                    <span className="text-[hsl(var(--green-badge))]">
+                                        Blocked
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">
+                                        Advertising Access
+                                    </span>
+                                    <span className="text-[hsl(var(--green-badge))]">
+                                        Blocked
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center justify-between text-xs">
+                                    <span className="text-muted-foreground">
+                                        Data Ownership
+                                    </span>
+                                    <span className="text-[hsl(var(--green-badge))]">
+                                        Yours
+                                    </span>
+                                </div>
+                            </div>
+                        </motion.div>
                     </motion.div>
                 </motion.div>
 

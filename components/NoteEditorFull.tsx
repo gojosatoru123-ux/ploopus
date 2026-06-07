@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, MoreHorizontal, Star, Share2, Clock, Focus, Minimize2, BookOpen, Sparkles, Undo2, Redo2, Download, FileText, FileCode, FileType, FileJsonIcon, File, Upload } from "lucide-react";
+import { X, Plus, MoreHorizontal, Star, Share2, Clock, Focus, Minimize2, BookOpen, Sparkles, Undo2, Redo2, Download, FileText, FileCode, FileType, FileJsonIcon, File, Upload, Stars, BookTemplate, WandSparkles } from "lucide-react";
 import NotionEditor from "./NotionEditor";
 import FloatingToolbar from "./FloatingToolbar";
 import FindReplaceBar from "./FindReplaceBar";
@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { SyncStatusIndicator } from "./SyncStatusIndicator";
 import { toast } from "sonner";
+import AiAssistantModal from "./AiAssistantModal";
 
 interface NoteEditorFullProps {
   note: Note;
@@ -39,6 +40,8 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
   const [showIndex, setShowIndex] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showAi, setShowAi] = useState(false);
+
   const activeBlockIndexRef = useRef<number>(-1);
   const importInputRef = useRef<HTMLInputElement>(null);
   // Index functionality
@@ -50,6 +53,12 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
     maxHistorySize: 100,
     debounceMs: 300,
   });
+
+  const handleAppendAiBlocks = useCallback((newBlocks: NoteBlock[]) => {
+    const merged = [...note.blocks, ...newBlocks];
+    pushState(merged, true);
+    onUpdate({ blocks: merged });
+  }, [note.blocks, onUpdate, pushState]);
 
   // Reset history when switching notes
   useEffect(() => {
@@ -160,7 +169,7 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
         } else if (Array.isArray(raw?.blocks)) {
           importedRaw = raw.blocks;
         } else {
-          toast.error("Invalid format: expected a JSON array of blocks or a note object with a blocks array.",{position:"top-right"});
+          toast.error("Invalid format: expected a JSON array of blocks or a note object with a blocks array.", { position: "top-right" });
           return;
         }
         if (importedRaw.length === 0) return;
@@ -180,7 +189,7 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
         handleBlocksChange(newBlocks);
         toast.success(`Successfully imported ${importedBlocks.length} blocks!`, { position: "top-right" });
       } catch (err) {
-        toast.error("Failed to parse JSON file. Make sure it's a valid JSON.",{position:"top-right"});
+        toast.error("Failed to parse JSON file. Make sure it's a valid JSON.", { position: "top-right" });
       } finally {
         e.target.value = "";
       }
@@ -298,53 +307,138 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
               </div>
             </TooltipProvider>
 
-            {/* Templates Button */}
-            <motion.button
-              onClick={() => setShowTemplates(true)}
-              className="hidden sm:block p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              title="Use a template"
-            >
-              <Sparkles className="w-4 h-4" />
-            </motion.button>
+            <TooltipProvider delayDuration={200}>
 
-            {/* Focus Mode Toggle */}
-            <motion.button
-              onClick={onToggleFocusMode}
-              className={`p-2 rounded-lg transition-colors ${focusMode
-                ? 'bg-primary/10 text-primary'
-                : 'hover:bg-muted text-muted-foreground'
-                }`}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              title={focusMode ? "Exit focus mode (Esc)" : "Enter focus mode"}
-            >
-              {focusMode ? <Minimize2 className="w-4 h-4" /> : <Focus className="w-4 h-4" />}
-            </motion.button>
+              {/* Templates Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <motion.button
+                    onClick={() => setShowTemplates(true)}
+                    className="hidden sm:block p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Use a template</p>
+                </TooltipContent>
+              </Tooltip>
 
-            {/* Index Toggle */}
-            <motion.button
-              onClick={() => setShowIndex(!showIndex)}
-              className={`p-2 rounded-lg transition-colors relative ${showIndex
-                ? 'bg-primary/10 text-primary'
-                : 'hover:bg-muted text-muted-foreground'
-                }`}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              title="Toggle document index"
-            >
-              <BookOpen className="w-4 h-4" />
-              {index.length > 0 && (
-                <motion.span
-                  className="absolute top-0 right-0 w-4 h-4 text-[10px] font-bold bg-primary text-primary-foreground rounded-full flex items-center justify-center"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                >
-                  {index.length}
-                </motion.span>
-              )}
-            </motion.button>
+              {/* AI Feature */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="relative">
+                    <motion.button
+                      onClick={() => setShowAi(true)}
+                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <WandSparkles className="w-4 h-4" />
+                    </motion.button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>AI Features</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Focus Mode Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <motion.button
+                    onClick={onToggleFocusMode}
+                    className={`p-2 rounded-lg transition-colors ${focusMode
+                      ? 'bg-primary/10 text-primary'
+                      : 'hover:bg-muted text-muted-foreground'
+                      }`}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    {focusMode ? <Minimize2 className="w-4 h-4" /> : <Focus className="w-4 h-4" />}
+                  </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>{focusMode ? "Exit focus mode (Esc)" : "Enter focus mode"}</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Index Toggle */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <motion.button
+                    onClick={() => setShowIndex(!showIndex)}
+                    className={`p-2 rounded-lg transition-colors relative ${showIndex
+                      ? 'bg-primary/10 text-primary'
+                      : 'hover:bg-muted text-muted-foreground'
+                      }`}
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    {index.length > 0 && (
+                      <motion.span
+                        className="absolute top-0 right-0 w-4 h-4 text-[10px] font-bold bg-primary text-primary-foreground rounded-full flex items-center justify-center"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                      >
+                        {index.length}
+                      </motion.span>
+                    )}
+                  </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Toggle document index</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Export Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="relative">
+                    <motion.button
+                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <Download className="w-4 h-4" />
+                    </motion.button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Export note</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Import Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="relative">
+                    <input
+                      ref={importInputRef}
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={handleImport}
+                    />
+                    <motion.button
+                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => importInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4" />
+                    </motion.button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Import blocks from JSON</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {/* <motion.button
               onClick={() => setIsFavorite(!isFavorite)}
@@ -354,38 +448,6 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
             >
               <Star className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
             </motion.button> */}
-            {/* Export Button */}
-            <div className="relative">
-              <motion.button
-                onClick={() => setShowExportMenu(!showExportMenu)}
-                className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                title="Export note"
-              >
-                <Download className="w-4 h-4" />
-              </motion.button>
-            </div>
-
-            {/* Import Button */}
-            <div className="relative">
-              <input
-                ref={importInputRef}
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={handleImport}
-              />
-              <motion.button
-                className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                title="Import blocks from JSON"
-                onClick={() => importInputRef.current?.click()}
-              >
-                <Upload className="w-4 h-4" />
-              </motion.button>
-            </div>
 
             {/* <motion.button
               className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
@@ -409,6 +471,15 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
           onClose={() => setShowTemplates(false)}
           onSelectTemplate={handleApplyTemplate}
         />
+
+        {/* AI Assistant Modal */}
+        <AiAssistantModal
+          isOpen={showAi}
+          onClose={() => setShowAi(false)}
+          note={note}
+          onAppendBlocks={handleAppendAiBlocks}
+        />
+
 
         {/* Index Dropdown Menu */}
         <AnimatePresence>

@@ -4,9 +4,9 @@ import { useRef } from "react";
 import { ArrowRight } from "lucide-react";
 
 const stats = [
-    { value: "0ms", label: "Input Latency", color: "border-[hsl(var(--green-badge))] bg-[hsl(var(--green-light))]" },
-    { value: "50+", label: "Power Blocks", color: "border-accent bg-[hsl(var(--yellow-light))]" },
-    { value: "100%", label: "Data Ownership", color: "border-[hsl(var(--green-badge))] bg-[hsl(var(--mint-bg))]" },
+    { value: "38+", label: "Knowledge Blocks", color: "border-[hsl(var(--green-badge))] bg-[hsl(var(--green-light))]" },
+    { value: "5", label: "Core Workflows", color: "border-accent bg-[hsl(var(--yellow-light))]" },
+    { value: "100%", label: "Ownership", color: "border-[hsl(var(--green-badge))] bg-[hsl(var(--mint-bg))]" },
 ];
 
 const SpiralSVG = ({ className }: { className?: string }) => (
@@ -41,11 +41,11 @@ const SocialStatsSection = () => {
                         className="text-center md:text-left"
                     >
                         <span className="inline-flex items-center rounded-full bg-[hsl(var(--green-badge))]/15 px-3 py-1 text-xs font-medium text-[hsl(var(--green-badge))] border border-[hsl(var(--green-badge))]/20">
-                            PERFORMANCE METRICS
+                            KNOWLEDGE SYSTEM
                         </span>
-                        <h3 className="mt-4 text-2xl font-bold text-foreground sm:text-3xl md:text-4xl">Engineered for the elite 1% of creators</h3>
+                        <h3 className="mt-4 text-2xl font-bold text-foreground sm:text-3xl md:text-4xl">Everything You Need To Build A Second Brain</h3>
                         <p className="mt-3 mx-auto max-w-sm text-sm text-muted-foreground sm:text-base md:mx-0">
-                            We traded the cloud for speed. By running everything on your local hardware, we've eliminated the friction between your thoughts and the screen.
+                            Capture ideas, connect knowledge, study smarter, and manage projects in one local-first workspace. Notes, mind maps, flashcards, calendars, and powerful knowledge tools work together seamlessly.
                         </p>
                     </motion.div>
 

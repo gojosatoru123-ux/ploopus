@@ -76,10 +76,10 @@ const Footer = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                             </motion.div>
 
                             <h3 className="text-2xl font-bold text-white sm:text-3xl md:text-4xl lg:text-5xl">
-                                Ready for a faster workspace?
+                                Ready to Build Your Second Brain?
                             </h3>
                             <p className="mx-auto mt-3 max-w-lg text-xs text-white/50 sm:mt-4 sm:text-sm md:text-base">
-                                Experience the power of local-first productivity. Your data stays with you, always accessible, with the speed your work demands.
+                                Capture ideas, connect knowledge, study smarter, and manage projects in one local-first workspace that you fully own.
                             </p>
 
                             <motion.button
@@ -88,7 +88,7 @@ const Footer = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                                 whileTap={{ scale: 0.95 }}
                                 className="cursor-pointer inline-flex items-center justify-center gap-2 rounded-2xl bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground shadow-lg transition-all duration-200 sm:py-3.5 my-4"
                             >
-                                Start Building for Free <ArrowRight className="h-4 w-4" />
+                                Build Your Knowledge System <ArrowRight className="h-4 w-4" />
                             </motion.button>
 
                             <p className="mt-3 text-[10px] text-white/50 sm:text-xs">
@@ -111,7 +111,7 @@ const Footer = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                                 <span className="text-lg font-bold text-white">Ploopus</span>
                             </div>
                             <p className="max-w-xs text-sm leading-relaxed text-white/40">
-                                The professional local-first workspace. 50+ formatting blocks and 30+ templates designed for speed, privacy, and creative freedom.
+                                Ploopus is a local-first Knowledge OS for notes, mind maps, flashcards, study systems, and project planning. Your ideas stay on your device, forever under your control.
                             </p>
 
                             <div className="mt-6 space-y-2">
@@ -145,7 +145,7 @@ const Footer = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                             </div>
                         </motion.div>
 
-                        {/* Quick Links */}
+                        {/* Resources */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             whileInView={{ opacity: 1, y: 0 }}
@@ -153,7 +153,7 @@ const Footer = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                             transition={{ delay: 0.1 }}
                             className="md:text-right"
                         >
-                            <h4 className="text-xs font-bold uppercase tracking-widest text-white/60 mb-4">Quick Links</h4>
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-white/60 mb-4">Resources</h4>
                             <ul className="space-y-2">
                                 {footerLinks.map((link) => (
                                     <li key={link.label}>
@@ -181,9 +181,9 @@ const Footer = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                             <div className="flex items-center gap-1.5">
                                 <span>© 2026 Ploopus. Built for</span>
                                 <Heart className="h-3 w-3 fill-destructive/60 text-destructive/60" />
-                                <span>digital sovereignty</span>
+                                <span>knowledge ownership</span>
                             </div>
-                            <p className="text-white/40">Think freely. Store locally. Create endlessly.</p>
+                            <p className="text-white/40">Capture knowledge. Connect ideas. Own everything.</p>
                         </div>
                     </motion.div>
                 </motion.div>

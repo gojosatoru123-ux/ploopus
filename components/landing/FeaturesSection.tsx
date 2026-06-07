@@ -40,10 +40,10 @@ const FeaturesSection = () => {
                     className="text-center"
                 >
                     <span className="inline-flex items-center rounded-full bg-[hsl(var(--green-badge))]/15 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-[hsl(var(--green-badge))] border border-[hsl(var(--green-badge))]/20 sm:px-4 sm:py-1.5 sm:text-xs">
-                        WRITE LIKE A PRO
+                        BUILD YOUR KNOWLEDGE SYSTEM
                     </span>
                     <h2 className="mt-4 text-3xl font-bold text-foreground sm:text-4xl md:text-5xl">
-                        Take your notes<br />to the next level
+                        From Quick Notes<br />to Deep Knowledge
                     </h2>
                 </motion.div>
 
@@ -72,20 +72,35 @@ const FeaturesSection = () => {
                             transition={{ duration: 0.8, delay: 0.15 }}
                         >
                             <span className="inline-flex items-center rounded-full bg-accent/30 px-3 py-1 text-xs font-semibold text-accent-foreground">
-                                Step 1
+                                Capture & Organize
                             </span>
                             <h3 className="mt-4 text-2xl font-bold text-foreground sm:text-4xl">
-                                Notion-like<br />formatting
+                                More Than<br />Just Notes
                             </h3>
                             <p className="mt-3 text-sm text-muted-foreground leading-relaxed sm:text-base">
-                                Write with beautiful rich text, slash commands, markdown shortcuts, embeds, databases, and more — all working offline.
+                                Capture ideas, connect concepts, build mind maps, study with flashcards, manage projects, and organize everything in one local-first workspace.
                             </p>
 
                             <div className="mt-6 space-y-3 sm:mt-8 sm:space-y-4">
                                 {[
-                                    { icon: Heading, label: "Rich Text & Markdown", desc: "Headings, bold, code blocks", bg: "bg-accent/20" },
-                                    { icon: List, label: "Checklists & Tables", desc: "Organize tasks beautifully", bg: "bg-[hsl(var(--green-badge))]/15" },
-                                    { icon: FileText, label: "50+ Block Types", desc: "Mind maps, kanban, databases", bg: "bg-[hsl(var(--peach-bg))]" },
+                                    {
+                                        icon: FileText,
+                                        label: "38+ Powerful Blocks",
+                                        desc: "Notes, databases, charts, equations, embeds and more",
+                                        bg: "bg-accent/20"
+                                    },
+                                    {
+                                        icon: List,
+                                        label: "Mind Maps & Flashcards",
+                                        desc: "Turn information into understanding and retention",
+                                        bg: "bg-[hsl(var(--green-badge))]/15"
+                                    },
+                                    {
+                                        icon: Heading,
+                                        label: "Projects & Knowledge",
+                                        desc: "Kanban boards, calendars, graphs and structured workflows",
+                                        bg: "bg-[hsl(var(--peach-bg))]"
+                                    },
                                 ].map((item, i) => (
                                     <motion.div
                                         key={item.label}
@@ -106,6 +121,21 @@ const FeaturesSection = () => {
                                     </motion.div>
                                 ))}
                             </div>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                whileInView={{ opacity: 1 }}
+                                viewport={{ once: true }}
+                                transition={{ delay: 0.7 }}
+                                className="mt-8 rounded-2xl border border-[hsl(var(--green-badge))]/15 bg-card p-4"
+                            >
+                                <p className="text-sm font-medium text-foreground">
+                                    Notes → Mind Maps → Flashcards → Study Mode
+                                </p>
+
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    Transform information into long-term knowledge without switching apps.
+                                </p>
+                            </motion.div>
                         </motion.div>
                     </motion.div>
                 </div>
