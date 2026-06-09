@@ -55,7 +55,7 @@ const BenchmarkSection = () => {
                             className="mt-4 inline-flex items-center gap-2 rounded-full bg-[hsl(var(--green-badge))] px-3 py-1.5 transition-transform duration-200 hover:scale-105 sm:mt-6 sm:px-4 sm:py-2"
                         >
                             <Shield className="h-3 w-3 text-white sm:h-3.5 sm:w-3.5" />
-                            <span className="text-[10px] text-white font-medium sm:text-xs">Ploopus ranks No.1 in offline-first privacy</span>
+                            <span className="text-[10px] text-white font-medium sm:text-xs">Ploopus ranks No.1 in local-first privacy</span>
                         </motion.div>
 
                         <div className="mt-8 space-y-4 sm:mt-10 sm:space-y-6">

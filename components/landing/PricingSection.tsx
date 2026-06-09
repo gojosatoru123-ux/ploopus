@@ -27,7 +27,6 @@ const tiers = [
             "38+ editing blocks",
             "PDF, HTML, MD & TXT exports",
             "Knowledge graph",
-            "100% offline workspace",
             "Single device"
         ],
 
@@ -46,7 +45,7 @@ const tiers = [
 
     {
         name: "Pro",
-        price: "$2",
+        price: "$3",
         period: "/month",
 
         description:
@@ -54,13 +53,9 @@ const tiers = [
 
         features: [
             "Everything in Free",
-            "Unlimited cloud backups",
-            "Multi-device sync",
-            "Version history",
             "Premium templates",
-            "Priority support",
-            "Early access features",
-            "Advanced workspace analytics"
+            "Semantic Search in knowledge graph",
+            "AI power functionalities using your own AI or open source models",
         ],
 
         cta: "Try Free For 60 Days",
@@ -78,24 +73,17 @@ const tiers = [
     },
 
     {
-        name: "Team",
+        name: "placeholder",
 
-        price: "$6",
+        price: "$5",
 
-        period: "/user/month",
+        period: "/month",
 
         description:
-            "For teams that need shared knowledge, permissions, and collaborative workspaces.",
+            "",
 
         features: [
-            "Everything in Pro",
-            "Shared workspaces",
-            "Team permissions",
-            "Admin controls",
-            "Centralized backups",
-            "Unlimited version history",
-            "Team templates",
-            "Priority onboarding"
+            
         ],
 
         cta: "Contact Sales",

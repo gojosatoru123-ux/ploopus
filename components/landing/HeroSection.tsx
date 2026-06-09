@@ -129,7 +129,8 @@ const HeroSection = ({ signinwithgoogle }: { signinwithgoogle: () => {} }) => {
                         "Study Mode",
                         "Knowledge Graph",
                         "Projects",
-                        "Offline",
+                        "Semantic Search",
+                        "AI Features",
                         "Local-First"
                     ].map(
                         (brand) => (

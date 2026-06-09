@@ -19,7 +19,14 @@ const tiers = [
     {
         name: "Free", price: "$0", period: "forever", plan: 'free',
         description: "For personal use — capture ideas offline with zero friction.",
-        features: ["Unlimited notes & pages", "Offline-first editing", "Rich text & markdown", "Basic mind maps", "3 Google Drive backups/day", "Single device sync"],
+        features: [
+            "Unlimited notes & pages",
+            "Offline-first editing",
+            "Rich text & markdown",
+            "Basic mind maps",
+            "3 Google Drive backups/day",
+            "Single device sync"
+        ],
         cta: "Get Started Free", highlighted: false,
         cardBg: "bg-[hsl(var(--green-light))] border-[hsl(var(--green-badge))]/15",
         btnBg: "bg-[hsl(var(--green-badge))] text-white",
@@ -28,7 +35,16 @@ const tiers = [
     {
         name: "Pro", price: "$8", period: "/month", plan: 'pro',
         description: "For power users — unlock full formatting, unlimited sync, and team features.",
-        features: ["Everything in Free", "Unlimited Google Drive sync", "Advanced mind maps & kanban", "Databases & tables", "Multi-device real-time sync", "Version history (30 days)", "Priority support", "Custom templates"],
+        features: [
+            "Everything in Free",
+            "Unlimited Google Drive sync",
+            "Advanced mind maps & kanban",
+            "Databases & tables",
+            "Multi-device real-time sync",
+            "Version history (30 days)",
+            "Priority support",
+            "Custom templates"
+        ],
         cta: "Start 14-Day Trial", highlighted: true,
         cardBg: "bg-gradient-to-br from-[hsl(var(--green-badge))] to-[hsl(var(--green-badge))]/80 border-[hsl(var(--green-badge))]",
         btnBg: "bg-[hsl(var(--yellow-light))] text-accent-foreground",
@@ -37,7 +53,15 @@ const tiers = [
     {
         name: "Team", price: "$16", period: "/user/month", plan: 'team',
         description: "For teams — collaborate with shared workspaces and admin controls.",
-        features: ["Everything in Pro", "Shared workspaces", "Admin & permission controls", "Team templates library", "Unlimited version history", "SSO & SAML", "Dedicated support"],
+        features: [
+            "Everything in Pro",
+            "Shared workspaces",
+            "Admin & permission controls",
+            "Team templates library",
+            "Unlimited version history",
+            "SSO & SAML",
+            "Dedicated support"
+        ],
         cta: "Contact Sales", highlighted: false,
         cardBg: "bg-[hsl(var(--yellow-light))] border-accent/20",
         btnBg: "bg-accent text-accent-foreground",
@@ -49,9 +73,9 @@ const BillingsPage = () => {
     const ref = useRef<HTMLElement>(null);
     const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
     const spiralRotate = useTransform(scrollYProgress, [0, 1], [0, 55]);
-    const {data:session,} = authClient.useSession()
+    const { data: session, } = authClient.useSession()
 
-    const handleCreateOrder = async (plan:string) => {
+    const handleCreateOrder = async (plan: string) => {
         try {
             const data = await createOrder(plan, session?.user.id as string);
             console.log(data)
@@ -64,10 +88,10 @@ const BillingsPage = () => {
                 handler: async function (response: any) {
                     // verify payment
                     const res = await verifyOrder({
-                            orderId: response.razorpay_order_id,
-                            razorpayPaymentId: response.razorpay_payment_id,
-                            razorpaySignature: response.razorpay_signature,
-                        })
+                        orderId: response.razorpay_order_id,
+                        razorpayPaymentId: response.razorpay_payment_id,
+                        razorpaySignature: response.razorpay_signature,
+                    })
                     if (res.isOk) {
                         alert("Payment successful");
                     } else {
@@ -83,11 +107,11 @@ const BillingsPage = () => {
     }
 
     return (
-        <section ref={ref} className="h-full relative overflow-hidden px-4 py-2 sm:px-6 sm:py-8 lg:px-12 bg-[hsl(var(--mint-bg))]">
+        <section ref={ref} className="h-full relative overflow-y-auto scrollbar-thin px-4 py-2 sm:px-6 sm:py-8 lg:px-12 bg-[hsl(var(--mint-bg))]">
             <Script
-        type="text/javascript"
-        src="https://checkout.razorpay.com/v1/checkout.js"
-      />
+                type="text/javascript"
+                src="https://checkout.razorpay.com/v1/checkout.js"
+            />
 
             <motion.div style={{ rotate: spiralRotate }}>
                 <SpiralSVG className="pointer-events-none absolute -right-16 top-8 h-36 w-36 text-[hsl(var(--green-badge))] sm:h-52 sm:w-52" />

@@ -45,6 +45,18 @@ const ComparisonDifferenceSection = ({ signinwithgoogle }: { signinwithgoogle: (
             obsidian: "Available",
         },
         {
+            label: "Semantic Search",
+            ploopus: "Built-in",
+            notion: "Limited",
+            obsidian: "Available",
+        },
+        {
+            label: "AI power",
+            ploopus: "Use your own AI - No data sharing even to those AI companies",
+            notion: "Limited",
+            obsidian: "Available",
+        },
+        {
             label: "Offline Access",
             ploopus: "Fully offline",
             notion: "Limited",
