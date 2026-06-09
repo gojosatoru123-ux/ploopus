@@ -22,7 +22,7 @@ import {
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NoteIndex, Folder, FlashcardItem, CalendarEvent, FlashcardDeck } from "@/lib/types";
-import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, SLIDEDECK_FILE } from "@/lib/contants";
+import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, SLIDEDECK_FILE } from "@/lib/constants";
 import { authClient } from "@/lib/auth-client";
 import Link from "next/link";
 

@@ -1,4 +1,4 @@
-import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, NOTES_DIR, SLIDEDECK_FILE } from "./contants";
+import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, NOTES_DIR, SLIDEDECK_FILE, MEDIA_DIR } from "./constants";
 import { CalendarEvent, FlashcardDeck, Folder, NoteBlock, NoteIndex } from "./types";
 
 export type SyncStatus = "synced" | "syncing" | "fetching" | "error" | "offline" | "nocloud";
@@ -256,7 +256,7 @@ export const StorageEngine = {
   async getMediaUrl(fileName: string): Promise<string | null> {
     try {
       const root = await navigator.storage.getDirectory();
-      const mediaDir = await root.getDirectoryHandle("media");
+      const mediaDir = await root.getDirectoryHandle(MEDIA_DIR);
       const fileHandle = await mediaDir.getFileHandle(fileName);
       const file = await fileHandle.getFile();
       return URL.createObjectURL(file);
@@ -269,7 +269,7 @@ export const StorageEngine = {
   async saveMedia(file: File): Promise<string> {
     await this.init();
     const root = await navigator.storage.getDirectory();
-    const mediaDir = await root.getDirectoryHandle("media", { create: true });
+    const mediaDir = await root.getDirectoryHandle(MEDIA_DIR, { create: true });
     const safeName = `${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
     const fileHandle = await mediaDir.getFileHandle(safeName, { create: true });
     const writable = await fileHandle.createWritable();
@@ -283,7 +283,7 @@ export const StorageEngine = {
       const root = await navigator.storage.getDirectory();
       let mediaDir;
       try {
-        mediaDir = await root.getDirectoryHandle('media', { create: false });
+        mediaDir = await root.getDirectoryHandle(MEDIA_DIR, { create: false });
       } catch (e) {
         console.warn("Media folder does not exist yet.");
         return [];

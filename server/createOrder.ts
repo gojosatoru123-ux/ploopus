@@ -1,5 +1,5 @@
 'use server'
-import { PLANS } from "@/lib/contants";
+import { PLANS } from "@/lib/constants";
 import Razorpay from "razorpay";
 const razorpay = new Razorpay({
     key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
