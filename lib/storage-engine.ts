@@ -1,3 +1,4 @@
+import * as Y from "yjs";
 import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, NOTES_DIR, SLIDEDECK_FILE, MEDIA_DIR } from "./constants";
 import { CalendarEvent, FlashcardDeck, Folder, NoteBlock, NoteIndex } from "./types";
 
@@ -6,11 +7,10 @@ export type SyncProgress = { current: number; total: number };
 
 /**
  * CONFLICT RESOLUTION (FUTURE-PROOF HOOK)
- * This is where you can implement merge logic (e.g., LWW or CRDT) later.
+ * Since Yjs natively merges binary structures, this wrapper serves as an update compositor hook.
  */
 const ConflictManager = {
   async resolve(fileName: string, localData: any, incomingCloudData: any): Promise<any> {
-    // Current behavior: Cloud version takes precedence if conflict check is triggered
     return incomingCloudData;
   }
 };
@@ -64,10 +64,10 @@ export const StorageEngine = {
       try {
         await root.getDirectoryHandle(NOTES_DIR, { create: true });
 
-        // Load the journal (manifest)
+        // Load the modern Yjs binary manifest file directly
         const localManifest = await this._readLocal(MANIFEST_FILE);
-        if (localManifest) {
-          manifest = localManifest;
+        if (localManifest && typeof localManifest === "object" && !Array.isArray(localManifest)) {
+          manifest = localManifest as Record<string, { id: string; dirty: boolean; ts: number }>;
         } else {
           manifest = {};
           await this._persistManifest();
@@ -75,7 +75,7 @@ export const StorageEngine = {
 
         this._emitStatus(CloudProvider.isEnabled ? "synced" : "nocloud");
       } catch (e) {
-        console.error("Ploopus Storage Init Error:", e);
+        console.error("Elephant Storage Init Error:", e);
         this._emitStatus("error");
       }
     })();
@@ -90,16 +90,14 @@ export const StorageEngine = {
     try {
       const now = Date.now();
 
-      // Update Versioning
       if (!manifest[fileName]) manifest[fileName] = { id: "", dirty: true, ts: now };
       manifest[fileName].ts = now;
       manifest[fileName].dirty = true;
 
-      // Atomic OPFS Write
+      // Fast, Atomic OPFS Binary Write
       await this._saveToLocal(fileName, data, isNote);
       await this._persistManifest();
 
-      // Cloud Logic Branch
       if (CloudProvider.isEnabled && navigator.onLine) {
         this._triggerCloudUpload(fileName, data);
       } else {
@@ -146,39 +144,85 @@ export const StorageEngine = {
   },
 
   /**
-   * LOW-LEVEL OPFS ACCESSORS
+   * LOW-LEVEL OPFS ACCESSORS (PURE BINARY)
    */
   async _saveToLocal(fileName: string, data: any, isNote: boolean) {
     const root = await getRoot();
     const dir = isNote ? await root.getDirectoryHandle(NOTES_DIR) : root;
-    const name = isNote && !fileName.endsWith('.json') ? `${fileName}.json` : fileName;
+    const name = isNote && !fileName.endsWith('.bin') ? `${fileName}.bin` : fileName;
 
+    // Encode payload state into a Yjs Document update blob
+    const doc = new Y.Doc();
+    if (Array.isArray(data)) {
+      const sharedArray = doc.getArray("data_array");
+      sharedArray.insert(0, data);
+    } else if (typeof data === "object" && data !== null) {
+      const sharedMap = doc.getMap("data");
+      for (const [key, val] of Object.entries(data)) {
+        sharedMap.set(key, val);
+      }
+    } else {
+      doc.getMap("data").set("value", data);
+    }
+
+    const binaryUpdate = Y.encodeStateAsUpdate(doc);
+
+    // Stream the raw byte sequence directly to the handle
     const handle = await dir.getFileHandle(name, { create: true });
     const writable = await handle.createWritable();
-    await writable.write(JSON.stringify(data));
-    await writable.close(); // Crucial for handle release
+    await writable.write(binaryUpdate);
+    await writable.close();
   },
 
-  async _readLocal(fileName: string, isNote: boolean = false) {
+  async _readLocal(fileName: string, isNote: boolean = false): Promise<any> {
     try {
       const root = await getRoot();
       const dir = isNote ? await root.getDirectoryHandle(NOTES_DIR) : root;
-      const name = isNote && !fileName.endsWith('.json') ? `${fileName}.json` : fileName;
+      const name = isNote && !fileName.endsWith('.bin') ? `${fileName}.bin` : fileName;
+      
       const h = await dir.getFileHandle(name);
-      return JSON.parse(await (await h.getFile()).text());
-    } catch { return null; }
+      const file = await h.getFile();
+      const buffer = await file.arrayBuffer();
+      const binary = new Uint8Array(buffer);
+
+      if (binary.byteLength === 0) return null;
+
+      // Unpack Native Yjs Binary Structure Directly
+      const doc = new Y.Doc();
+      Y.applyUpdate(doc, binary);
+
+      const arrayData = doc.getArray("data_array");
+      if (arrayData.length > 0) return arrayData.toJSON();
+
+      const mapData = doc.getMap("data").toJSON();
+      if (Object.keys(mapData).length === 0 && doc.getMap("data").size === 0) {
+        return doc.getMap("data").get("value") ?? null;
+      }
+      return mapData;
+    } catch { 
+      return null; 
+    }
   },
 
   async _persistManifest() {
     const root = await getRoot();
     const handle = await root.getFileHandle(MANIFEST_FILE, { create: true });
     const writable = await handle.createWritable();
-    await writable.write(JSON.stringify(manifest));
+
+    // Serialize internal manifest tracking context state cleanly via Yjs map structures
+    const doc = new Y.Doc();
+    const sharedMap = doc.getMap("manifest");
+    for (const [key, value] of Object.entries(manifest)) {
+      sharedMap.set(key, value);
+    }
+    
+    const binaryManifest = Y.encodeStateAsUpdate(doc);
+    await writable.write(binaryManifest);
     await writable.close();
   },
 
   /**
-   * ORIGINAL PUBLIC DATA LOADERS
+   * PUBLIC DATA LOADERS
    */
   async loadIndexes(): Promise<NoteIndex[]> { return await this._readLocal(INDEXES_FILE) || []; },
   async loadFolders(): Promise<Folder[]> { return await this._readLocal(FOLDERS_FILE) || []; },
@@ -187,12 +231,12 @@ export const StorageEngine = {
 
   async loadNoteBlocks(id: string): Promise<NoteBlock[]> {
     const local = await this._readLocal(id, true);
-    if (local) return local;
+    if (local && Array.isArray(local)) return local;
     return [{ id: crypto.randomUUID(), type: "text", content: "" }];
   },
 
   /**
-   * ORIGINAL PUBLIC DEBOUNCED WRITERS
+   * PUBLIC DEBOUNCED WRITERS
    */
   saveIndexesDebounced(i: NoteIndex[]) { this._writeFile(INDEXES_FILE, i, false); },
   saveFoldersDebounced(f: Folder[]) { this._writeFile(FOLDERS_FILE, f, false); },
@@ -233,7 +277,8 @@ export const StorageEngine = {
       this._emitProgress(1, 1);
       const root = await getRoot();
       const dir = await root.getDirectoryHandle(NOTES_DIR);
-      await dir.removeEntry(`${id}.json`);
+      
+      await dir.removeEntry(`${id}.bin`);
 
       const cloudId = manifest[id]?.id;
       delete manifest[id];
@@ -281,7 +326,7 @@ export const StorageEngine = {
   listAllFiles: async (): Promise<string[]> => {
     try {
       const root = await navigator.storage.getDirectory();
-      let mediaDir;
+      let mediaDir: any;
       try {
         mediaDir = await root.getDirectoryHandle(MEDIA_DIR, { create: false });
       } catch (e) {
@@ -290,11 +335,9 @@ export const StorageEngine = {
       }
       const files: string[] = [];
 
-      // 2. Iterate specifically through the media directory
-      // @ts-ignore
+      // Iterate specifically through the media directory
       const entries = mediaDir.entries();
 
-      // @ts-ignore
       for await (const [name, handle] of entries) {
         if (handle.kind === 'file') {
           files.push(`${name}`);
