@@ -5,53 +5,47 @@ import { CalendarEvent, FlashcardDeck, Folder, NoteBlock, NoteIndex } from "./ty
 export type SyncStatus = "synced" | "syncing" | "fetching" | "error" | "offline" | "nocloud";
 export type SyncProgress = { current: number; total: number };
 
-/**
- * CONFLICT RESOLUTION (FUTURE-PROOF HOOK)
- * Since Yjs natively merges binary structures, this wrapper serves as an update compositor hook.
- */
-const ConflictManager = {
-  async resolve(fileName: string, localData: any, incomingCloudData: any): Promise<any> {
-    return incomingCloudData;
-  }
-};
+export interface DocLoadResult {
+  doc: Y.Doc;
+  status: "new" | "loaded" | "corrupted";
+}
 
 /**
- * CLOUD PROVIDER (DUMMY WRAPPER)
- * Purely local right now. Flip 'isEnabled' to true and add API calls here to re-enable sync.
+ * IN-MEMORY DOCUMENT CACHE
+ * Namespaced keys (e.g. "notes:id" vs "root:id") protect data context 
+ * and preserve historical operational sequences for smooth future syncing.
+ */
+const activeDocs = new Map<string, Y.Doc>();
+
+/**
+ * SERIALIZATION TRANSACTION LOCKS
+ * Forces overlapping requests to the same file handle to execute sequentially,
+ * completely neutralizing OPFS concurrent createWritable() data-loss race windows.
+ */
+const fileWriteLocks = new Map<string, Promise<void>>();
+
+/**
+ * CLOUD PROVIDER STUB RELAY
  */
 const CloudProvider = {
   isEnabled: false,
-
   async upload(fileName: string, data: any): Promise<{ id: string; v: number } | null> {
-    if (!this.isEnabled) return null;
-    await new Promise(r => setTimeout(r, 1000)); // Latency Simulation
-    return { id: `cloud_ref_${Math.random().toString(36).substring(7)}`, v: (data.v || 0) + 1 };
-  },
-
-  async fetchLatest(fileName: string): Promise<any | null> {
-    if (!this.isEnabled) return null;
     return null;
   },
-
-  async delete(cloudId: string): Promise<void> {
-    if (!this.isEnabled) return;
-    console.log(`Cloud: Resource ${cloudId} removed.`);
+  async fetchLatest(fileName: string): Promise<any | null> {
+    return null;
   }
 };
 
-/**
- * ENGINE STATE
- */
 let statusListener: ((status: SyncStatus) => void) | null = null;
 let progressListener: ((progress: SyncProgress) => void) | null = null;
 
 let manifest: Record<string, { id: string; dirty: boolean; ts: number }> = {};
-
 const saveTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
-const uploadQueue = new Map<string, Promise<any>>();
 let initPromise: Promise<void> | null = null;
 
 const getRoot = () => navigator.storage.getDirectory();
+const getCacheKey = (id: string, isNote: boolean) => `${isNote ? "notes" : "root"}:${id}`;
 
 export const StorageEngine = {
   onStatusChange(cb: (s: SyncStatus) => void) { statusListener = cb; },
@@ -63,11 +57,11 @@ export const StorageEngine = {
       const root = await getRoot();
       try {
         await root.getDirectoryHandle(NOTES_DIR, { create: true });
+        await root.getDirectoryHandle(MEDIA_DIR, { create: true });
 
-        // Load the modern Yjs binary manifest file directly
-        const localManifest = await this._readLocal(MANIFEST_FILE);
-        if (localManifest && typeof localManifest === "object" && !Array.isArray(localManifest)) {
-          manifest = localManifest as Record<string, { id: string; dirty: boolean; ts: number }>;
+        const manifestResult = await this.getOrCreateDoc(MANIFEST_FILE, false);
+        if (manifestResult.status === "loaded") {
+          manifest = manifestResult.doc.getMap("manifest").toJSON() as any;
         } else {
           manifest = {};
           await this._persistManifest();
@@ -75,7 +69,7 @@ export const StorageEngine = {
 
         this._emitStatus(CloudProvider.isEnabled ? "synced" : "nocloud");
       } catch (e) {
-        console.error("Elephant Storage Init Error:", e);
+        console.error("Storage Engine Initialization Failed:", e);
         this._emitStatus("error");
       }
     })();
@@ -83,221 +77,209 @@ export const StorageEngine = {
   },
 
   /**
-   * INTERNAL: Orchestrates the write cycle
+   * SAFELY DISPATCHES OR CACHES DOCUMENT INSTANCES
+   * Distinctly returns status states so corrupt storage layers are exposed rather than overwritten.
    */
-  async _performWrite(fileName: string, data: any, isNote: boolean) {
-    await this.init();
-    try {
-      const now = Date.now();
-
-      if (!manifest[fileName]) manifest[fileName] = { id: "", dirty: true, ts: now };
-      manifest[fileName].ts = now;
-      manifest[fileName].dirty = true;
-
-      // Fast, Atomic OPFS Binary Write
-      await this._saveToLocal(fileName, data, isNote);
-      await this._persistManifest();
-
-      if (CloudProvider.isEnabled && navigator.onLine) {
-        this._triggerCloudUpload(fileName, data);
-      } else {
-        this._emitStatus("nocloud");
-      }
-    } catch (e) {
-      this._emitStatus("error");
+  async getOrCreateDoc(id: string, isNote: boolean): Promise<DocLoadResult> {
+    const cacheKey = getCacheKey(id, isNote);
+    if (activeDocs.has(cacheKey)) {
+      return { doc: activeDocs.get(cacheKey)!, status: "loaded" };
     }
-  },
 
-  /**
-   * INTERNAL: Handles the cloud sync queue with progress reporting
-   */
-  async _triggerCloudUpload(fileName: string, data: any) {
-    if (uploadQueue.has(fileName)) return;
-
-    const task = (async () => {
-      this._emitStatus("syncing");
-      this._emitProgress(1, 1);
-
-      try {
-        const cloudData = await CloudProvider.fetchLatest(fileName);
-        let finalData = data;
-
-        if (cloudData && cloudData.ts > manifest[fileName].ts) {
-          finalData = await ConflictManager.resolve(fileName, data, cloudData);
-          await this._saveToLocal(fileName, finalData, fileName !== MANIFEST_FILE);
-        }
-
-        const result = await CloudProvider.upload(fileName, finalData);
-        if (result) {
-          manifest[fileName].id = result.id;
-          manifest[fileName].dirty = false;
-          await this._persistManifest();
-        }
-        this._emitStatus("synced");
-      } finally {
-        this._emitProgress(0, 0);
-        uploadQueue.delete(fileName);
-      }
-    })();
-
-    uploadQueue.set(fileName, task);
-  },
-
-  /**
-   * LOW-LEVEL OPFS ACCESSORS (PURE BINARY)
-   */
-  async _saveToLocal(fileName: string, data: any, isNote: boolean) {
+    const doc = new Y.Doc();
     const root = await getRoot();
     const dir = isNote ? await root.getDirectoryHandle(NOTES_DIR) : root;
-    const name = isNote && !fileName.endsWith('.bin') ? `${fileName}.bin` : fileName;
+    const actualFileName = isNote && !id.endsWith(".bin") ? `${id}.bin` : id;
 
-    // Encode payload state into a Yjs Document update blob
-    const doc = new Y.Doc();
-    if (Array.isArray(data)) {
-      const sharedArray = doc.getArray("data_array");
-      sharedArray.insert(0, data);
-    } else if (typeof data === "object" && data !== null) {
-      const sharedMap = doc.getMap("data");
-      for (const [key, val] of Object.entries(data)) {
-        sharedMap.set(key, val);
+    try {
+      const fileHandle = await dir.getFileHandle(actualFileName);
+      const file = await fileHandle.getFile();
+      const buffer = await file.arrayBuffer();
+      const binaryData = new Uint8Array(buffer);
+
+      if (binaryData.byteLength === 0) {
+        activeDocs.set(cacheKey, doc);
+        return { doc, status: "new" };
       }
-    } else {
-      doc.getMap("data").set("value", data);
+
+      // V2 Encoding is highly optimized for local compaction and low network packet sizes
+      Y.applyUpdateV2(doc, binaryData);
+      activeDocs.set(cacheKey, doc);
+      return { doc, status: "loaded" };
+
+    } catch (error: any) {
+      activeDocs.set(cacheKey, doc);
+      if (error.name === "NotFoundError") {
+        return { doc, status: "new" };
+      }
+      console.error(`CRITICAL STORAGE LAYER EXCEPTION: Binary file [${actualFileName}] is unreadable.`, error);
+      return { doc, status: "corrupted" };
     }
-
-    const binaryUpdate = Y.encodeStateAsUpdate(doc);
-
-    // Stream the raw byte sequence directly to the handle
-    const handle = await dir.getFileHandle(name, { create: true });
-    const writable = await handle.createWritable();
-    await writable.write(binaryUpdate);
-    await writable.close();
   },
 
-  async _readLocal(fileName: string, isNote: boolean = false): Promise<any> {
-    try {
+  /**
+   * PIPELINE MUTEX TASK QUEUER
+   */
+  async _queueWriteTrack(fileName: string, isNote: boolean, writeTask: () => Promise<void>) {
+    const cacheKey = getCacheKey(fileName, isNote);
+    const backgroundChain = fileWriteLocks.get(cacheKey) || Promise.resolve();
+
+    const currentTrack = backgroundChain.then(async () => {
+      try {
+        await writeTask();
+      } catch (e) {
+        console.error(`File write cycle structural crash on channel: ${cacheKey}`, e);
+      }
+    });
+
+    fileWriteLocks.set(cacheKey, currentTrack);
+    return currentTrack;
+  },
+
+  async _performWrite(fileName: string, data: any, isNote: boolean) {
+    await this.init();
+    const now = Date.now();
+
+    if (!manifest[fileName]) manifest[fileName] = { id: "", dirty: true, ts: now };
+    manifest[fileName].ts = now;
+    manifest[fileName].dirty = true;
+
+    await this._queueWriteTrack(fileName, isNote, async () => {
       const root = await getRoot();
       const dir = isNote ? await root.getDirectoryHandle(NOTES_DIR) : root;
-      const name = isNote && !fileName.endsWith('.bin') ? `${fileName}.bin` : fileName;
+      const actualFileName = isNote && !fileName.endsWith(".bin") ? `${fileName}.bin` : fileName;
+
+      const loadResult = await this.getOrCreateDoc(fileName, isNote);
+      if (loadResult.status === "corrupted") throw new Error("Abort write sequence to protect a corrupted target");
       
-      const h = await dir.getFileHandle(name);
-      const file = await h.getFile();
-      const buffer = await file.arrayBuffer();
-      const binary = new Uint8Array(buffer);
+      const doc = loadResult.doc;
 
-      if (binary.byteLength === 0) return null;
+      // Wrap operations in a transaction to safely handle local delta mutations
+      doc.transact(() => {
+        if (Array.isArray(data)) {
+          const sharedArray = doc.getArray("data_array");
+          sharedArray.delete(0, sharedArray.length);
+          if (data.length > 0) sharedArray.insert(0, data);
+        } else if (typeof data === "object" && data !== null) {
+          const sharedMap = doc.getMap("data");
+          for (const key of Array.from(sharedMap.keys())) {
+            if (!(key in data)) sharedMap.delete(key);
+          }
+          for (const [key, val] of Object.entries(data)) {
+            sharedMap.set(key, val);
+          }
+        } else {
+          doc.getMap("data").set("value", data);
+        }
+      });
 
-      // Unpack Native Yjs Binary Structure Directly
-      const doc = new Y.Doc();
-      Y.applyUpdate(doc, binary);
+      const binaryState = Y.encodeStateAsUpdateV2(doc);
+      const handle = await dir.getFileHandle(actualFileName, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(binaryState);
+      await writable.close();
+    });
 
-      const arrayData = doc.getArray("data_array");
-      if (arrayData.length > 0) return arrayData.toJSON();
-
-      const mapData = doc.getMap("data").toJSON();
-      if (Object.keys(mapData).length === 0 && doc.getMap("data").size === 0) {
-        return doc.getMap("data").get("value") ?? null;
-      }
-      return mapData;
-    } catch { 
-      return null; 
-    }
+    await this._persistManifest();
   },
 
   async _persistManifest() {
-    const root = await getRoot();
-    const handle = await root.getFileHandle(MANIFEST_FILE, { create: true });
-    const writable = await handle.createWritable();
+    await this._queueWriteTrack(MANIFEST_FILE, false, async () => {
+      const root = await getRoot();
+      const loadResult = await this.getOrCreateDoc(MANIFEST_FILE, false);
+      const doc = loadResult.doc;
 
-    // Serialize internal manifest tracking context state cleanly via Yjs map structures
-    const doc = new Y.Doc();
-    const sharedMap = doc.getMap("manifest");
-    for (const [key, value] of Object.entries(manifest)) {
-      sharedMap.set(key, value);
-    }
-    
-    const binaryManifest = Y.encodeStateAsUpdate(doc);
-    await writable.write(binaryManifest);
-    await writable.close();
+      doc.transact(() => {
+        const sharedMap = doc.getMap("manifest");
+        for (const key of Array.from(sharedMap.keys())) {
+          if (!(key in manifest)) sharedMap.delete(key);
+        }
+        for (const [key, value] of Object.entries(manifest)) {
+          sharedMap.set(key, value);
+        }
+      });
+
+      const binaryManifest = Y.encodeStateAsUpdateV2(doc);
+      const handle = await root.getFileHandle(MANIFEST_FILE, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(binaryManifest);
+      await writable.close();
+    });
   },
 
-  /**
-   * PUBLIC DATA LOADERS
-   */
-  async loadIndexes(): Promise<NoteIndex[]> { return await this._readLocal(INDEXES_FILE) || []; },
-  async loadFolders(): Promise<Folder[]> { return await this._readLocal(FOLDERS_FILE) || []; },
-  async loadCalendars(): Promise<CalendarEvent[]> { return await this._readLocal(CALENDAR_FILE) || []; },
-  async loadDecks(): Promise<FlashcardDeck[]> { return await this._readLocal(SLIDEDECK_FILE) || []; },
+  async _readDataPayload(fileName: string, isNote: boolean): Promise<any> {
+    const result = await this.getOrCreateDoc(fileName, isNote);
+    if (result.status === "corrupted") return null;
+
+    const doc = result.doc;
+    const arrayData = doc.getArray("data_array");
+    if (arrayData.length > 0 || doc.getMap("data").size === 0) {
+      if (arrayData.length > 0) return arrayData.toJSON();
+    }
+
+    const mapData = doc.getMap("data");
+    if (mapData.has("value") && mapData.size === 1) {
+      return mapData.get("value");
+    }
+    
+    return mapData.size > 0 ? mapData.toJSON() : null;
+  },
+
+  async loadIndexes(): Promise<NoteIndex[]> { return await this._readDataPayload(INDEXES_FILE, false) || []; },
+  async loadFolders(): Promise<Folder[]> { return await this._readDataPayload(FOLDERS_FILE, false) || []; },
+  async loadCalendars(): Promise<CalendarEvent[]> { return await this._readDataPayload(CALENDAR_FILE, false) || []; },
+  async loadDecks(): Promise<FlashcardDeck[]> { return await this._readDataPayload(SLIDEDECK_FILE, false) || []; },
 
   async loadNoteBlocks(id: string): Promise<NoteBlock[]> {
-    const local = await this._readLocal(id, true);
-    if (local && Array.isArray(local)) return local;
+    const localData = await this._readDataPayload(id, true);
+    if (localData && Array.isArray(localData)) return localData;
     return [{ id: crypto.randomUUID(), type: "text", content: "" }];
   },
 
-  /**
-   * PUBLIC DEBOUNCED WRITERS
-   */
   saveIndexesDebounced(i: NoteIndex[]) { this._writeFile(INDEXES_FILE, i, false); },
   saveFoldersDebounced(f: Folder[]) { this._writeFile(FOLDERS_FILE, f, false); },
   saveNoteBlocksDebounced(id: string, b: NoteBlock[]) { this._writeFile(id, b, true); },
   saveCalendarDebounced(c: CalendarEvent[]) { this._writeFile(CALENDAR_FILE, c, false); },
   saveSlideDebounced(d: FlashcardDeck[]) { this._writeFile(SLIDEDECK_FILE, d, false); },
 
-  /**
-   * INTERNAL COORDINATOR
-   */
   _writeFile(name: string, data: any, isNote: boolean) {
-    if (saveTimeouts.has(name)) {
-      clearTimeout(saveTimeouts.get(name));
-    }
-
+    if (saveTimeouts.has(name)) clearTimeout(saveTimeouts.get(name));
     const timeout = setTimeout(() => {
       this._performWrite(name, data, isNote);
       saveTimeouts.delete(name);
     }, 800);
-
     saveTimeouts.set(name, timeout);
   },
 
-  _emitStatus(s: SyncStatus) {
-    if (statusListener) statusListener(s);
-  },
-
-  _emitProgress(current: number, total: number) {
-    if (progressListener) progressListener({ current, total });
-  },
-
-  /**
-   * DELETION
-   */
   async deleteNoteFile(id: string) {
     await this.init();
+    const actualFileName = id.endsWith(".bin") ? id : `${id}.bin`;
+    const cleanId = id.endsWith(".bin") ? id.slice(0, -4) : id;
+
     try {
       this._emitProgress(1, 1);
       const root = await getRoot();
       const dir = await root.getDirectoryHandle(NOTES_DIR);
       
-      await dir.removeEntry(`${id}.bin`);
+      await dir.removeEntry(actualFileName);
 
-      const cloudId = manifest[id]?.id;
-      delete manifest[id];
+      delete manifest[cleanId];
+      delete manifest[actualFileName];
       await this._persistManifest();
 
-      if (CloudProvider.isEnabled && cloudId) {
-        await CloudProvider.delete(cloudId);
+      const cacheKey = getCacheKey(cleanId, true);
+      const doc = activeDocs.get(cacheKey);
+      if (doc) {
+        doc.destroy();
+        activeDocs.delete(cacheKey);
       }
-      this._emitStatus(CloudProvider.isEnabled ? "synced" : "nocloud");
     } catch (e) {
-      console.warn(`Local file ${id} was already removed or doesn't exist.`);
+      console.warn(`File target ${actualFileName} was already missing on disk.`);
     } finally {
       this._emitProgress(0, 0);
     }
   },
 
-  /**
-   * FILE UPLOADS
-   */
   async getMediaUrl(fileName: string): Promise<string | null> {
     try {
       const root = await navigator.storage.getDirectory();
@@ -314,7 +296,7 @@ export const StorageEngine = {
   async saveMedia(file: File): Promise<string> {
     await this.init();
     const root = await navigator.storage.getDirectory();
-    const mediaDir = await root.getDirectoryHandle(MEDIA_DIR, { create: true });
+    const mediaDir = await root.getDirectoryHandle(MEDIA_DIR);
     const safeName = `${Date.now()}-${file.name.replace(/\s+/g, '_')}`;
     const fileHandle = await mediaDir.getFileHandle(safeName, { create: true });
     const writable = await fileHandle.createWritable();
@@ -323,31 +305,25 @@ export const StorageEngine = {
     return safeName;
   },
 
-  listAllFiles: async (): Promise<string[]> => {
+  async listAllFiles(): Promise<string[]> {
     try {
+      await this.init();
       const root = await navigator.storage.getDirectory();
-      let mediaDir: any;
-      try {
-        mediaDir = await root.getDirectoryHandle(MEDIA_DIR, { create: false });
-      } catch (e) {
-        console.warn("Media folder does not exist yet.");
-        return [];
-      }
+      const mediaDir = await root.getDirectoryHandle(MEDIA_DIR);
       const files: string[] = [];
 
-      // Iterate specifically through the media directory
-      const entries = mediaDir.entries();
-
-      for await (const [name, handle] of entries) {
+      for await (const [name, handle] of (mediaDir as any).entries()) {
         if (handle.kind === 'file') {
-          files.push(`${name}`);
+          files.push(name);
         }
       }
-      console.log("Media Library items found:", files);
       return files;
     } catch (error) {
-      console.error("Failed to list OPFS media files:", error);
+      console.error("Failed to compile list of media directory paths:", error);
       return [];
     }
   },
+
+  _emitStatus(s: SyncStatus) { if (statusListener) statusListener(s); },
+  _emitProgress(current: number, total: number) { if (progressListener) progressListener({ current, total }); }
 };
