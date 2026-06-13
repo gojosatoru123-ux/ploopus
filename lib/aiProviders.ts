@@ -118,7 +118,7 @@ export const AI_PROVIDERS: AiProvider[] = [
 // these locally so users can point at any host (LAN box, Docker, etc.) and
 // switch between installed models without touching code.
 
-const OLLAMA_CFG = "elephant.ai.ollama.cfg.v1";
+const OLLAMA_CFG = "ploopus.ai.ollama.cfg.v1";
 
 export interface OllamaConfig {
   localBaseUrl: string;
@@ -154,9 +154,9 @@ export const saveOllamaConfig = (cfg: Partial<OllamaConfig>) => {
 // with navigator.userAgent to derive a XOR key. This stops casual plaintext
 // scraping while keeping the system fully passwordless.
 
-const KEYS_STORAGE = "elephant.ai.keys.v2";
-const SALT_STORAGE = "elephant.ai.salt.v1";
-const LEGACY_KEYS = "elephant.ai.keys.v1"; // plaintext legacy
+const KEYS_STORAGE = "ploopus.ai.keys.v2";
+const SALT_STORAGE = "ploopus.ai.salt.v1";
+const LEGACY_KEYS = "ploopus.ai.keys.v1"; // plaintext legacy
 
 const getDeviceSalt = (): string => {
   try {

@@ -19,7 +19,8 @@ import {
   LogOut,
   CreditCard,
   User,
-  ExternalLink
+  ExternalLink,
+  BrainCircuitIcon
 } from "lucide-react";
 import { Sidebar } from "./ui/sidebar";
 import { authClient } from "@/lib/auth-client";
@@ -49,6 +50,10 @@ const AppSidebar = () => {
     { id: "calendar", icon: Calendar, label: "Calendar", href: "/calendar" },
     { id: "flashcards", icon: Layers, label: "Flashcards", href: "/flashcards" },
     { id: "graph", icon: Network, label: "Graph View", href: "/graphview" },
+  ];
+
+  const memoryItems = [
+    { id: "feed", icon: BrainCircuitIcon, label: "Memory Hub", href: "/memory-feed" },
   ];
 
   const noteSubItems = [
@@ -93,7 +98,7 @@ const AppSidebar = () => {
             href="/"
             className="flex items-center justify-center gap-2 hover:opacity-90 transition-opacity w-fit"
           >
-            <div className="relative w-12 h-12 flex">
+            <div className="relative w-12 h-12 flex border-2 rounded-full">
               <Image
                 src={ploopusLogo}
                 alt="Ploopus"
@@ -174,6 +179,23 @@ const AppSidebar = () => {
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          {/* Memory Section */}
+          <div className="pt-4 border-t border-white/5 mt-4 space-y-1">
+            {memoryItems.map((item) => (
+              <MotionLink
+                key={item.id}
+                href={item.href}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all duration-200 ${isActive(item.href) ? "bg-white/15 text-white" : "text-white/70 hover:text-white hover:bg-white/10"
+                  }`}
+                whileHover={{ x: 4 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                <item.icon className={`w-5 h-5 ${isActive(item.href) ? "text-amber-400" : ""}`} />
+                <span className="font-medium text-lg">{item.label}</span>
+              </MotionLink>
+            ))}
           </div>
 
           {/* Bottom Items */}
