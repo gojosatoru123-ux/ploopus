@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Play, Layers, Trash2, Edit2, Check, X, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FlashcardDeck, FlashcardItem } from "@/lib/types";
-import FlashcardStudyMode from "@/components/FlashcardStudyMode";
+import FlashcardStudyMode from "@/components/utility/FlashcardStudyMode";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { StorageEngine } from "@/lib/storage-engine";
-import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
+import { SyncStatusIndicator } from "@/components/utility/SyncStatusIndicator";
 
 const cardColors = [
   { name: "yellow", bg: "bg-yellow-100 dark:bg-yellow-900/30", border: "border-yellow-300 dark:border-yellow-700", text: "text-yellow-900 dark:text-yellow-100" },

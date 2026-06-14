@@ -14,7 +14,7 @@ import {
     type StoryKind,
 } from "@/lib/feedStories";
 import { computeStreak, useInsightsVersion } from "@/lib/knowledgeInsights";
-import StoryCard from "./StoryCard";
+import StoryCard from "./utility/StoryCard";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 const FILTERS: { key: "all" | StoryKind; label: string; icon: React.ElementType; description: string }[] = [

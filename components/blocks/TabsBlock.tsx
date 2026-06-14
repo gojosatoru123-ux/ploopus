@@ -4,7 +4,7 @@ import { Plus, X } from "lucide-react";
 import { NoteBlock } from "@/lib/types";
 
 // Lazy import to avoid circular dependency issues at module level
-const NotionEditorLazy = lazy(() => import("./NotionEditor"));
+const NotionEditorLazy = lazy(() => import("../NotionEditor"));
 
 interface TabItem {
   id: string;

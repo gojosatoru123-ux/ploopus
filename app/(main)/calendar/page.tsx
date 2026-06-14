@@ -38,7 +38,7 @@ import WeekView from "@/components/calendar/WeekView"
 import DayView from "@/components/calendar/DayView"
 import AgendaView from "@/components/calendar/AgendaView"
 import { SidebarTrigger } from "@/components/ui/sidebar"
-import { SyncStatusIndicator } from "@/components/SyncStatusIndicator"
+import { SyncStatusIndicator } from "@/components/utility/SyncStatusIndicator"
 
 type ViewMode = "month" | "week" | "day" | "agenda"
 

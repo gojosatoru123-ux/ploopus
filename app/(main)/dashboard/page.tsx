@@ -9,7 +9,7 @@ import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 import { NoteIndex } from "@/lib/types";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { SyncStatusIndicator } from "@/components/SyncStatusIndicator";
+import { SyncStatusIndicator } from "@/components/utility/SyncStatusIndicator";
 import { StorageEngine } from "@/lib/storage-engine";
 import { cn } from "@/lib/utils";
 

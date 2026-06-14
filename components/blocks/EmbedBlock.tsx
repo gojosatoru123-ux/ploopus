@@ -3,7 +3,7 @@
 import { NoteBlock } from "@/lib/types";
 import { Globe, Info, Maximize2, X } from "lucide-react";
 import { useState } from "react";
-import EmbedBlockInfo from "./EmbedBlockInfo";
+import EmbedBlockInfo from "../utility/EmbedBlockInfo";
 interface EmbedBlockProps {
     block: NoteBlock;
     updateBlock: (id: string, updates: Partial<NoteBlock>) => void;

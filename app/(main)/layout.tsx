@@ -5,7 +5,7 @@ import { NotesProvider } from "@/contexts/NotesContext";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "@/components/app-sidebar";
 import { StorageEngine } from "@/lib/storage-engine";
-import AuthGuard from "@/components/AuthGuard";
+import AuthGuard from "@/components/utility/AuthGuard";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {

@@ -1,11 +1,11 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, MoreHorizontal, Star, Share2, Clock, Focus, Minimize2, BookOpen, Sparkles, Undo2, Redo2, Download, FileText, FileCode, FileType, FileJsonIcon, File, Upload, Stars, BookTemplate, WandSparkles } from "lucide-react";
+import { X, Plus, MoreHorizontal, Star, Share2, Clock, Focus, Minimize2, BookOpen, Sparkles, Undo2, Redo2, Download, FileText, FileCode, FileType, FileJsonIcon, File, Upload, Stars, BookTemplate, WandSparkles, CloudFog } from "lucide-react";
 import NotionEditor from "./NotionEditor";
-import FloatingToolbar from "./FloatingToolbar";
-import FindReplaceBar from "./FindReplaceBar";
-import TemplatesModal from "./TemplatesModal";
+import FloatingToolbar from "./utility/FloatingToolbar";
+import FindReplaceBar from "./utility/FindReplaceBar";
+import TemplatesModal from "./modals/TemplatesModal";
 import { Note, NoteBlock } from "@/lib/types";
 import { useHeadingIndex } from "@/hooks/useHeadingIndex";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
@@ -13,9 +13,10 @@ import { useNoteExport } from "@/hooks/useNoteExport";
 import { Template } from "@/data/templates";
 import { format } from "date-fns";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { SyncStatusIndicator } from "./SyncStatusIndicator";
+import { SyncStatusIndicator } from "./utility/SyncStatusIndicator";
 import { toast } from "sonner";
-import AiAssistantModal from "./AiAssistantModal";
+import AiAssistantModal from "./modals/AiAssistantModal";
+import PublishSiteModal from "./modals/PublishSiteModal";
 
 interface NoteEditorFullProps {
   note: Note;
@@ -40,6 +41,7 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
   const [showIndex, setShowIndex] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showPublishModal, setShowPublishModal] = useState(false);
   const [showAi, setShowAi] = useState(false);
 
   const activeBlockIndexRef = useRef<number>(-1);
@@ -438,6 +440,24 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
                   <p>Import blocks from JSON</p>
                 </TooltipContent>
               </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="relative">
+                    <motion.button
+                      onClick={() => setShowPublishModal(!showPublishModal)}
+                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <CloudFog className="w-4 h-4" />
+                    </motion.button>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Publish Site</p>
+                </TooltipContent>
+              </Tooltip>
             </TooltipProvider>
 
             {/* <motion.button
@@ -478,6 +498,13 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
           onClose={() => setShowAi(false)}
           note={note}
           onAppendBlocks={handleAppendAiBlocks}
+        />
+
+        {/* Publish Site Modal */}
+        <PublishSiteModal
+          isOpen={showPublishModal}
+          onClose={() => setShowPublishModal(false)}
+          note={note}
         />
 
 
