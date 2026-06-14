@@ -196,6 +196,17 @@ function extractSnippet(content, queryTerms, maxLen = 240) {
 
 // ─── File Extraction ─────────────────────────────────────────────────────────
 
+async function readFullNote(id) {
+    try {
+      const root = await navigator.storage.getDirectory();
+      const notesDir = await root.getDirectoryHandle("notes", { create: false });
+      const fileHandle = await notesDir.getFileHandle(id + ".json");
+      const file = await fileHandle.getFile();
+      const content = await file.text();
+      return JSON.parse(content);
+    } catch (e) { return null; }
+  }
+
 async function extractTextFromFile(file) {
   const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
   const textExts = ["txt","md","markdown","json","js","ts","jsx","tsx","css","html","htm",
@@ -333,7 +344,8 @@ async function buildIndex(noteIndexes, progressCb) {
     if (note.preview) contentParts.push(note.preview);
     if (note.summary) contentParts.push(note.summary);
     if (note.description) contentParts.push(note.description);
-    const content = contentParts.join(" ");
+    const noteData = await readFullNote(note.id);
+    const content=noteData.map(item=>item.content).join(" ")
 
     const titleToks = stemTokenize(note.title||"");
     const tagToks = tags.flatMap(t=>stemTokenize(t));
@@ -356,18 +368,15 @@ async function buildIndex(noteIndexes, progressCb) {
       const deckName = deck.name || deck.title || "Untitled Deck";
       const cards = deck.cards || deck.flashcards || [];
       cards.forEach((card, idx) => {
-        const front = card.front || card.question || card.term || "";
-        const back = card.back || card.answer || card.definition || "";
-        const hint = card.hint || card.extra || "";
-        const content = [deckName, front, back, hint].filter(Boolean).join(" ");
-        const titleToks = stemTokenize(front || deckName);
+        const content = card.content;
+        const titleToks = stemTokenize(deckName);
         const baseToks = stemTokenize(content);
         const boosted = [...titleToks,...titleToks,...titleToks,...baseToks];
         const tf = new Map();
         for (const t of boosted) tf.set(t,(tf.get(t)??0)+1);
         indexedDocs.push({
           id: "deck-card-" + deck.id + "-" + idx,
-          title: front || deckName,
+          title:  deckName,
           content,
           type: "deck",
           deckId: deck.id,
@@ -870,8 +879,8 @@ function SemanticSearchPanel({ isOpen, onClose, onHighlightNodes, rawNotes, onSe
             transition={{ type: "spring", damping: 30, stiffness: 340, mass: 0.85 }}
             className="absolute z-50 flex flex-col"
             style={{
-              top: "72px",
-              right: "16px",
+              top: "21px",
+              right: "7px",
               width: "min(94vw, 520px)",
               height: "min(calc(100vh - 160px), 680px)",
               background: "linear-gradient(160deg, rgba(14,12,26,0.99) 0%, rgba(10,8,20,0.99) 100%)",

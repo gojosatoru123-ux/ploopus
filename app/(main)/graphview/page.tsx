@@ -40,7 +40,7 @@ const GraphPage = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.1 }}
-        className="flex-1 p-4"
+        className="flex-1 p-1 sm:p-4"
       >
         <GraphView onSelectNote={handleSelectNote} />
       </motion.div>
