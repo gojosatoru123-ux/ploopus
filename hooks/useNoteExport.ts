@@ -7,41 +7,41 @@ export type ExportFormat = "markdown" | "text" | "html" | "pdf" | "json";
 
 const esc = (s = "") =>
   s.replace(/ /g, " ").replace(/&nbsp;/gi, " ")
-   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 // ── Tailwind class → hex color ────────────────────────────────────────────────
 // The app stores colors as Tailwind class strings (e.g. "bg-blue-500", "sage", "gold")
 // We map all known variants to real hex values for HTML output.
 const TW: Record<string, string> = {
   // bg-{color}-{shade}
-  "bg-blue-50":"#eff6ff","bg-blue-100":"#dbeafe","bg-blue-200":"#bfdbfe",
-  "bg-blue-300":"#93c5fd","bg-blue-400":"#60a5fa","bg-blue-500":"#3b82f6",
-  "bg-blue-600":"#2563eb","bg-blue-700":"#1d4ed8","bg-blue-800":"#1e40af",
-  "bg-green-50":"#f0fdf4","bg-green-100":"#dcfce7","bg-green-200":"#bbf7d0",
-  "bg-green-400":"#4ade80","bg-green-500":"#22c55e","bg-green-600":"#16a34a",
-  "bg-emerald-500":"#10b981",
-  "bg-teal-500":"#14b8a6",
-  "bg-cyan-500":"#06b6d4",
-  "bg-purple-400":"#c084fc","bg-purple-500":"#a855f7","bg-purple-600":"#9333ea",
-  "bg-indigo-500":"#6366f1","bg-indigo-600":"#4f46e5",
-  "bg-violet-500":"#8b5cf6",
-  "bg-pink-400":"#f472b6","bg-pink-500":"#ec4899","bg-pink-600":"#db2777",
-  "bg-rose-500":"#f43f5e",
-  "bg-red-400":"#f87171","bg-red-500":"#ef4444","bg-red-600":"#dc2626",
-  "bg-orange-400":"#fb923c","bg-orange-500":"#f97316","bg-orange-600":"#ea580c",
-  "bg-amber-500":"#f59e0b","bg-yellow-400":"#facc15","bg-yellow-500":"#eab308",
-  "bg-lime-500":"#84cc16",
-  "bg-sky-500":"#0ea5e9",
-  "bg-slate-400":"#94a3b8","bg-slate-500":"#64748b",
-  "bg-gray-400":"#9ca3af","bg-gray-500":"#6b7280",
+  "bg-blue-50": "#eff6ff", "bg-blue-100": "#dbeafe", "bg-blue-200": "#bfdbfe",
+  "bg-blue-300": "#93c5fd", "bg-blue-400": "#60a5fa", "bg-blue-500": "#3b82f6",
+  "bg-blue-600": "#2563eb", "bg-blue-700": "#1d4ed8", "bg-blue-800": "#1e40af",
+  "bg-green-50": "#f0fdf4", "bg-green-100": "#dcfce7", "bg-green-200": "#bbf7d0",
+  "bg-green-400": "#4ade80", "bg-green-500": "#22c55e", "bg-green-600": "#16a34a",
+  "bg-emerald-500": "#10b981",
+  "bg-teal-500": "#14b8a6",
+  "bg-cyan-500": "#06b6d4",
+  "bg-purple-400": "#c084fc", "bg-purple-500": "#a855f7", "bg-purple-600": "#9333ea",
+  "bg-indigo-500": "#6366f1", "bg-indigo-600": "#4f46e5",
+  "bg-violet-500": "#8b5cf6",
+  "bg-pink-400": "#f472b6", "bg-pink-500": "#ec4899", "bg-pink-600": "#db2777",
+  "bg-rose-500": "#f43f5e",
+  "bg-red-400": "#f87171", "bg-red-500": "#ef4444", "bg-red-600": "#dc2626",
+  "bg-orange-400": "#fb923c", "bg-orange-500": "#f97316", "bg-orange-600": "#ea580c",
+  "bg-amber-500": "#f59e0b", "bg-yellow-400": "#facc15", "bg-yellow-500": "#eab308",
+  "bg-lime-500": "#84cc16",
+  "bg-sky-500": "#0ea5e9",
+  "bg-slate-400": "#94a3b8", "bg-slate-500": "#64748b",
+  "bg-gray-400": "#9ca3af", "bg-gray-500": "#6b7280",
   // Named colors used in flashcards / mindmap
-  "blue":"#3b82f6","green":"#22c55e","purple":"#a855f7","pink":"#ec4899",
-  "orange":"#f97316","red":"#ef4444","yellow":"#eab308","teal":"#14b8a6",
-  "indigo":"#6366f1","rose":"#f43f5e","amber":"#f59e0b","lime":"#84cc16",
-  "cyan":"#06b6d4","sky":"#0ea5e9","violet":"#8b5cf6","emerald":"#10b981",
+  "blue": "#3b82f6", "green": "#22c55e", "purple": "#a855f7", "pink": "#ec4899",
+  "orange": "#f97316", "red": "#ef4444", "yellow": "#eab308", "teal": "#14b8a6",
+  "indigo": "#6366f1", "rose": "#f43f5e", "amber": "#f59e0b", "lime": "#84cc16",
+  "cyan": "#06b6d4", "sky": "#0ea5e9", "violet": "#8b5cf6", "emerald": "#10b981",
   // Mindmap named colors
-  "sage":"#87a878","gold":"#d4af37","coral":"#ff6b6b","mint":"#98d8c8",
-  "lavender":"#b39ddb","peach":"#ffb347","steel":"#708090",
+  "sage": "#87a878", "gold": "#d4af37", "coral": "#ff6b6b", "mint": "#98d8c8",
+  "lavender": "#b39ddb", "peach": "#ffb347", "steel": "#708090",
 };
 
 const toHex = (c = "", fallback = "#6366f1") => {
@@ -69,12 +69,12 @@ const toTint = (c = "", alpha = "18") => toHex(c) + alpha;
 // can survive because we explicitly allowlist tags + attributes.
 
 const ALLOWED_TAGS: Record<string, string[]> = {
-  b:      [], strong: [], i: [], em: [], u: [], s: [], strike: [], del: [],
-  code:   [], mark:   [], br: [],
-  font:   ["color", "style"],   // <font color="#ef4444" style="background-color:…">
-  span:   ["style"],            // <span style="color:…;background:…;font-weight:…">
-  a:      ["href", "target", "rel"],
-  sub:    [], sup: [],
+  b: [], strong: [], i: [], em: [], u: [], s: [], strike: [], del: [],
+  code: [], mark: [], br: [],
+  font: ["color", "style"],   // <font color="#ef4444" style="background-color:…">
+  span: ["style"],            // <span style="color:…;background:…;font-weight:…">
+  a: ["href", "target", "rel"],
+  sub: [], sup: [],
 };
 
 // Safe CSS property allowlist for style attributes
@@ -122,11 +122,11 @@ const sanitizeTag = (tag: string): string => {
     } else if (attrName === "color") {
       // <font color="..."> — keep colour attribute directly
       safeAttrs.push(`color="${val}"`);
-    } else if (!["target","rel"].includes(attrName)) {
+    } else if (!["target", "rel"].includes(attrName)) {
       safeAttrs.push(`${attrName}="${val}"`);
     }
   }
-  return `<${tagName}${safeAttrs.length ? " "+safeAttrs.join(" ") : ""}>`;
+  return `<${tagName}${safeAttrs.length ? " " + safeAttrs.join(" ") : ""}>`;
 };
 
 const renderInline = (raw: string): string => {
@@ -208,7 +208,7 @@ const urlHost = (url = "") => {
 // (Error 153 / "Video unavailable" / CSP). We instead produce rich thumbnail
 // cards that open the video on click — works in every context.
 type VideoResult = {
-  type: "yt-card"|"vimeo-card"|"loom-card"|"wistia-card"|"generic-card"|"native-video"|"link";
+  type: "yt-card" | "vimeo-card" | "loom-card" | "wistia-card" | "generic-card" | "native-video" | "link";
   videoId?: string;
   iframeSrc?: string;   // kept for served-origin contexts (future)
   thumbUrl?: string;
@@ -225,8 +225,8 @@ const resolveVideo = (url = ""): VideoResult => {
       type: "yt-card",
       videoId: id,
       thumbUrl: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
-      iframeSrc: `https://www.youtube-nocookie.com/embed/${id}?rel=0${t?`&start=${t[1]}`:""}`,
-      watchUrl: `https://www.youtube.com/watch?v=${id}${t?`&t=${t[1]}`:""}`,
+      iframeSrc: `https://www.youtube-nocookie.com/embed/${id}?rel=0${t ? `&start=${t[1]}` : ""}`,
+      watchUrl: `https://www.youtube.com/watch?v=${id}${t ? `&t=${t[1]}` : ""}`,
       label: "YouTube",
     };
   }
@@ -266,7 +266,7 @@ const resolveVideo = (url = ""): VideoResult => {
 
 // ── Audio embed resolver ───────────────────────────────────────────────────────
 type AudioResult = {
-  type: "native"|"spotify-track"|"spotify-playlist"|"soundcloud"|"apple"|"link";
+  type: "native" | "spotify-track" | "spotify-playlist" | "soundcloud" | "apple" | "link";
   src: string;
   label?: string;
   mimeHint?: string;  // optional <source type=""> hint
@@ -286,7 +286,7 @@ const resolveAudio = (url = ""): AudioResult => {
   };
   // Apple Music / Podcasts
   if (/music\.apple\.com|podcasts\.apple\.com/.test(url)) {
-    const em = url.replace("music.apple.com","embed.music.apple.com").replace("podcasts.apple.com","embed.podcasts.apple.com");
+    const em = url.replace("music.apple.com", "embed.music.apple.com").replace("podcasts.apple.com", "embed.podcasts.apple.com");
     return { type: "apple", src: em, label: "Apple Music" };
   }
   // Known streaming / hosting platforms that need a link card (no embeddable player)
@@ -297,16 +297,16 @@ const resolveAudio = (url = ""): AudioResult => {
   // CDN-hosted audio, podcast episode MP3s, etc.) — use native <audio>.
   // Detect MIME hint from extension if present so <source type> is correct.
   const ext = url.split("?")[0].split(".").pop()?.toLowerCase() || "";
-  const mimeMap: Record<string,string> = {
-    mp3:"audio/mpeg", wav:"audio/wav", ogg:"audio/ogg", oga:"audio/ogg",
-    aac:"audio/aac", flac:"audio/flac", opus:"audio/ogg;codecs=opus",
-    m4a:"audio/mp4", weba:"audio/webm", webm:"audio/webm",
+  const mimeMap: Record<string, string> = {
+    mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg",
+    aac: "audio/aac", flac: "audio/flac", opus: "audio/ogg;codecs=opus",
+    m4a: "audio/mp4", weba: "audio/webm", webm: "audio/webm",
   };
   return { type: "native", src: url, label: urlHost(url) || "Audio", mimeHint: mimeMap[ext] };
 };
 
 // ── File / embed resolver ─────────────────────────────────────────────────────
-type FileResult = { type: "pdf-iframe"|"gdoc"|"gsheet"|"gslide"|"office"|"codepen"|"codesandbox"|"stackblitz"|"jsfiddle"|"replit"|"figma"|"airtable"|"notion"|"generic-iframe"|"download"|"local"; label: string; iframeSrc?: string };
+type FileResult = { type: "pdf-iframe" | "gdoc" | "gsheet" | "gslide" | "office" | "codepen" | "codesandbox" | "stackblitz" | "jsfiddle" | "replit" | "figma" | "airtable" | "notion" | "generic-iframe" | "download" | "local"; label: string; iframeSrc?: string };
 const resolveFile = (url = "", name = ""): FileResult => {
   if (!url) return { type: "local", label: "File" };
   if (isLocal(url)) return { type: "local", label: name || url.split("/").pop() || "File" };
@@ -355,7 +355,7 @@ const resolveFile = (url = "", name = ""): FileResult => {
   // Notion
   if (/notion\.so|notion\.site/.test(url)) return { type: "notion", label: "Notion", iframeSrc: url };
   // Office file extensions
-  if (["doc","docx","xls","xlsx","ppt","pptx"].includes(ext)) {
+  if (["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(ext)) {
     const em = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
     return { type: "office", label: ext.toUpperCase(), iframeSrc: em };
   }
@@ -534,12 +534,12 @@ const iframeBlock = (iframeSrc: string, label: string, origUrl: string, height =
 };
 
 // ─── Embed resolver (for dedicated embed blocks) ────────────────────────────────
-type EmbedResult = { type: "iframe"|"vid-card"|"link"; src: string; label: string; tall?: boolean; thumbUrl?: string; watchUrl?: string };
+type EmbedResult = { type: "iframe" | "vid-card" | "link"; src: string; label: string; tall?: boolean; thumbUrl?: string; watchUrl?: string };
 const resolveEmbed = (url = ""): EmbedResult => {
   // First try file resolver for code/doc embeds
   const fr = resolveFile(url, "");
   if (fr.iframeSrc && fr.type !== "local" && fr.type !== "download") {
-    const tall = ["codepen","codesandbox","stackblitz","replit","jsfiddle","figma"].includes(fr.type);
+    const tall = ["codepen", "codesandbox", "stackblitz", "replit", "jsfiddle", "figma"].includes(fr.type);
     return { type: "iframe", src: fr.iframeSrc, label: fr.label, tall };
   }
   // Then try video resolver — return as card (not iframe) to avoid origin errors
@@ -560,38 +560,38 @@ const resolveEmbed = (url = ""): EmbedResult => {
 const fileIcon = (name = "", url = "") => {
   const ext = (name || url).split(".").pop()?.toLowerCase() || "";
   if (["pdf"].includes(ext)) return "📄";
-  if (["doc","docx"].includes(ext)) return "📝";
-  if (["xls","xlsx","csv"].includes(ext)) return "📊";
-  if (["ppt","pptx"].includes(ext)) return "📋";
-  if (["zip","rar","7z","tar","gz"].includes(ext)) return "🗜";
-  if (["jpg","jpeg","png","gif","webp","svg","ico"].includes(ext)) return "🖼";
-  if (["mp4","mov","avi","mkv","webm"].includes(ext)) return "🎬";
-  if (["mp3","wav","ogg","aac","flac"].includes(ext)) return "🎵";
-  if (["js","ts","jsx","tsx","html","css","py","go","rs","java","c","cpp","sh"].includes(ext)) return "💻";
-  if (["md","txt"].includes(ext)) return "📃";
-  if (["json","yaml","yml","xml","env"].includes(ext)) return "⚙️";
+  if (["doc", "docx"].includes(ext)) return "📝";
+  if (["xls", "xlsx", "csv"].includes(ext)) return "📊";
+  if (["ppt", "pptx"].includes(ext)) return "📋";
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return "🗜";
+  if (["jpg", "jpeg", "png", "gif", "webp", "svg", "ico"].includes(ext)) return "🖼";
+  if (["mp4", "mov", "avi", "mkv", "webm"].includes(ext)) return "🎬";
+  if (["mp3", "wav", "ogg", "aac", "flac"].includes(ext)) return "🎵";
+  if (["js", "ts", "jsx", "tsx", "html", "css", "py", "go", "rs", "java", "c", "cpp", "sh"].includes(ext)) return "💻";
+  if (["md", "txt"].includes(ext)) return "📃";
+  if (["json", "yaml", "yml", "xml", "env"].includes(ext)) return "⚙️";
   return "📎";
 };
 
 // ── Service branding ─────────────────────────────────────────────────────────
 const serviceBadge = (label: string) => {
-  const badges: Record<string,{bg:string;fg:string;icon:string}> = {
-    "YouTube":    { bg:"#ff0000", fg:"#fff", icon:"▶" },
-    "Vimeo":      { bg:"#1ab7ea", fg:"#fff", icon:"▶" },
-    "Loom":       { bg:"#625df5", fg:"#fff", icon:"▶" },
-    "Spotify":    { bg:"#1db954", fg:"#fff", icon:"♫" },
-    "SoundCloud": { bg:"#ff5500", fg:"#fff", icon:"♬" },
-    "Apple Music":{ bg:"#fc3c44", fg:"#fff", icon:"♫" },
-    "CodePen":    { bg:"#1e1f26", fg:"#fff", icon:"✏" },
-    "CodeSandbox":{ bg:"#040404", fg:"#fff", icon:"⬡" },
-    "StackBlitz": { bg:"#1374ef", fg:"#fff", icon:"⚡" },
-    "JSFiddle":   { bg:"#0084ff", fg:"#fff", icon:"⌨" },
-    "Replit":     { bg:"#f26207", fg:"#fff", icon:"▶" },
-    "Figma":      { bg:"#f24e1e", fg:"#fff", icon:"◈" },
-    "Google Doc": { bg:"#4285f4", fg:"#fff", icon:"📄" },
-    "Google Sheet":{ bg:"#0f9d58",fg:"#fff", icon:"📊" },
-    "Google Slides":{ bg:"#f4b400",fg:"#fff",icon:"📋" },
-    "Airtable":   { bg:"#2d7ff9", fg:"#fff", icon:"⊞" },
+  const badges: Record<string, { bg: string; fg: string; icon: string }> = {
+    "YouTube": { bg: "#ff0000", fg: "#fff", icon: "▶" },
+    "Vimeo": { bg: "#1ab7ea", fg: "#fff", icon: "▶" },
+    "Loom": { bg: "#625df5", fg: "#fff", icon: "▶" },
+    "Spotify": { bg: "#1db954", fg: "#fff", icon: "♫" },
+    "SoundCloud": { bg: "#ff5500", fg: "#fff", icon: "♬" },
+    "Apple Music": { bg: "#fc3c44", fg: "#fff", icon: "♫" },
+    "CodePen": { bg: "#1e1f26", fg: "#fff", icon: "✏" },
+    "CodeSandbox": { bg: "#040404", fg: "#fff", icon: "⬡" },
+    "StackBlitz": { bg: "#1374ef", fg: "#fff", icon: "⚡" },
+    "JSFiddle": { bg: "#0084ff", fg: "#fff", icon: "⌨" },
+    "Replit": { bg: "#f26207", fg: "#fff", icon: "▶" },
+    "Figma": { bg: "#f24e1e", fg: "#fff", icon: "◈" },
+    "Google Doc": { bg: "#4285f4", fg: "#fff", icon: "📄" },
+    "Google Sheet": { bg: "#0f9d58", fg: "#fff", icon: "📊" },
+    "Google Slides": { bg: "#f4b400", fg: "#fff", icon: "📋" },
+    "Airtable": { bg: "#2d7ff9", fg: "#fff", icon: "⊞" },
   };
   const b = badges[label];
   if (!b) return `<span class="svc-badge svc-badge-default">${label}</span>`;
@@ -616,7 +616,7 @@ const nextCid = () => `ch${++_cid}`;
 let _forPdf = false;
 
 // Chart.js 4 palette (same as ChartBlock.tsx defaultColors)
-const PAL = ["#3b82f6","#22c55e","#a855f7","#f97316","#ec4899","#14b8a6","#eab308","#ef4444","#6366f1","#84cc16"];
+const PAL = ["#3b82f6", "#22c55e", "#a855f7", "#f97316", "#ec4899", "#14b8a6", "#eab308", "#ef4444", "#6366f1", "#84cc16"];
 const pc = (i: number) => PAL[i % PAL.length];
 
 // ─── Chart config builder ─────────────────────────────────────────────────────
@@ -627,8 +627,8 @@ const buildChartConfig = (block: NoteBlock): object | null => {
   let rows = block.chartRows ?? [];
 
   if (!cols.length && block.chartData?.length) {
-    cols = [{ id:"cn", key:"name", type:"text" as const }, { id:"cv", key:"value", type:"number" as const }];
-    rows = block.chartData.map(d => ({ id:d.id, cells:{ name:d.label, value:d.value } }));
+    cols = [{ id: "cn", key: "name", type: "text" as const }, { id: "cv", key: "value", type: "number" as const }];
+    rows = block.chartData.map(d => ({ id: d.id, cells: { name: d.label, value: d.value } }));
   }
   if (!cols.length || !rows.length) return null;
 
@@ -636,7 +636,7 @@ const buildChartConfig = (block: NoteBlock): object | null => {
   if (!numericCols.length) return null;
 
   const xKey = block.chartXAxisKey ?? cols.find(c => c.type === "text")?.key ?? cols[0].key;
-  const sColors: Record<string,string> = { ...(block.chartSeriesColors ?? {}) };
+  const sColors: Record<string, string> = { ...(block.chartSeriesColors ?? {}) };
   numericCols.forEach((col, i) => { if (!sColors[col.key]) sColors[col.key] = pc(i); });
 
   const rawSel = block.chartSelectedSeries?.length ? block.chartSelectedSeries : numericCols.map(c => c.key);
@@ -644,23 +644,23 @@ const buildChartConfig = (block: NoteBlock): object | null => {
   if (!active.length) return null;
 
   const data = rows.map(row => {
-    const item: Record<string, string|number> = {};
+    const item: Record<string, string | number> = {};
     cols.forEach(col => { item[col.key] = row.cells[col.key] ?? (col.type === "number" ? 0 : ""); });
     return item;
   });
   const labels = data.map(d => String(d[xKey] ?? ""));
 
   // Hardcoded design tokens — no CSS variables (standalone HTML has no app theme)
-  const GRID_COLOR  = "#e5e7eb";
-  const TICK_COLOR  = "#6b7280";
+  const GRID_COLOR = "#e5e7eb";
+  const TICK_COLOR = "#6b7280";
   const LABEL_COLOR = "#374151";
   const FONT_FAMILY = "-apple-system,'SF Pro Text','Helvetica Neue',sans-serif";
-  const FONT_SIZE   = 12;
+  const FONT_SIZE = 12;
   const baseFont = { family: FONT_FAMILY, size: FONT_SIZE };
-  const gridCfg  = { color: GRID_COLOR };
+  const gridCfg = { color: GRID_COLOR };
   // Chart.js 4: use border object (not deprecated drawBorder)
   const borderCfg = { display: false };
-  const tickCfg   = { color: TICK_COLOR, font: baseFont };
+  const tickCfg = { color: TICK_COLOR, font: baseFont };
 
   const legend = {
     display: true,
@@ -706,61 +706,81 @@ const buildChartConfig = (block: NoteBlock): object | null => {
   switch (type) {
     case "bar": return {
       type: "bar",
-      data: { labels, datasets: active.map(k => ({
-        label: k, data: data.map(d => Number(d[k]??0)),
-        backgroundColor: sColors[k], borderRadius: 6, borderSkipped: false, borderWidth: 0,
-      }))},
-      options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
-        plugins:{ legend, tooltip }, scales: cartScales() },
+      data: {
+        labels, datasets: active.map(k => ({
+          label: k, data: data.map(d => Number(d[k] ?? 0)),
+          backgroundColor: sColors[k], borderRadius: 6, borderSkipped: false, borderWidth: 0,
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+        plugins: { legend, tooltip }, scales: cartScales()
+      },
     };
 
     case "horizontalBar": return {
       type: "bar",
-      data: { labels, datasets: active.map(k => ({
-        label: k, data: data.map(d => Number(d[k]??0)),
-        backgroundColor: sColors[k], borderRadius: 6, borderSkipped: false,
-      }))},
-      options: { indexAxis: "y", responsive:true, maintainAspectRatio:false, animation:{duration:400},
-        plugins:{ legend, tooltip }, scales: cartScales(true) },
+      data: {
+        labels, datasets: active.map(k => ({
+          label: k, data: data.map(d => Number(d[k] ?? 0)),
+          backgroundColor: sColors[k], borderRadius: 6, borderSkipped: false,
+        }))
+      },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+        plugins: { legend, tooltip }, scales: cartScales(true)
+      },
     };
 
     case "stackedBar": return {
       type: "bar",
-      data: { labels, datasets: active.map(k => ({
-        label: k, data: data.map(d => Number(d[k]??0)),
-        backgroundColor: sColors[k], stack: "s",
-      }))},
-      options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
-        plugins:{ legend, tooltip:{ ...tooltip, mode:"index" as const } },
-        scales: cartScales(false, true) },
+      data: {
+        labels, datasets: active.map(k => ({
+          label: k, data: data.map(d => Number(d[k] ?? 0)),
+          backgroundColor: sColors[k], stack: "s",
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+        plugins: { legend, tooltip: { ...tooltip, mode: "index" as const } },
+        scales: cartScales(false, true)
+      },
     };
 
     case "line": return {
       type: "line",
-      data: { labels, datasets: active.map(k => ({
-        label: k, data: data.map(d => Number(d[k]??0)),
-        borderColor: sColors[k], backgroundColor: sColors[k],
-        borderWidth: 2.5,
-        pointRadius: 5, pointHoverRadius: 7,
-        pointBackgroundColor: sColors[k], pointBorderColor: "#fff", pointBorderWidth: 2,
-        tension: 0, fill: false,
-      }))},
-      options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
-        plugins:{ legend, tooltip:{ ...tooltip, mode:"index" as const } }, scales: cartScales() },
+      data: {
+        labels, datasets: active.map(k => ({
+          label: k, data: data.map(d => Number(d[k] ?? 0)),
+          borderColor: sColors[k], backgroundColor: sColors[k],
+          borderWidth: 2.5,
+          pointRadius: 5, pointHoverRadius: 7,
+          pointBackgroundColor: sColors[k], pointBorderColor: "#fff", pointBorderWidth: 2,
+          tension: 0, fill: false,
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+        plugins: { legend, tooltip: { ...tooltip, mode: "index" as const } }, scales: cartScales()
+      },
     };
 
     case "area": return {
       type: "line",
-      data: { labels, datasets: active.map(k => ({
-        label: k, data: data.map(d => Number(d[k]??0)),
-        borderColor: sColors[k], backgroundColor: sColors[k]+"4d",
-        borderWidth: 2.5,
-        pointRadius: 4, pointHoverRadius: 6,
-        pointBackgroundColor: sColors[k], pointBorderColor: "#fff", pointBorderWidth: 2,
-        tension: 0, fill: true,
-      }))},
-      options: { responsive:true, maintainAspectRatio:false, animation:{duration:400},
-        plugins:{ legend, tooltip:{ ...tooltip, mode:"index" as const } }, scales: cartScales() },
+      data: {
+        labels, datasets: active.map(k => ({
+          label: k, data: data.map(d => Number(d[k] ?? 0)),
+          borderColor: sColors[k], backgroundColor: sColors[k] + "4d",
+          borderWidth: 2.5,
+          pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: sColors[k], pointBorderColor: "#fff", pointBorderWidth: 2,
+          tension: 0, fill: true,
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+        plugins: { legend, tooltip: { ...tooltip, mode: "index" as const } }, scales: cartScales()
+      },
     };
 
     case "pie":
@@ -768,15 +788,23 @@ const buildChartConfig = (block: NoteBlock): object | null => {
       const col = numericCols.find(c => active.includes(c.key)) ?? numericCols[0];
       return {
         type: "doughnut",
-        data: { labels, datasets:[{ data: data.map(d=>Number(d[col.key]??0)),
-          backgroundColor: data.map((_,i)=>pc(i)), borderColor:"#fff", borderWidth:3, hoverOffset:10 }]},
+        data: {
+          labels, datasets: [{
+            data: data.map(d => Number(d[col.key] ?? 0)),
+            backgroundColor: data.map((_, i) => pc(i)), borderColor: "#fff", borderWidth: 3, hoverOffset: 10
+          }]
+        },
         options: {
-          cutout: type==="donut"?"60%":"0%",
-          responsive:true, maintainAspectRatio:false, animation:{duration:400},
-          plugins:{
-            legend:{ display:true, position:"bottom" as const,
-              labels:{ padding:16, usePointStyle:true, pointStyle:"circle" as const,
-                color: LABEL_COLOR, font:{ family: FONT_FAMILY, size:12 } } },
+          cutout: type === "donut" ? "60%" : "0%",
+          responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+          plugins: {
+            legend: {
+              display: true, position: "bottom" as const,
+              labels: {
+                padding: 16, usePointStyle: true, pointStyle: "circle" as const,
+                color: LABEL_COLOR, font: { family: FONT_FAMILY, size: 12 }
+              }
+            },
             tooltip,
           },
         },
@@ -788,24 +816,30 @@ const buildChartConfig = (block: NoteBlock): object | null => {
       const yk = active[1] ?? active[0] ?? xk;
       return {
         type: "scatter",
-        data: { datasets:[{
-          label: "Data",
-          data: data.map(d=>({x:Number(d[xk]??0),y:Number(d[yk]??0)})),
-          backgroundColor: (sColors[xk]||pc(0))+"bb",
-          borderColor: sColors[xk]||pc(0),
-          borderWidth: 1.5,
-          pointRadius: 7, pointHoverRadius: 9,
-          pointBackgroundColor: sColors[xk]||pc(0),
-          pointBorderColor: "#fff", pointBorderWidth: 2,
-        }]},
+        data: {
+          datasets: [{
+            label: "Data",
+            data: data.map(d => ({ x: Number(d[xk] ?? 0), y: Number(d[yk] ?? 0) })),
+            backgroundColor: (sColors[xk] || pc(0)) + "bb",
+            borderColor: sColors[xk] || pc(0),
+            borderWidth: 1.5,
+            pointRadius: 7, pointHoverRadius: 9,
+            pointBackgroundColor: sColors[xk] || pc(0),
+            pointBorderColor: "#fff", pointBorderWidth: 2,
+          }]
+        },
         options: {
-          responsive:true, maintainAspectRatio:false, animation:{duration:400},
-          plugins:{ legend, tooltip },
-          scales:{
-            x:{ type:"linear" as const, grid:gridCfg, border:borderCfg, ticks:tickCfg,
-              title:{ display:true, text:xk, color:LABEL_COLOR, font:baseFont } },
-            y:{ grid:gridCfg, border:borderCfg, ticks:tickCfg, beginAtZero:true,
-              title:{ display:true, text:yk, color:LABEL_COLOR, font:baseFont } },
+          responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+          plugins: { legend, tooltip },
+          scales: {
+            x: {
+              type: "linear" as const, grid: gridCfg, border: borderCfg, ticks: tickCfg,
+              title: { display: true, text: xk, color: LABEL_COLOR, font: baseFont }
+            },
+            y: {
+              grid: gridCfg, border: borderCfg, ticks: tickCfg, beginAtZero: true,
+              title: { display: true, text: yk, color: LABEL_COLOR, font: baseFont }
+            },
           },
         },
       };
@@ -813,24 +847,28 @@ const buildChartConfig = (block: NoteBlock): object | null => {
 
     case "radar": return {
       type: "radar",
-      data: { labels, datasets: active.map(k=>({
-        label:k, data:data.map(d=>Number(d[k]??0)),
-        backgroundColor:sColors[k]+"4d", borderColor:sColors[k],
-        borderWidth:2.5,
-        pointBackgroundColor:sColors[k], pointBorderColor:"#fff", pointBorderWidth:2,
-        pointRadius:5, pointHoverRadius:7,
-      }))},
-      options:{
-        responsive:true, maintainAspectRatio:false, animation:{duration:400},
-        plugins:{ legend, tooltip },
-        scales:{
-          r:{
-            grid:{ color:GRID_COLOR },
-            angleLines:{ color:GRID_COLOR, lineWidth:1 },
-            pointLabels:{ display:true, color:LABEL_COLOR, font:{ family:FONT_FAMILY, size:12 } },
-            ticks:{ display:true, color:TICK_COLOR, backdropColor:"transparent",
-              font:{ family:FONT_FAMILY, size:10 } },
-            beginAtZero:true,
+      data: {
+        labels, datasets: active.map(k => ({
+          label: k, data: data.map(d => Number(d[k] ?? 0)),
+          backgroundColor: sColors[k] + "4d", borderColor: sColors[k],
+          borderWidth: 2.5,
+          pointBackgroundColor: sColors[k], pointBorderColor: "#fff", pointBorderWidth: 2,
+          pointRadius: 5, pointHoverRadius: 7,
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+        plugins: { legend, tooltip },
+        scales: {
+          r: {
+            grid: { color: GRID_COLOR },
+            angleLines: { color: GRID_COLOR, lineWidth: 1 },
+            pointLabels: { display: true, color: LABEL_COLOR, font: { family: FONT_FAMILY, size: 12 } },
+            ticks: {
+              display: true, color: TICK_COLOR, backdropColor: "transparent",
+              font: { family: FONT_FAMILY, size: 10 }
+            },
+            beginAtZero: true,
           },
         },
       },
@@ -838,18 +876,22 @@ const buildChartConfig = (block: NoteBlock): object | null => {
 
     case "combo": return {
       type: "bar",
-      data: { labels, datasets: active.map((k,idx)=>({
-        type: idx%2===0?"bar" as const:"line" as const,
-        label:k, data:data.map(d=>Number(d[k]??0)),
-        backgroundColor:idx%2===0?sColors[k]:sColors[k]+"33",
-        borderColor:sColors[k], borderWidth:idx%2===0?0:2.5,
-        borderRadius:idx%2===0?6:0, fill:false, tension:0,
-        pointRadius:idx%2===0?0:5, pointHoverRadius:idx%2===0?0:7,
-        pointBackgroundColor:sColors[k], pointBorderColor:"#fff",
-        pointBorderWidth:idx%2===0?0:2,
-      }))},
-      options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
-        plugins:{ legend, tooltip:{ ...tooltip, mode:"index" as const } }, scales:cartScales() },
+      data: {
+        labels, datasets: active.map((k, idx) => ({
+          type: idx % 2 === 0 ? "bar" as const : "line" as const,
+          label: k, data: data.map(d => Number(d[k] ?? 0)),
+          backgroundColor: idx % 2 === 0 ? sColors[k] : sColors[k] + "33",
+          borderColor: sColors[k], borderWidth: idx % 2 === 0 ? 0 : 2.5,
+          borderRadius: idx % 2 === 0 ? 6 : 0, fill: false, tension: 0,
+          pointRadius: idx % 2 === 0 ? 0 : 5, pointHoverRadius: idx % 2 === 0 ? 0 : 7,
+          pointBackgroundColor: sColors[k], pointBorderColor: "#fff",
+          pointBorderWidth: idx % 2 === 0 ? 0 : 2,
+        }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+        plugins: { legend, tooltip: { ...tooltip, mode: "index" as const } }, scales: cartScales()
+      },
     };
 
     default: return null;
@@ -858,7 +900,7 @@ const buildChartConfig = (block: NoteBlock): object | null => {
 
 // ─── HTML block renderer ──────────────────────────────────────────────────────
 
-const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {n:0}): string => {
+const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = { n: 0 }): string => {
   // Track numbered list consecutive counter
   if (block.type !== "numbered") { counter.n = 0; }
 
@@ -886,7 +928,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
     // ── Todo ──────────────────────────────────────────────────────────────────
     case "todo":
-      return `<label class="todo-item"><span class="cb${block.checked?" cb-on":""}"><svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="${block.checked?"done":""}">${renderInline(block.content)}</span></label>`;
+      return `<label class="todo-item"><span class="cb${block.checked ? " cb-on" : ""}"><svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span class="${block.checked ? "done" : ""}">${renderInline(block.content)}</span></label>`;
 
     // ── Quote ─────────────────────────────────────────────────────────────────
     case "quote":
@@ -908,7 +950,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
     // ── Toggle — always open so PDF shows all content ────────────────────────
     case "toggle":
-      return `<details class="toggle" open><summary class="toggle-summary">${renderInline(block.content)}</summary><div class="toggle-body">${renderInline(block.toggleContent||"")}</div></details>`;
+      return `<details class="toggle" open><summary class="toggle-summary">${renderInline(block.content)}</summary><div class="toggle-body">${renderInline(block.toggleContent || "")}</div></details>`;
 
     // ── Image — local images are inlined as base64 in HTML & PDF exports ────────
     case "image": {
@@ -1016,10 +1058,10 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
       // Shared mime-type helper used by both local and external native audio
       const audioExt = audioUrl.split("?")[0].split(".").pop()?.toLowerCase() || "";
-      const audioMimeMap: Record<string,string> = {
-        mp3:"audio/mpeg", wav:"audio/wav", ogg:"audio/ogg", oga:"audio/ogg",
-        aac:"audio/aac", flac:"audio/flac", opus:"audio/ogg;codecs=opus",
-        m4a:"audio/mp4", weba:"audio/webm", webm:"audio/webm",
+      const audioMimeMap: Record<string, string> = {
+        mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg",
+        aac: "audio/aac", flac: "audio/flac", opus: "audio/ogg;codecs=opus",
+        m4a: "audio/mp4", weba: "audio/webm", webm: "audio/webm",
       };
       const audioMime = audioMimeMap[audioExt] || "";
 
@@ -1151,15 +1193,15 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       // ── HTML export: try getEmbedUrl for embeddable files ─────────────────────
       const embedSrc = getEmbedUrl(fileUrl) || fr.iframeSrc;
       if (embedSrc) {
-        const isCode  = ["codepen","codesandbox","stackblitz","jsfiddle","replit"].includes(fr.type);
+        const isCode = ["codepen", "codesandbox", "stackblitz", "jsfiddle", "replit"].includes(fr.type);
         const isDesign = fr.type === "figma";
         const iframeH = isCode ? "460px" : isDesign ? "500px" : fr.type === "gslide" ? "480px" : "520px";
         const accentMap: Record<string, string> = {
-          "Google Doc":"#4285f4","Google Sheet":"#0f9d58","Google Slides":"#f4b400",
-          "Google Drive":"#4285f4","Office / OneDrive":"#0078d4","PDF":"#ef4444",
-          "CodePen":"#1e1f26","CodeSandbox":"#040404","StackBlitz":"#1374ef",
-          "JSFiddle":"#0084ff","Replit":"#f26207","Figma":"#f24e1e",
-          "Airtable":"#2d7ff9","Notion":"#000",
+          "Google Doc": "#4285f4", "Google Sheet": "#0f9d58", "Google Slides": "#f4b400",
+          "Google Drive": "#4285f4", "Office / OneDrive": "#0078d4", "PDF": "#ef4444",
+          "CodePen": "#1e1f26", "CodeSandbox": "#040404", "StackBlitz": "#1374ef",
+          "JSFiddle": "#0084ff", "Replit": "#f26207", "Figma": "#f24e1e",
+          "Airtable": "#2d7ff9", "Notion": "#000",
         };
         const accent = accentMap[fr.label] || "#6366f1";
         return `<div class="embed-block">
@@ -1199,7 +1241,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
     // ── Bookmark ──────────────────────────────────────────────────────────────
     case "bookmark":
       if (!block.bookmarkUrl) return "";
-      return `<a class="bookmark-card" href="${esc(block.bookmarkUrl)}" target="_blank" rel="noopener"><div class="bm-body"><div class="bm-title">${renderInline(block.bookmarkTitle||block.bookmarkUrl)}</div>${block.bookmarkDescription?`<div class="bm-desc">${renderInline(block.bookmarkDescription)}</div>`:""}<div class="bm-url">${esc(block.bookmarkUrl)}</div></div><span class="bm-arrow">↗</span></a>`;
+      return `<a class="bookmark-card" href="${esc(block.bookmarkUrl)}" target="_blank" rel="noopener"><div class="bm-body"><div class="bm-title">${renderInline(block.bookmarkTitle || block.bookmarkUrl)}</div>${block.bookmarkDescription ? `<div class="bm-desc">${renderInline(block.bookmarkDescription)}</div>` : ""}<div class="bm-url">${esc(block.bookmarkUrl)}</div></div><span class="bm-arrow">↗</span></a>`;
 
     // ── Embed — CodePen / CodeSandbox / StackBlitz / Figma / GDoc / YT / etc ────
     case "embed": {
@@ -1266,11 +1308,11 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
         const h = isSpotifyPlaylist ? "352px" : isSpotifyTrack ? "152px" : isSoundCloud ? "166px" : isAudio ? "175px" : isTall ? "480px" : "360px";
         // Pick accent color by service
         const accentMap: Record<string, string> = {
-          "YouTube":"#ff0000","Vimeo":"#1ab7ea","Loom":"#625df5",
-          "Spotify":"#1db954","SoundCloud":"#ff5500","Apple Music":"#fc3c44",
-          "CodePen":"#1e1f26","CodeSandbox":"#040404","StackBlitz":"#1374ef",
-          "JSFiddle":"#0084ff","Replit":"#f26207","Figma":"#f24e1e",
-          "Google Doc":"#4285f4","Google Sheet":"#0f9d58","Google Slides":"#f4b400",
+          "YouTube": "#ff0000", "Vimeo": "#1ab7ea", "Loom": "#625df5",
+          "Spotify": "#1db954", "SoundCloud": "#ff5500", "Apple Music": "#fc3c44",
+          "CodePen": "#1e1f26", "CodeSandbox": "#040404", "StackBlitz": "#1374ef",
+          "JSFiddle": "#0084ff", "Replit": "#f26207", "Figma": "#f24e1e",
+          "Google Doc": "#4285f4", "Google Sheet": "#0f9d58", "Google Slides": "#f4b400",
         };
         const accent = accentMap[label] || "#6366f1";
         const extraClass = isAudio ? " embed-block-audio" : "";
@@ -1279,7 +1321,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
           return `<div class="embed-block${extraClass}">
   <div class="embed-bar">${serviceBadge(label)}<a href="${esc(embedUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Open ↗</a></div>
   <div class="screen-only" style="overflow:hidden;border-radius:0 0 var(--r14) var(--r14)">
-    <iframe src="${esc(embedSrc)}" width="100%" height="${h.replace("px","")}" frameborder="0" allowtransparency="true"
+    <iframe src="${esc(embedSrc)}" width="100%" height="${h.replace("px", "")}" frameborder="0" allowtransparency="true"
       allow="autoplay;clipboard-write;encrypted-media;fullscreen;picture-in-picture"
       loading="lazy" style="display:block"></iframe>
   </div>
@@ -1303,9 +1345,9 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       if (er.type === "vid-card") {
         // YouTube/Vimeo thumbnail card (works without iframe)
         return `<div class="embed-block">
-  <div class="embed-bar">${serviceBadge(er.label)}<a href="${esc(er.watchUrl||embedUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Watch on ${esc(er.label)} ↗</a></div>
-  <a class="vid-thumb-card" href="${esc(er.watchUrl||embedUrl)}" target="_blank" rel="noopener">
-    ${er.thumbUrl?`<img class="vid-thumb-img" src="${esc(er.thumbUrl)}" alt="Video thumbnail" loading="lazy" onerror="this.style.display='none'">`:`<div class="vid-thumb-placeholder"></div>`}
+  <div class="embed-bar">${serviceBadge(er.label)}<a href="${esc(er.watchUrl || embedUrl)}" target="_blank" rel="noopener" class="embed-ext-link">Watch on ${esc(er.label)} ↗</a></div>
+  <a class="vid-thumb-card" href="${esc(er.watchUrl || embedUrl)}" target="_blank" rel="noopener">
+    ${er.thumbUrl ? `<img class="vid-thumb-img" src="${esc(er.thumbUrl)}" alt="Video thumbnail" loading="lazy" onerror="this.style.display='none'">` : `<div class="vid-thumb-placeholder"></div>`}
     <div class="vid-thumb-overlay"><div class="vid-play-btn"><svg viewBox="0 0 24 24" fill="white" width="28" height="28"><path d="M8 5v14l11-7z"/></svg></div></div>
   </a>
 </div>`;
@@ -1340,30 +1382,30 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
     // ── Rating ────────────────────────────────────────────────────────────────
     case "rating": {
-      const v = block.ratingValue??0, m = block.ratingMax??5;
-      return `<div class="rating">${Array.from({length:m},(_,i)=>`<span class="${i<v?"star-on":"star-off"}">★</span>`).join("")}<span class="rating-label">${v}/${m}</span></div>`;
+      const v = block.ratingValue ?? 0, m = block.ratingMax ?? 5;
+      return `<div class="rating">${Array.from({ length: m }, (_, i) => `<span class="${i < v ? "star-on" : "star-off"}">★</span>`).join("")}<span class="rating-label">${v}/${m}</span></div>`;
     }
 
     // ── Table — with horizontal scroll + print-safe full width ───────────────
     case "table": {
-      const rows = block.tableData??[]; if (!rows.length) return "";
-      const head = rows[0].map(c=>`<th>${renderInline(c)}</th>`).join("");
-      const body = rows.slice(1).map(r=>`<tr>${r.map(c=>`<td>${renderInline(c)}</td>`).join("")}</tr>`).join("");
+      const rows = block.tableData ?? []; if (!rows.length) return "";
+      const head = rows[0].map(c => `<th>${renderInline(c)}</th>`).join("");
+      const body = rows.slice(1).map(r => `<tr>${r.map(c => `<td>${renderInline(c)}</td>`).join("")}</tr>`).join("");
       return `<div class="table-outer"><div class="table-scroll"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div></div>`;
     }
 
     // ── Kanban ────────────────────────────────────────────────────────────────
     case "kanban": {
-      const cols=(block.kanbanColumns??[]).filter(c=>c.title||c.cards.length);
-      return `<div class="kanban"><div class="kanban-scroll">${cols.map(col=>`<div class="kanban-col"><div class="kanban-hd"><span class="kanban-title">${esc(col.title||"Column")}</span><span class="kanban-badge">${col.cards.filter(c=>c.content).length}</span></div>${col.cards.filter(c=>c.content).map(c=>`<div class="kanban-card">${renderInline(c.content)}</div>`).join("")}</div>`).join("")}</div></div>`;
+      const cols = (block.kanbanColumns ?? []).filter(c => c.title || c.cards.length);
+      return `<div class="kanban"><div class="kanban-scroll">${cols.map(col => `<div class="kanban-col"><div class="kanban-hd"><span class="kanban-title">${esc(col.title || "Column")}</span><span class="kanban-badge">${col.cards.filter(c => c.content).length}</span></div>${col.cards.filter(c => c.content).map(c => `<div class="kanban-card">${renderInline(c.content)}</div>`).join("")}</div>`).join("")}</div></div>`;
     }
 
     // ── Timeline — color from Tailwind class ───────────────────────────────────
     case "timeline": {
-      const items=block.timelineItems??[];
-      return `<div class="timeline">${items.map((item,i)=>{
-        const hex=toHex(item.color,"#6366f1");
-        return `<div class="tl-row${i===0?" tl-first":""}"><div class="tl-side"><div class="tl-dot" style="background:${hex};box-shadow:0 0 0 4px ${hex}22"></div><div class="tl-line" style="background:linear-gradient(${hex},${hex}44)"></div></div><div class="tl-content"><div class="tl-date">${esc(item.date)}</div><div class="tl-title">${renderInline(item.title)}</div>${item.description?`<div class="tl-desc">${renderInline(item.description)}</div>`:""}</div></div>`;
+      const items = block.timelineItems ?? [];
+      return `<div class="timeline">${items.map((item, i) => {
+        const hex = toHex(item.color, "#6366f1");
+        return `<div class="tl-row${i === 0 ? " tl-first" : ""}"><div class="tl-side"><div class="tl-dot" style="background:${hex};box-shadow:0 0 0 4px ${hex}22"></div><div class="tl-line" style="background:linear-gradient(${hex},${hex}44)"></div></div><div class="tl-content"><div class="tl-date">${esc(item.date)}</div><div class="tl-title">${renderInline(item.title)}</div>${item.description ? `<div class="tl-desc">${renderInline(item.description)}</div>` : ""}</div></div>`;
       }).join("")}</div>`;
     }
 
@@ -1378,7 +1420,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
           // This fallback only shows if mediaMap has no entry for this url.
         }
         // Always emit img — mediaMap will swap local src to base64
-        return `<figure class="gal-item"><img src="${esc(img.url)}" alt="${esc(img.caption||"")}" loading="lazy">${img.caption?`<figcaption>${renderInline(img.caption)}</figcaption>`:""}</figure>`;
+        return `<figure class="gal-item"><img src="${esc(img.url)}" alt="${esc(img.caption || "")}" loading="lazy">${img.caption ? `<figcaption>${renderInline(img.caption)}</figcaption>` : ""}</figure>`;
       }).join("")}</div>`;
     }
 
@@ -1399,11 +1441,11 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       );
       const usedIds = new Set<string>();
       validConns.forEach(c => { usedIds.add(c.from); usedIds.add(c.to); });
-      const graphNodes = nodes.filter(n =>  usedIds.has(n.id));
+      const graphNodes = nodes.filter(n => usedIds.has(n.id));
       const floatNodes = nodes.filter(n => !usedIds.has(n.id));
 
       // ── Step 2: Back-edge detection (iterative DFS) ────────────────────────
-      const dfsCol = new Map<string, 0|1|2>();
+      const dfsCol = new Map<string, 0 | 1 | 2>();
       graphNodes.forEach(n => dfsCol.set(n.id, 0));
       const backSet = new Set<string>(); // "from→to"
 
@@ -1429,7 +1471,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
       // ── Step 3: Longest-path layering on the DAG ──────────────────────────
       const outE = new Map<string, string[]>();
-      const inD  = new Map<string, number>();
+      const inD = new Map<string, number>();
       graphNodes.forEach(n => { outE.set(n.id, []); inD.set(n.id, 0); });
       validConns.forEach(c => {
         if (isBack(c.from, c.to)) return;
@@ -1457,15 +1499,15 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       const layerGroups: string[][] = Array.from({ length: maxL + 1 }, () => []);
       graphNodes.forEach(n => layerGroups[layerOf.get(n.id) ?? 0].push(n.id));
 
-      const bary = (id: string, dir: "in"|"out") => {
+      const bary = (id: string, dir: "in" | "out") => {
         const peers = dir === "out"
           ? validConns.filter(c => c.from === id && !isBack(c.from, c.to)).map(c => c.to)
-          : validConns.filter(c => c.to   === id && !isBack(c.from, c.to)).map(c => c.from);
+          : validConns.filter(c => c.to === id && !isBack(c.from, c.to)).map(c => c.from);
         if (!peers.length) return 999;
-        return peers.reduce((s, r) => s + (layerGroups[layerOf.get(r)??0]?.indexOf(r) ?? 0), 0) / peers.length;
+        return peers.reduce((s, r) => s + (layerGroups[layerOf.get(r) ?? 0]?.indexOf(r) ?? 0), 0) / peers.length;
       };
       for (let pass = 0; pass < 3; pass++) {
-        layerGroups.forEach(g => g.sort((a, b) => bary(a, pass%2===0?"in":"out") - bary(b, pass%2===0?"in":"out")));
+        layerGroups.forEach(g => g.sort((a, b) => bary(a, pass % 2 === 0 ? "in" : "out") - bary(b, pass % 2 === 0 ? "in" : "out")));
       }
 
       // ── Step 5: Pixel positions ────────────────────────────────────────────
@@ -1489,7 +1531,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
         const p = pos.get(n.id);
         if (!p) return;
         const outs = validConns.filter(c => c.from === n.id && !isBack(c.from, c.to));
-        const ins  = validConns.filter(c => c.to   === n.id && !isBack(c.from, c.to));
+        const ins = validConns.filter(c => c.to === n.id && !isBack(c.from, c.to));
         const spread = (count: number) => {
           if (count === 0) return [];
           if (count === 1) return [p.cy];
@@ -1510,35 +1552,35 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       const arrowDefs = [
         // Shared drop-shadow filter for nodes
         `<filter id="mm-shadow" x="-20%" y="-20%" width="140%" height="140%">` +
-          `<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000018"/>` +
+        `<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000018"/>` +
         `</filter>`,
         // Subtle glow filter for source nodes
         `<filter id="mm-glow" x="-30%" y="-30%" width="160%" height="160%">` +
-          `<feGaussianBlur stdDeviation="4" result="blur"/>` +
-          `<feComposite in="SourceGraphic" in2="blur" operator="over"/>` +
+        `<feGaussianBlur stdDeviation="4" result="blur"/>` +
+        `<feComposite in="SourceGraphic" in2="blur" operator="over"/>` +
         `</filter>`,
         // Per-color arrow markers + gradient defs
         ...[...uniqueHex].map(hex => {
-          const id    = hex.replace('#', '');
-          const mid   = `am${id}`;
-          const gid   = `mg${id}`;
-          const egid  = `eg${id}`;
+          const id = hex.replace('#', '');
+          const mid = `am${id}`;
+          const gid = `mg${id}`;
+          const egid = `eg${id}`;
           // Hex → RGB for rgba() use
-          const r = parseInt(hex.slice(1,3),16), g2 = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+          const r = parseInt(hex.slice(1, 3), 16), g2 = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
           return [
             // Elegant filled arrowhead — slim triangle, refX=6 so tip aligns with path endpoint
             `<marker id="${mid}" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">` +
-              `<path d="M0,0.5 L6,3.5 L0,6.5 Z" fill="${hex}" opacity="0.9"/>` +
+            `<path d="M0,0.5 L6,3.5 L0,6.5 Z" fill="${hex}" opacity="0.9"/>` +
             `</marker>`,
             // Radial gradient fill for source nodes
             `<radialGradient id="${gid}" cx="35%" cy="30%" r="65%">` +
-              `<stop offset="0%" stop-color="${hex}" stop-opacity="1"/>` +
-              `<stop offset="100%" stop-color="${hex}" stop-opacity="0.82"/>` +
+            `<stop offset="0%" stop-color="${hex}" stop-opacity="1"/>` +
+            `<stop offset="100%" stop-color="${hex}" stop-opacity="0.82"/>` +
             `</radialGradient>`,
             // Linear gradient for edges (color → transparent)
             `<linearGradient id="${egid}" x1="0%" y1="0%" x2="100%" y2="0%">` +
-              `<stop offset="0%" stop-color="rgba(${r},${g2},${b},0.55)"/>` +
-              `<stop offset="100%" stop-color="rgba(${r},${g2},${b},0.85)"/>` +
+            `<stop offset="0%" stop-color="rgba(${r},${g2},${b},0.55)"/>` +
+            `<stop offset="100%" stop-color="rgba(${r},${g2},${b},0.85)"/>` +
             `</linearGradient>`,
           ].join("");
         })
@@ -1555,9 +1597,9 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
         const fp = pos.get(c.from)!;
         const tp = pos.get(c.to)!;
         const fHex = toHex(nodeMap.get(c.from)?.color || "bg-blue-500", "#3b82f6");
-        const tHex = toHex(nodeMap.get(c.to)?.color   || "bg-blue-500", "#3b82f6");
+        const tHex = toHex(nodeMap.get(c.to)?.color || "bg-blue-500", "#3b82f6");
         const markId = `am${tHex.replace('#', '')}`;
-        const label  = (c as any).label as string | undefined;
+        const label = (c as any).label as string | undefined;
 
         let pathD = "", lx = 0, ly = 0;
 
@@ -1570,23 +1612,23 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
           const sx = fp.cx, sy = fp.y + NH;
           const ex = tp.cx, ey = tp.y + NH;
           pathD = `M${sx.toFixed(1)},${sy.toFixed(1)} ` +
-                  `C${sx.toFixed(1)},${arcY.toFixed(1)} ` +
-                  `${ex.toFixed(1)},${arcY.toFixed(1)} ` +
-                  `${ex.toFixed(1)},${ey.toFixed(1)}`;
+            `C${sx.toFixed(1)},${arcY.toFixed(1)} ` +
+            `${ex.toFixed(1)},${arcY.toFixed(1)} ` +
+            `${ex.toFixed(1)},${ey.toFixed(1)}`;
           lx = (sx + ex) / 2;
           ly = arcY - 8;
         } else {
           // Forward edge: smooth port-routed bezier
           const ri = rIdxOf.get(c.from) ?? 0;
-          const li = lIdxOf.get(c.to)   ?? 0;
+          const li = lIdxOf.get(c.to) ?? 0;
           rIdxOf.set(c.from, ri + 1);
-          lIdxOf.set(c.to,   li + 1);
+          lIdxOf.set(c.to, li + 1);
 
-          const fy  = (rPortsOf.get(c.from) ?? [fp.cy])[ri] ?? fp.cy;
-          const ty2 = (lPortsOf.get(c.to)  ?? [tp.cy])[li] ?? tp.cy;
+          const fy = (rPortsOf.get(c.from) ?? [fp.cy])[ri] ?? fp.cy;
+          const ty2 = (lPortsOf.get(c.to) ?? [tp.cy])[li] ?? tp.cy;
 
           // Source port: right edge of source node
-          const sx  = fp.x + NW;
+          const sx = fp.x + NW;
           // Target port: left edge of target node (arrowhead tip sits here)
           const tx2 = tp.x;
           const cpx = sx + (tx2 - sx) * 0.5;
@@ -1598,17 +1640,17 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
               ? Math.min(fy, ty2) - 70
               : Math.max(fy, ty2) + 70;
             pathD = `M${sx.toFixed(1)},${fy.toFixed(1)} ` +
-                    `C${(sx+60).toFixed(1)},${fy.toFixed(1)} ` +
-                    `${(sx+60).toFixed(1)},${midY.toFixed(1)} ` +
-                    `${((sx + tx2)/2).toFixed(1)},${midY.toFixed(1)} ` +
-                    `S${(tx2-50).toFixed(1)},${ty2.toFixed(1)} ${tx2.toFixed(1)},${ty2.toFixed(1)}`;
+              `C${(sx + 60).toFixed(1)},${fy.toFixed(1)} ` +
+              `${(sx + 60).toFixed(1)},${midY.toFixed(1)} ` +
+              `${((sx + tx2) / 2).toFixed(1)},${midY.toFixed(1)} ` +
+              `S${(tx2 - 50).toFixed(1)},${ty2.toFixed(1)} ${tx2.toFixed(1)},${ty2.toFixed(1)}`;
             lx = (sx + tx2) / 2;
             ly = midY - 16;
           } else {
             pathD = `M${sx.toFixed(1)},${fy.toFixed(1)} ` +
-                    `C${cpx.toFixed(1)},${fy.toFixed(1)} ` +
-                    `${cpx.toFixed(1)},${ty2.toFixed(1)} ` +
-                    `${tx2.toFixed(1)},${ty2.toFixed(1)}`;
+              `C${cpx.toFixed(1)},${fy.toFixed(1)} ` +
+              `${cpx.toFixed(1)},${ty2.toFixed(1)} ` +
+              `${tx2.toFixed(1)},${ty2.toFixed(1)}`;
             lx = sx + (tx2 - sx) * 0.5;
             ly = fy + (ty2 - fy) * 0.5 - 12;
           }
@@ -1630,8 +1672,8 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
           const lw = Math.max(label.length * 6.8 + 22, 28);
           const lh2 = 18;
           labelSvg.push(
-            `<rect x="${(lx - lw/2).toFixed(1)}" y="${(ly - lh2/2).toFixed(1)}" ` +
-            `width="${lw.toFixed(1)}" height="${lh2}" rx="${(lh2/2).toFixed(0)}" ` +
+            `<rect x="${(lx - lw / 2).toFixed(1)}" y="${(ly - lh2 / 2).toFixed(1)}" ` +
+            `width="${lw.toFixed(1)}" height="${lh2}" rx="${(lh2 / 2).toFixed(0)}" ` +
             `fill="white" stroke="${fHex}" stroke-width="1.2" opacity=".97" ` +
             `filter="url(#mm-shadow)"/>` +
             `<text x="${lx.toFixed(1)}" y="${(ly + 4.5).toFixed(1)}" ` +
@@ -1644,24 +1686,24 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
       // ── Step 9: Draw nodes ─────────────────────────────────────────────────
       const drawN = (n: typeof nodes[0], ox: number, oy: number) => {
-        const hex    = toHex(n.color || "bg-blue-500", "#3b82f6");
-        const gid    = `mg${hex.replace('#', '')}`;
-        const hasIn  = validConns.some(c => c.to === n.id && !isBack(c.from, c.to));
+        const hex = toHex(n.color || "bg-blue-500", "#3b82f6");
+        const gid = `mg${hex.replace('#', '')}`;
+        const hasIn = validConns.some(c => c.to === n.id && !isBack(c.from, c.to));
         // Source nodes: rich gradient fill; child nodes: light tinted background
-        const fill   = hasIn ? hex + "1a" : `url(#${gid})`;
-        const textC  = hasIn ? hex : "#ffffff";
-        const sw     = hasIn ? "1.5" : "0";         // border only on tinted nodes
+        const fill = hasIn ? hex + "1a" : `url(#${gid})`;
+        const textC = hasIn ? hex : "#ffffff";
+        const sw = hasIn ? "1.5" : "0";         // border only on tinted nodes
         const strokeC = hasIn ? hex + "60" : "none";
 
         // Derive a lighter shade for the inner highlight line on solid nodes
-        const r3 = parseInt(hex.slice(1,3),16), g3 = parseInt(hex.slice(3,5),16), b3 = parseInt(hex.slice(5,7),16);
+        const r3 = parseInt(hex.slice(1, 3), 16), g3 = parseInt(hex.slice(3, 5), 16), b3 = parseInt(hex.slice(5, 7), 16);
         const lighten = (v: number) => Math.min(255, v + 55);
-        const hlHex = `#${[r3,g3,b3].map(v => lighten(v).toString(16).padStart(2,'0')).join('')}`;
+        const hlHex = `#${[r3, g3, b3].map(v => lighten(v).toString(16).padStart(2, '0')).join('')}`;
 
-        const sty = (n.bold    ? "font-weight:700;" : "font-weight:500;") +
-                    (n.italic  ? "font-style:italic;" : "") +
-                    (n.underline ? "text-decoration:underline;" : "") +
-                    "font-family:-apple-system,'SF Pro Text','Helvetica Neue',sans-serif;";
+        const sty = (n.bold ? "font-weight:700;" : "font-weight:500;") +
+          (n.italic ? "font-style:italic;" : "") +
+          (n.underline ? "text-decoration:underline;" : "") +
+          "font-family:-apple-system,'SF Pro Text','Helvetica Neue',sans-serif;";
         const cx = ox + NW / 2, cy = oy + NH / 2;
 
         // Word wrap at 16 chars
@@ -1680,7 +1722,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
         const ty0 = oy + (nodeH / 2) - (th / 2) + lh - 3;
 
         const textEls = lns.map((l2, i) =>
-          `<text x="${cx.toFixed(1)}" y="${(ty0 + i*lh).toFixed(1)}" ` +
+          `<text x="${cx.toFixed(1)}" y="${(ty0 + i * lh).toFixed(1)}" ` +
           `text-anchor="middle" font-size="12.5" fill="${textC}" style="${sty}">${esc(l2)}</text>`
         ).join("");
 
@@ -1690,20 +1732,20 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
         if (shape === "diamond") {
           // Diamond with shadow
           shp =
-            `<polygon points="${cx},${oy-8} ${ox+NW+8},${cy} ${cx},${oy+nodeH+8} ${ox-8},${cy}" ` +
+            `<polygon points="${cx},${oy - 8} ${ox + NW + 8},${cy} ${cx},${oy + nodeH + 8} ${ox - 8},${cy}" ` +
             `fill="${fill}" stroke="${strokeC}" stroke-width="${sw}" filter="url(#mm-shadow)"/>`;
           // Inner highlight line near top edge
           if (!hasIn) shp +=
-            `<polygon points="${cx},${oy-2} ${ox+NW+2},${cy} ${cx},${(oy+nodeH*0.3).toFixed(1)} ${ox-2},${cy}" ` +
+            `<polygon points="${cx},${oy - 2} ${ox + NW + 2},${cy} ${cx},${(oy + nodeH * 0.3).toFixed(1)} ${ox - 2},${cy}" ` +
             `fill="${hlHex}" opacity="0.15"/>`;
         } else if (shape === "oval") {
           const rx = NW / 2, ry = nodeH / 2;
           shp =
-            `<ellipse cx="${cx}" cy="${(oy+nodeH/2).toFixed(1)}" rx="${rx}" ry="${ry}" ` +
+            `<ellipse cx="${cx}" cy="${(oy + nodeH / 2).toFixed(1)}" rx="${rx}" ry="${ry}" ` +
             `fill="${fill}" stroke="${strokeC}" stroke-width="${sw}" filter="url(#mm-shadow)"/>`;
           if (!hasIn) shp +=
-            `<ellipse cx="${(cx - rx*0.12).toFixed(1)}" cy="${(oy+nodeH/2 - ry*0.28).toFixed(1)}" ` +
-            `rx="${(rx*0.45).toFixed(1)}" ry="${(ry*0.22).toFixed(1)}" ` +
+            `<ellipse cx="${(cx - rx * 0.12).toFixed(1)}" cy="${(oy + nodeH / 2 - ry * 0.28).toFixed(1)}" ` +
+            `rx="${(rx * 0.45).toFixed(1)}" ry="${(ry * 0.22).toFixed(1)}" ` +
             `fill="${hlHex}" opacity="0.22"/>`;
         } else {
           // Rounded rectangle
@@ -1713,13 +1755,13 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
             `fill="${fill}" stroke="${strokeC}" stroke-width="${sw}" filter="url(#mm-shadow)"/>`;
           // Subtle top-edge gloss highlight on solid nodes
           if (!hasIn) shp +=
-            `<rect x="${(ox+4).toFixed(1)}" y="${(oy+3).toFixed(1)}" width="${NW-8}" height="${(nodeH*0.38).toFixed(1)}" rx="${rx2-2}" ` +
+            `<rect x="${(ox + 4).toFixed(1)}" y="${(oy + 3).toFixed(1)}" width="${NW - 8}" height="${(nodeH * 0.38).toFixed(1)}" rx="${rx2 - 2}" ` +
             `fill="${hlHex}" opacity="0.13"/>`;
         }
 
         // Port dot — small circle on the right edge (exit point) for source nodes
         const portDot = !hasIn
-          ? `<circle cx="${(ox+NW).toFixed(1)}" cy="${cy.toFixed(1)}" r="3" fill="#fff" opacity=".55"/>`
+          ? `<circle cx="${(ox + NW).toFixed(1)}" cy="${cy.toFixed(1)}" r="3" fill="#fff" opacity=".55"/>`
           : "";
 
         return shp + textEls + portDot;
@@ -1756,7 +1798,7 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
         allPX.reduce((m, p) => Math.max(m, p.x + NW), 0) + PAD,
         4 * (NW + LH_GAP) + PAD
       );
-      const floatRows  = Math.ceil(floatNodes.length / 4);
+      const floatRows = Math.ceil(floatNodes.length / 4);
       const svgH = floatY0 + (floatNodes.length ? floatRows * (NH + NV_GAP) + PAD : 0);
 
       // ── Node background knockout layer ─────────────────────────────────────
@@ -1770,11 +1812,11 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
           const cx = p.x + NW / 2, cy = p.y + NH / 2;
           // Use a slightly larger inset so the node fill covers edge bleed
           if (shape === "diamond") {
-            return `<polygon points="${cx},${p.y-10} ${p.x+NW+10},${cy} ${cx},${p.y+NH+10} ${p.x-10},${cy}" fill="#f8f9fc"/>`;
+            return `<polygon points="${cx},${p.y - 10} ${p.x + NW + 10},${cy} ${cx},${p.y + NH + 10} ${p.x - 10},${cy}" fill="#f8f9fc"/>`;
           } else if (shape === "oval") {
-            return `<ellipse cx="${cx}" cy="${cy}" rx="${NW/2+2}" ry="${NH/2+2}" fill="#f8f9fc"/>`;
+            return `<ellipse cx="${cx}" cy="${cy}" rx="${NW / 2 + 2}" ry="${NH / 2 + 2}" fill="#f8f9fc"/>`;
           } else {
-            return `<rect x="${p.x-2}" y="${p.y-2}" width="${NW+4}" height="${NH+4}" rx="13" fill="#f8f9fc"/>`;
+            return `<rect x="${p.x - 2}" y="${p.y - 2}" width="${NW + 4}" height="${NH + 4}" rx="13" fill="#f8f9fc"/>`;
           }
         }),
         ...floatNodes.map((n, i) => {
@@ -1783,11 +1825,11 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
           const shape = n.shape ?? "rectangle";
           const cx = ox + NW / 2, cy = oy + NH / 2;
           if (shape === "diamond") {
-            return `<polygon points="${cx},${oy-10} ${ox+NW+10},${cy} ${cx},${oy+NH+10} ${ox-10},${cy}" fill="#f8f9fc"/>`;
+            return `<polygon points="${cx},${oy - 10} ${ox + NW + 10},${cy} ${cx},${oy + NH + 10} ${ox - 10},${cy}" fill="#f8f9fc"/>`;
           } else if (shape === "oval") {
-            return `<ellipse cx="${cx}" cy="${cy}" rx="${NW/2+2}" ry="${NH/2+2}" fill="#f8f9fc"/>`;
+            return `<ellipse cx="${cx}" cy="${cy}" rx="${NW / 2 + 2}" ry="${NH / 2 + 2}" fill="#f8f9fc"/>`;
           } else {
-            return `<rect x="${ox-2}" y="${oy-2}" width="${NW+4}" height="${NH+4}" rx="13" fill="#f8f9fc"/>`;
+            return `<rect x="${ox - 2}" y="${oy - 2}" width="${NW + 4}" height="${NH + 4}" rx="13" fill="#f8f9fc"/>`;
           }
         }),
       ].join("");
@@ -1816,29 +1858,29 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
     // ── Flashcards — with named color mapping ─────────────────────────────────
     case "flashcard": {
-      const cards=block.flashcards??[];
-      return `<div class="flashcards">${cards.map((c,i)=>{
-        const hex=toHex(c.color||"blue","#3b82f6");
-        return `<div class="fc-card" style="--fc:${hex}"><span class="fc-num">#${i+1}</span><p class="fc-text">${renderInline(c.content)}</p></div>`;
+      const cards = block.flashcards ?? [];
+      return `<div class="flashcards">${cards.map((c, i) => {
+        const hex = toHex(c.color || "blue", "#3b82f6");
+        return `<div class="fc-card" style="--fc:${hex}"><span class="fc-num">#${i + 1}</span><p class="fc-text">${renderInline(c.content)}</p></div>`;
       }).join("")}</div>`;
     }
 
     // ── Tabs — interactive in browser, all panels visible in PDF ─────────────
     // For print we inject a .tab-panel-print wrapper that shows all tabs stacked.
     case "tabs": {
-      const tabs=block.tabsData??[];
-      const nav=tabs.map((tab,i)=>`<button class="tab-btn${i===0?" active":""}" data-tab="${i}">${esc(tab.label)}</button>`).join("");
-      const panels=tabs.map((tab,i)=>{
-        const inner=tab.blocks
-          ? tab.blocks.map((b,j,arr)=>blockToHtml(b,depth+1,arr[j-1]?.type,counter)).join("")
-          : `<p class="prose">${renderInline(tab.content||"")}</p>`;
-        return `<div class="tab-panel${i===0?" active":""}" data-panel="${i}">${inner}</div>`;
+      const tabs = block.tabsData ?? [];
+      const nav = tabs.map((tab, i) => `<button class="tab-btn${i === 0 ? " active" : ""}" data-tab="${i}">${esc(tab.label)}</button>`).join("");
+      const panels = tabs.map((tab, i) => {
+        const inner = tab.blocks
+          ? tab.blocks.map((b, j, arr) => blockToHtml(b, depth + 1, arr[j - 1]?.type, counter)).join("")
+          : `<p class="prose">${renderInline(tab.content || "")}</p>`;
+        return `<div class="tab-panel${i === 0 ? " active" : ""}" data-panel="${i}">${inner}</div>`;
       }).join("");
       // Print version: all tabs shown as labelled sections
-      const printPanels=tabs.map((tab,i)=>{
-        const inner=tab.blocks
-          ? tab.blocks.map((b,j,arr)=>blockToHtml(b,depth+1,arr[j-1]?.type,counter)).join("")
-          : `<p class="prose">${renderInline(tab.content||"")}</p>`;
+      const printPanels = tabs.map((tab, i) => {
+        const inner = tab.blocks
+          ? tab.blocks.map((b, j, arr) => blockToHtml(b, depth + 1, arr[j - 1]?.type, counter)).join("")
+          : `<p class="prose">${renderInline(tab.content || "")}</p>`;
         return `<div class="tab-print-section"><div class="tab-print-label">${esc(tab.label)}</div>${inner}</div>`;
       }).join("");
       return `<div class="tabs-block"><div class="tabs-nav screen-only">${nav}</div><div class="tabs-content screen-only">${panels}</div><div class="tabs-print print-only">${printPanels}</div></div>`;
@@ -1846,48 +1888,48 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
 
     // ── Chart ─────────────────────────────────────────────────────────────────
     case "chart": {
-      const cfg=buildChartConfig(block);
-      if (!cfg) return `<div class="chart-empty"><span class="chart-empty-icon">📊</span><p>${esc(block.chartTitle||"Chart — no data")}</p></div>`;
-      const id=nextCid();
-      _charts.push({id,cfg});
-      const title=block.chartTitle?`<div class="chart-title">${esc(block.chartTitle)}</div>`:"";
-      const badge=`<span class="chart-badge">${esc(block.chartType??"bar")}</span>`;
+      const cfg = buildChartConfig(block);
+      if (!cfg) return `<div class="chart-empty"><span class="chart-empty-icon">📊</span><p>${esc(block.chartTitle || "Chart — no data")}</p></div>`;
+      const id = nextCid();
+      _charts.push({ id, cfg });
+      const title = block.chartTitle ? `<div class="chart-title">${esc(block.chartTitle)}</div>` : "";
+      const badge = `<span class="chart-badge">${esc(block.chartType ?? "bar")}</span>`;
       return `<div class="chart-card">${title}${badge}<div class="chart-canvas-wrap"><canvas id="${id}"></canvas></div></div>`;
     }
 
     // ── SWOT ──────────────────────────────────────────────────────────────────
     case "swot": {
-      const q=(label:string,color:string,icon:string,items:string[])=>{
-        const clean=items.filter(x=>x.trim());
-        return `<div class="swot-cell" style="--sc:${color}"><div class="swot-head"><span>${icon}</span><span>${label}</span></div><ul>${clean.map(x=>`<li>${renderInline(x)}</li>`).join("")||`<li class="swot-empty">None added</li>`}</ul></div>`;
+      const q = (label: string, color: string, icon: string, items: string[]) => {
+        const clean = items.filter(x => x.trim());
+        return `<div class="swot-cell" style="--sc:${color}"><div class="swot-head"><span>${icon}</span><span>${label}</span></div><ul>${clean.map(x => `<li>${renderInline(x)}</li>`).join("") || `<li class="swot-empty">None added</li>`}</ul></div>`;
       };
-      return `<div class="swot">${q("Strengths","#22c55e","💪",block.swotStrengths??[])}${q("Weaknesses","#ef4444","⚠️",block.swotWeaknesses??[])}${q("Opportunities","#3b82f6","🚀",block.swotOpportunities??[])}${q("Threats","#f97316","🔥",block.swotThreats??[])}</div>`;
+      return `<div class="swot">${q("Strengths", "#22c55e", "💪", block.swotStrengths ?? [])}${q("Weaknesses", "#ef4444", "⚠️", block.swotWeaknesses ?? [])}${q("Opportunities", "#3b82f6", "🚀", block.swotOpportunities ?? [])}${q("Threats", "#f97316", "🔥", block.swotThreats ?? [])}</div>`;
     }
 
     // ── Steps ─────────────────────────────────────────────────────────────────
     case "steps": {
-      const items=(block.stepsItems??[]).filter(s=>s.title||s.description);
-      return `<div class="steps">${items.map((step,i)=>`<div class="step${step.completed?" step-done":""}"><div class="step-circle">${step.completed?`<svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`:i+1}</div><div class="step-body">${step.title?`<div class="step-title">${renderInline(step.title)}</div>`:""}<div class="step-desc">${renderInline(step.description||"")}</div></div></div>`).join("")}</div>`;
+      const items = (block.stepsItems ?? []).filter(s => s.title || s.description);
+      return `<div class="steps">${items.map((step, i) => `<div class="step${step.completed ? " step-done" : ""}"><div class="step-circle">${step.completed ? `<svg viewBox="0 0 12 12" fill="none"><polyline points="2,6 5,9 10,3" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>` : i + 1}</div><div class="step-body">${step.title ? `<div class="step-title">${renderInline(step.title)}</div>` : ""}<div class="step-desc">${renderInline(step.description || "")}</div></div></div>`).join("")}</div>`;
     }
 
     // ── FAQ — always open so answers visible in PDF ───────────────────────────
     case "faq": {
-      const items=block.faqItems??[];
-      return `<div class="faq">${items.map(item=>`<details class="faq-item" open><summary class="faq-q"><span>${renderInline(item.question)}</span><span class="faq-icon"></span></summary><div class="faq-a">${renderInline(item.answer)}</div></details>`).join("")}</div>`;
+      const items = block.faqItems ?? [];
+      return `<div class="faq">${items.map(item => `<details class="faq-item" open><summary class="faq-q"><span>${renderInline(item.question)}</span><span class="faq-icon"></span></summary><div class="faq-a">${renderInline(item.answer)}</div></details>`).join("")}</div>`;
     }
 
     // ── Comparison table ──────────────────────────────────────────────────────
     case "comparisonTable": {
-      const c=block.comparisonColumns??[],r=block.comparisonRows??[];
+      const c = block.comparisonColumns ?? [], r = block.comparisonRows ?? [];
       if (!c.length) return "";
-      const val=(v:string)=>{
-        if (v==="yes") return `<span class="cmp-yes"><svg viewBox="0 0 16 16" fill="none" width="18" height="18"><circle cx="8" cy="8" r="7" fill="#22c55e"/><polyline points="5,8 7,10 11,6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
-        if (v==="no") return `<span class="cmp-no"><svg viewBox="0 0 16 16" fill="none" width="18" height="18"><circle cx="8" cy="8" r="7" fill="#ef4444"/><line x1="5" y1="5" x2="11" y2="11" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="5" x2="5" y2="11" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></span>`;
-        if (v==="partial") return `<span class="cmp-partial"><svg viewBox="0 0 16 16" fill="none" width="18" height="18"><circle cx="8" cy="8" r="7" fill="#f97316"/><line x1="5" y1="8" x2="11" y2="8" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg></span>`;
-        return v?`<span class="cmp-text">${renderInline(v)}</span>`:`<span class="cmp-empty">—</span>`;
+      const val = (v: string) => {
+        if (v === "yes") return `<span class="cmp-yes"><svg viewBox="0 0 16 16" fill="none" width="18" height="18"><circle cx="8" cy="8" r="7" fill="#22c55e"/><polyline points="5,8 7,10 11,6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`;
+        if (v === "no") return `<span class="cmp-no"><svg viewBox="0 0 16 16" fill="none" width="18" height="18"><circle cx="8" cy="8" r="7" fill="#ef4444"/><line x1="5" y1="5" x2="11" y2="11" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="11" y1="5" x2="5" y2="11" stroke="white" stroke-width="2" stroke-linecap="round"/></svg></span>`;
+        if (v === "partial") return `<span class="cmp-partial"><svg viewBox="0 0 16 16" fill="none" width="18" height="18"><circle cx="8" cy="8" r="7" fill="#f97316"/><line x1="5" y1="8" x2="11" y2="8" stroke="white" stroke-width="2.5" stroke-linecap="round"/></svg></span>`;
+        return v ? `<span class="cmp-text">${renderInline(v)}</span>` : `<span class="cmp-empty">—</span>`;
       };
-      const head=`<thead><tr><th class="cmp-feature-col">Feature</th>${c.map(col=>`<th class="${col.highlighted?"cmp-hl":""}">${esc(col.name)}${col.highlighted?`<div class="cmp-popular">Popular</div>`:""}</th>`).join("")}</tr></thead>`;
-      const body=`<tbody>${r.map(row=>`<tr><td class="cmp-feat">${renderInline(row.feature)}</td>${c.map(col=>`<td class="${col.highlighted?"cmp-hlc":""}">${val(row.values[col.id]??"")}</td>`).join("")}</tr>`).join("")}</tbody>`;
+      const head = `<thead><tr><th class="cmp-feature-col">Feature</th>${c.map(col => `<th class="${col.highlighted ? "cmp-hl" : ""}">${esc(col.name)}${col.highlighted ? `<div class="cmp-popular">Popular</div>` : ""}</th>`).join("")}</tr></thead>`;
+      const body = `<tbody>${r.map(row => `<tr><td class="cmp-feat">${renderInline(row.feature)}</td>${c.map(col => `<td class="${col.highlighted ? "cmp-hlc" : ""}">${val(row.values[col.id] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody>`;
       return `<div class="table-outer"><div class="table-scroll"><table class="cmp-table">${head}${body}</table></div></div>`;
     }
 
@@ -1897,20 +1939,20 @@ const blockToHtml = (block: NoteBlock, depth = 0, prevType?: string, counter = {
       let imgPart = "";
       if (block.imageTextUrl) {
         // Always emit img — mediaMap will swap local src to base64 data URI
-        imgPart = `<div class="it-img"><img src="${esc(block.imageTextUrl)}" alt="${esc(block.imageTextTitle||"")}" loading="lazy"></div>`;
+        imgPart = `<div class="it-img"><img src="${esc(block.imageTextUrl)}" alt="${esc(block.imageTextTitle || "")}" loading="lazy"></div>`;
       }
-      const txt = `<div class="it-body">${block.imageTextTitle?`<h3 class="it-title">${renderInline(block.imageTextTitle)}</h3>`:""}${block.imageTextDescription?`<p class="it-desc">${renderInline(block.imageTextDescription)}</p>`:""}</div>`;
+      const txt = `<div class="it-body">${block.imageTextTitle ? `<h3 class="it-title">${renderInline(block.imageTextTitle)}</h3>` : ""}${block.imageTextDescription ? `<p class="it-desc">${renderInline(block.imageTextDescription)}</p>` : ""}</div>`;
       return `<div class="image-text" style="flex-direction:${dir}">${imgPart}${txt}</div>`;
     }
 
     // ── Columns layout ────────────────────────────────────────────────────────
     case "columns": {
-      const cols=block.columns??[];
-      return `<div class="col-layout" style="grid-template-columns:repeat(${cols.length},1fr)">${cols.map((col,i)=>`<div class="col-cell">${block.columnTitles?.[i]?`<div class="col-heading">${renderInline(block.columnTitles![i])}</div>`:""} ${col.map(b=>blockToHtml(b,depth+1,undefined,counter)).join("")}</div>`).join("")}</div>`;
+      const cols = block.columns ?? [];
+      return `<div class="col-layout" style="grid-template-columns:repeat(${cols.length},1fr)">${cols.map((col, i) => `<div class="col-cell">${block.columnTitles?.[i] ? `<div class="col-heading">${renderInline(block.columnTitles![i])}</div>` : ""} ${col.map(b => blockToHtml(b, depth + 1, undefined, counter)).join("")}</div>`).join("")}</div>`;
     }
 
     default:
-      return block.content?`<p class="prose">${renderInline(block.content)}</p>`:"";
+      return block.content ? `<p class="prose">${renderInline(block.content)}</p>` : "";
   }
 };
 
@@ -1920,7 +1962,7 @@ const renderBlocks = (blocks: NoteBlock[], depth = 0): string => {
   const counter = { n: 0 };
   return blocks.map((block, i) => {
     if (block.type !== "numbered") counter.n = 0;
-    return blockToHtml(block, depth, blocks[i-1]?.type, counter);
+    return blockToHtml(block, depth, blocks[i - 1]?.type, counter);
   }).filter(Boolean).join("\n");
 };
 
@@ -1950,103 +1992,103 @@ const blockToMarkdown = (block: NoteBlock, depth = 0): string => {
   const ind = "  ".repeat(depth);
   const c = stripHtml(block.content);  // strip contentEditable HTML → plain text
   switch (block.type) {
-    case "text":        return c||"";
-    case "heading1":    return `# ${c}`;
-    case "heading2":    return `## ${c}`;
-    case "heading3":    return `### ${c}`;
-    case "bullet":      return `${ind}- ${c}`;
-    case "numbered":    return `${ind}1. ${c}`;
-    case "todo":        return `${ind}- [${block.checked?"x":" "}] ${c}`;
-    case "quote":       return c.split("\n").map((l: string)=>`> ${l}`).join("\n");
-    case "callout":     return `> 💡 ${c}`;
-    case "code":        return "```\n"+c+"\n```";
-    case "divider":     return "---";
-    case "labeledDivider": return block.dividerLabel?`\n--- ${block.dividerLabel} ---\n`:"---";
-    case "toggle":      return `<details>\n<summary>${block.content}</summary>\n\n${block.toggleContent||""}\n</details>`;
-    case "image":       return block.imageUrl?`![Image](${block.imageUrl})`:"";
-    case "video":       return block.videoUrl?`[▶ Video](${block.videoUrl})`:"";
-    case "audio":       return block.audioUrl?`[🔊 Audio](${block.audioUrl})`:"";
-    case "file":        return block.fileUrl?`[📎 ${block.fileName||"File"}](${block.fileUrl})`:"";
-    case "bookmark":    return block.bookmarkUrl?`[${block.bookmarkTitle||block.bookmarkUrl}](${block.bookmarkUrl})`:"";
-    case "embed":       return block.embedUrl?`[🔗 ${block.embedUrl}](${block.embedUrl})`:"";
-    case "equation":    return `$$\n${block.content}\n$$`;
+    case "text": return c || "";
+    case "heading1": return `# ${c}`;
+    case "heading2": return `## ${c}`;
+    case "heading3": return `### ${c}`;
+    case "bullet": return `${ind}- ${c}`;
+    case "numbered": return `${ind}1. ${c}`;
+    case "todo": return `${ind}- [${block.checked ? "x" : " "}] ${c}`;
+    case "quote": return c.split("\n").map((l: string) => `> ${l}`).join("\n");
+    case "callout": return `> 💡 ${c}`;
+    case "code": return "```\n" + c + "\n```";
+    case "divider": return "---";
+    case "labeledDivider": return block.dividerLabel ? `\n--- ${block.dividerLabel} ---\n` : "---";
+    case "toggle": return `<details>\n<summary>${block.content}</summary>\n\n${block.toggleContent || ""}\n</details>`;
+    case "image": return block.imageUrl ? `![Image](${block.imageUrl})` : "";
+    case "video": return block.videoUrl ? `[▶ Video](${block.videoUrl})` : "";
+    case "audio": return block.audioUrl ? `[🔊 Audio](${block.audioUrl})` : "";
+    case "file": return block.fileUrl ? `[📎 ${block.fileName || "File"}](${block.fileUrl})` : "";
+    case "bookmark": return block.bookmarkUrl ? `[${block.bookmarkTitle || block.bookmarkUrl}](${block.bookmarkUrl})` : "";
+    case "embed": return block.embedUrl ? `[🔗 ${block.embedUrl}](${block.embedUrl})` : "";
+    case "equation": return `$$\n${block.content}\n$$`;
     case "progress": {
-      const v=block.progressValue??0;
-      return `**Progress:** ${"█".repeat(Math.round(v/5))}${"░".repeat(20-Math.round(v/5))} ${v}%`;
+      const v = block.progressValue ?? 0;
+      return `**Progress:** ${"█".repeat(Math.round(v / 5))}${"░".repeat(20 - Math.round(v / 5))} ${v}%`;
     }
     case "rating": {
-      const v=block.ratingValue??0,m=block.ratingMax??5;
-      return `**Rating:** ${"★".repeat(v)}${"☆".repeat(Math.max(0,m-v))} (${v}/${m})`;
+      const v = block.ratingValue ?? 0, m = block.ratingMax ?? 5;
+      return `**Rating:** ${"★".repeat(v)}${"☆".repeat(Math.max(0, m - v))} (${v}/${m})`;
     }
     case "table": {
-      const r=block.tableData;if(!r?.length)return"";
-      return [`| ${r[0].join(" | ")} |`,`| ${r[0].map(()=>"---").join(" | ")} |`,...r.slice(1).map(row=>`| ${row.join(" | ")} |`)].join("\n");
+      const r = block.tableData; if (!r?.length) return "";
+      return [`| ${r[0].join(" | ")} |`, `| ${r[0].map(() => "---").join(" | ")} |`, ...r.slice(1).map(row => `| ${row.join(" | ")} |`)].join("\n");
     }
-    case "kanban":      return (block.kanbanColumns??[]).map(col=>`**${col.title}**\n${col.cards.map(c=>`  - ${c.content}`).join("\n")||"  *(empty)*"}`).join("\n\n");
-    case "timeline":    return (block.timelineItems??[]).map(item=>`- **${item.date}** — **${item.title}**${item.description?`\n  ${item.description}`:""}`).join("\n");
-    case "gallery":     return (block.galleryImages??[]).map(img=>`![${img.caption||""}](${img.url})`).join("\n");
-    case "mindmap":     return (block.mindMapNodes??[]).map(n=>`- ${n.text}`).join("\n");
-    case "flashcard":   return (block.flashcards??[]).map((c,i)=>`**Card ${i+1}:** ${c.content}`).join("\n\n");
-    case "tabs":        return (block.tabsData??[]).map(tab=>`### ${tab.label}\n\n${tab.blocks?tab.blocks.map(b=>blockToMarkdown(b,depth+1)).join("\n\n"):tab.content||""}`).join("\n\n");
+    case "kanban": return (block.kanbanColumns ?? []).map(col => `**${col.title}**\n${col.cards.map(c => `  - ${c.content}`).join("\n") || "  *(empty)*"}`).join("\n\n");
+    case "timeline": return (block.timelineItems ?? []).map(item => `- **${item.date}** — **${item.title}**${item.description ? `\n  ${item.description}` : ""}`).join("\n");
+    case "gallery": return (block.galleryImages ?? []).map(img => `![${img.caption || ""}](${img.url})`).join("\n");
+    case "mindmap": return (block.mindMapNodes ?? []).map(n => `- ${n.text}`).join("\n");
+    case "flashcard": return (block.flashcards ?? []).map((c, i) => `**Card ${i + 1}:** ${c.content}`).join("\n\n");
+    case "tabs": return (block.tabsData ?? []).map(tab => `### ${tab.label}\n\n${tab.blocks ? tab.blocks.map(b => blockToMarkdown(b, depth + 1)).join("\n\n") : tab.content || ""}`).join("\n\n");
     case "chart": {
-      const title=block.chartTitle?`**${block.chartTitle}** *(${block.chartType??"bar"})*\n\n`:"";
-      const c=block.chartColumns??[],r=block.chartRows??[];
-      if(!c.length||!r.length)return`${title}*(chart — no data)*`;
-      return title+[`| ${c.map(x=>x.key).join(" | ")} |`,`| ${c.map(()=>"---").join(" | ")} |`,...r.map(row=>`| ${c.map(x=>String(row.cells[x.id]??'')).join(" | ")} |`)].join("\n");
+      const title = block.chartTitle ? `**${block.chartTitle}** *(${block.chartType ?? "bar"})*\n\n` : "";
+      const c = block.chartColumns ?? [], r = block.chartRows ?? [];
+      if (!c.length || !r.length) return `${title}*(chart — no data)*`;
+      return title + [`| ${c.map(x => x.key).join(" | ")} |`, `| ${c.map(() => "---").join(" | ")} |`, ...r.map(row => `| ${c.map(x => String(row.cells[x.id] ?? '')).join(" | ")} |`)].join("\n");
     }
-    case "swot":        return [`**Strengths**\n${(block.swotStrengths??[]).filter(x=>x).map(x=>`  - ${x}`).join("\n")||"  —"}`,`**Weaknesses**\n${(block.swotWeaknesses??[]).filter(x=>x).map(x=>`  - ${x}`).join("\n")||"  —"}`,`**Opportunities**\n${(block.swotOpportunities??[]).filter(x=>x).map(x=>`  - ${x}`).join("\n")||"  —"}`,`**Threats**\n${(block.swotThreats??[]).filter(x=>x).map(x=>`  - ${x}`).join("\n")||"  —"}`].join("\n\n");
-    case "steps":       return (block.stepsItems??[]).map((s,i)=>`${i+1}. ${s.completed?"~~":""}**${s.title}**${s.completed?"~~":""}${s.description?`\n   ${s.description}`:""}`).join("\n");
-    case "faq":         return (block.faqItems??[]).map(item=>`**Q: ${item.question}**\nA: ${item.answer}`).join("\n\n");
+    case "swot": return [`**Strengths**\n${(block.swotStrengths ?? []).filter(x => x).map(x => `  - ${x}`).join("\n") || "  —"}`, `**Weaknesses**\n${(block.swotWeaknesses ?? []).filter(x => x).map(x => `  - ${x}`).join("\n") || "  —"}`, `**Opportunities**\n${(block.swotOpportunities ?? []).filter(x => x).map(x => `  - ${x}`).join("\n") || "  —"}`, `**Threats**\n${(block.swotThreats ?? []).filter(x => x).map(x => `  - ${x}`).join("\n") || "  —"}`].join("\n\n");
+    case "steps": return (block.stepsItems ?? []).map((s, i) => `${i + 1}. ${s.completed ? "~~" : ""}**${s.title}**${s.completed ? "~~" : ""}${s.description ? `\n   ${s.description}` : ""}`).join("\n");
+    case "faq": return (block.faqItems ?? []).map(item => `**Q: ${item.question}**\nA: ${item.answer}`).join("\n\n");
     case "comparisonTable": {
-      const c=block.comparisonColumns??[],r=block.comparisonRows??[];if(!c.length)return"";
-      const v=(x:string)=>x==="yes"?"✅":x==="no"?"❌":x==="partial"?"⚠️":x||"—";
-      return [`| Feature | ${c.map(x=>x.name).join(" | ")} |`,`| --- | ${c.map(()=>"---").join(" | ")} |`,...r.map(row=>`| ${row.feature} | ${c.map(x=>v(row.values[x.id]??'')).join(" | ")} |`)].join("\n");
+      const c = block.comparisonColumns ?? [], r = block.comparisonRows ?? []; if (!c.length) return "";
+      const v = (x: string) => x === "yes" ? "✅" : x === "no" ? "❌" : x === "partial" ? "⚠️" : x || "—";
+      return [`| Feature | ${c.map(x => x.name).join(" | ")} |`, `| --- | ${c.map(() => "---").join(" | ")} |`, ...r.map(row => `| ${row.feature} | ${c.map(x => v(row.values[x.id] ?? '')).join(" | ")} |`)].join("\n");
     }
-    case "imageText": { const p:string[]=[];if(block.imageTextUrl)p.push(`![${block.imageTextTitle||""}](${block.imageTextUrl})`);if(block.imageTextTitle)p.push(`**${block.imageTextTitle}**`);if(block.imageTextDescription)p.push(block.imageTextDescription);return p.join("\n\n"); }
-    case "columns":     return (block.columns??[]).map((col,i)=>`${block.columnTitles?.[i]?`**${block.columnTitles[i]}**\n\n`:""}${col.map(b=>blockToMarkdown(b,depth+1)).join("\n\n")}`).join("\n\n---\n\n");
-    default: return block.content||"";
+    case "imageText": { const p: string[] = []; if (block.imageTextUrl) p.push(`![${block.imageTextTitle || ""}](${block.imageTextUrl})`); if (block.imageTextTitle) p.push(`**${block.imageTextTitle}**`); if (block.imageTextDescription) p.push(block.imageTextDescription); return p.join("\n\n"); }
+    case "columns": return (block.columns ?? []).map((col, i) => `${block.columnTitles?.[i] ? `**${block.columnTitles[i]}**\n\n` : ""}${col.map(b => blockToMarkdown(b, depth + 1)).join("\n\n")}`).join("\n\n---\n\n");
+    default: return block.content || "";
   }
 };
 
 const blockToText = (block: NoteBlock, depth = 0): string => {
   const c = stripHtml(block.content);  // strip contentEditable HTML → plain text
   switch (block.type) {
-    case "text":     return c||"";
-    case "heading1": return `\n${c}\n${"═".repeat(c.length||1)}`;
-    case "heading2": return `\n${c}\n${"─".repeat(c.length||1)}`;
+    case "text": return c || "";
+    case "heading1": return `\n${c}\n${"═".repeat(c.length || 1)}`;
+    case "heading2": return `\n${c}\n${"─".repeat(c.length || 1)}`;
     case "heading3": return `\n${c}`;
-    case "bullet":   return `${"  ".repeat(depth)}• ${c}`;
+    case "bullet": return `${"  ".repeat(depth)}• ${c}`;
     case "numbered": return `${"  ".repeat(depth)}1. ${c}`;
-    case "todo":     return `[${block.checked?"✓":" "}] ${c}`;
-    case "quote":    return block.content.split("\n").map(l=>`  "${l}"`).join("\n");
-    case "callout":  return `💡 ${block.content}`;
-    case "code":     return block.content.split("\n").map(l=>`    ${l}`).join("\n");
-    case "divider":  return "────────────────────────────";
-    case "labeledDivider": return block.dividerLabel?`──── ${block.dividerLabel} ────`:"────────────────────────────";
-    case "toggle":   return `▶ ${block.content}\n${(block.toggleContent||"").split("\n").map(l=>`  ${l}`).join("\n")}`;
-    case "image":    return block.imageUrl?`[Image: ${block.imageUrl}]`:"";
-    case "video":    return block.videoUrl?`[Video: ${block.videoUrl}]`:"";
-    case "audio":    return block.audioUrl?`[Audio: ${block.audioUrl}]`:"";
-    case "file":     return block.fileUrl?`[File: ${block.fileName||block.fileUrl}]`:"";
-    case "bookmark": return block.bookmarkUrl?`${block.bookmarkTitle||block.bookmarkUrl}\n  ${block.bookmarkUrl}`:"";
+    case "todo": return `[${block.checked ? "✓" : " "}] ${c}`;
+    case "quote": return block.content.split("\n").map(l => `  "${l}"`).join("\n");
+    case "callout": return `💡 ${block.content}`;
+    case "code": return block.content.split("\n").map(l => `    ${l}`).join("\n");
+    case "divider": return "────────────────────────────";
+    case "labeledDivider": return block.dividerLabel ? `──── ${block.dividerLabel} ────` : "────────────────────────────";
+    case "toggle": return `▶ ${block.content}\n${(block.toggleContent || "").split("\n").map(l => `  ${l}`).join("\n")}`;
+    case "image": return block.imageUrl ? `[Image: ${block.imageUrl}]` : "";
+    case "video": return block.videoUrl ? `[Video: ${block.videoUrl}]` : "";
+    case "audio": return block.audioUrl ? `[Audio: ${block.audioUrl}]` : "";
+    case "file": return block.fileUrl ? `[File: ${block.fileName || block.fileUrl}]` : "";
+    case "bookmark": return block.bookmarkUrl ? `${block.bookmarkTitle || block.bookmarkUrl}\n  ${block.bookmarkUrl}` : "";
     case "equation": return `∫ ${block.content}`;
-    case "progress": { const v=block.progressValue??0; return `Progress: [${"█".repeat(Math.round(v/5))}${"░".repeat(20-Math.round(v/5))}] ${v}%`; }
-    case "rating":   { const v=block.ratingValue??0,m=block.ratingMax??5; return `Rating: ${"★".repeat(v)}${"☆".repeat(Math.max(0,m-v))} (${v}/${m})`; }
-    case "table":    { const r=block.tableData??[];if(!r.length)return"";const w=r[0].map((_,ci)=>Math.max(...r.map(row=>(row[ci]??"").length)));return r.map(row=>row.map((c,ci)=>c.padEnd(w[ci])).join("  │  ")).join("\n"); }
-    case "kanban":   return (block.kanbanColumns??[]).map(col=>`[ ${col.title} ]\n${col.cards.map(c=>`  • ${c.content}`).join("\n")||"  (empty)"}`).join("\n\n");
-    case "timeline": return (block.timelineItems??[]).map(item=>`◆ ${item.date}  ${item.title}${item.description?`\n  ${item.description}`:""}`).join("\n");
-    case "gallery":  return (block.galleryImages??[]).map(img=>`[Image: ${img.caption||img.url}]`).join("\n");
-    case "mindmap":  return (block.mindMapNodes??[]).map(n=>`  ○ ${n.text}`).join("\n");
-    case "flashcard": return (block.flashcards??[]).map((c,i)=>`Card ${i+1}: ${c.content}`).join("\n");
-    case "chart":    { const title=block.chartTitle?`${block.chartTitle}\n`:"";const c=block.chartColumns??[],r=block.chartRows??[];if(!c.length||!r.length)return`${title}(no chart data)`;const w=c.map(col=>Math.max(col.key.length,...r.map(row=>String(row.cells[col.id]??"").length)));return title+[c.map((col,i)=>col.key.padEnd(w[i])).join("  │  "),w.map(x=>"─".repeat(x)).join("──┼──"),...r.map(row=>c.map((col,i)=>String(row.cells[col.id]??"").padEnd(w[i])).join("  │  "))].join("\n"); }
-    case "swot":     return [`STRENGTHS\n${(block.swotStrengths??[]).filter(x=>x).map(x=>`  + ${x}`).join("\n")||"  —"}`,`WEAKNESSES\n${(block.swotWeaknesses??[]).filter(x=>x).map(x=>`  - ${x}`).join("\n")||"  —"}`,`OPPORTUNITIES\n${(block.swotOpportunities??[]).filter(x=>x).map(x=>`  + ${x}`).join("\n")||"  —"}`,`THREATS\n${(block.swotThreats??[]).filter(x=>x).map(x=>`  - ${x}`).join("\n")||"  —"}`].join("\n\n");
-    case "steps":    return (block.stepsItems??[]).map((s,i)=>`${i+1}. [${s.completed?"✓":" "}] ${s.title||""}${s.description?`\n   ${s.description}`:""}`).join("\n");
-    case "faq":      return (block.faqItems??[]).map(item=>`Q: ${item.question}\nA: ${item.answer}`).join("\n\n");
-    case "comparisonTable": { const c=block.comparisonColumns??[],r=block.comparisonRows??[];if(!c.length)return"";const v=(x:string)=>x==="yes"?"Yes":x==="no"?"No":x==="partial"?"Partial":x||"—";const allC=["Feature",...c.map(x=>x.name)];const w=allC.map((h,ci)=>Math.max(h.length,...r.map(row=>ci===0?row.feature.length:v(row.values[c[ci-1].id]??"").length)));return[allC.map((h,i)=>h.padEnd(w[i])).join("  │  "),w.map(x=>"─".repeat(x)).join("──┼──"),...r.map(row=>[row.feature,...c.map(x=>v(row.values[x.id]??""))].map((cell,i)=>cell.padEnd(w[i])).join("  │  "))].join("\n"); }
-    case "imageText": { const p:string[]=[];if(block.imageTextTitle)p.push(block.imageTextTitle);if(block.imageTextDescription)p.push(block.imageTextDescription);if(block.imageTextUrl)p.push(`[Image: ${block.imageTextUrl}]`);return p.join("\n"); }
-    case "tabs":     return (block.tabsData??[]).map(tab=>`[ ${tab.label} ]\n${tab.blocks?tab.blocks.map(b=>blockToText(b,depth+1)).join("\n"):tab.content||""}`).join("\n\n");
-    case "columns":  return (block.columns??[]).map((col,i)=>`${block.columnTitles?.[i]?`${block.columnTitles[i]}\n`:""}${col.map(b=>blockToText(b,depth+1)).join("\n")}`).join("\n\n");
-    default: return block.content||"";
+    case "progress": { const v = block.progressValue ?? 0; return `Progress: [${"█".repeat(Math.round(v / 5))}${"░".repeat(20 - Math.round(v / 5))}] ${v}%`; }
+    case "rating": { const v = block.ratingValue ?? 0, m = block.ratingMax ?? 5; return `Rating: ${"★".repeat(v)}${"☆".repeat(Math.max(0, m - v))} (${v}/${m})`; }
+    case "table": { const r = block.tableData ?? []; if (!r.length) return ""; const w = r[0].map((_, ci) => Math.max(...r.map(row => (row[ci] ?? "").length))); return r.map(row => row.map((c, ci) => c.padEnd(w[ci])).join("  │  ")).join("\n"); }
+    case "kanban": return (block.kanbanColumns ?? []).map(col => `[ ${col.title} ]\n${col.cards.map(c => `  • ${c.content}`).join("\n") || "  (empty)"}`).join("\n\n");
+    case "timeline": return (block.timelineItems ?? []).map(item => `◆ ${item.date}  ${item.title}${item.description ? `\n  ${item.description}` : ""}`).join("\n");
+    case "gallery": return (block.galleryImages ?? []).map(img => `[Image: ${img.caption || img.url}]`).join("\n");
+    case "mindmap": return (block.mindMapNodes ?? []).map(n => `  ○ ${n.text}`).join("\n");
+    case "flashcard": return (block.flashcards ?? []).map((c, i) => `Card ${i + 1}: ${c.content}`).join("\n");
+    case "chart": { const title = block.chartTitle ? `${block.chartTitle}\n` : ""; const c = block.chartColumns ?? [], r = block.chartRows ?? []; if (!c.length || !r.length) return `${title}(no chart data)`; const w = c.map(col => Math.max(col.key.length, ...r.map(row => String(row.cells[col.id] ?? "").length))); return title + [c.map((col, i) => col.key.padEnd(w[i])).join("  │  "), w.map(x => "─".repeat(x)).join("──┼──"), ...r.map(row => c.map((col, i) => String(row.cells[col.id] ?? "").padEnd(w[i])).join("  │  "))].join("\n"); }
+    case "swot": return [`STRENGTHS\n${(block.swotStrengths ?? []).filter(x => x).map(x => `  + ${x}`).join("\n") || "  —"}`, `WEAKNESSES\n${(block.swotWeaknesses ?? []).filter(x => x).map(x => `  - ${x}`).join("\n") || "  —"}`, `OPPORTUNITIES\n${(block.swotOpportunities ?? []).filter(x => x).map(x => `  + ${x}`).join("\n") || "  —"}`, `THREATS\n${(block.swotThreats ?? []).filter(x => x).map(x => `  - ${x}`).join("\n") || "  —"}`].join("\n\n");
+    case "steps": return (block.stepsItems ?? []).map((s, i) => `${i + 1}. [${s.completed ? "✓" : " "}] ${s.title || ""}${s.description ? `\n   ${s.description}` : ""}`).join("\n");
+    case "faq": return (block.faqItems ?? []).map(item => `Q: ${item.question}\nA: ${item.answer}`).join("\n\n");
+    case "comparisonTable": { const c = block.comparisonColumns ?? [], r = block.comparisonRows ?? []; if (!c.length) return ""; const v = (x: string) => x === "yes" ? "Yes" : x === "no" ? "No" : x === "partial" ? "Partial" : x || "—"; const allC = ["Feature", ...c.map(x => x.name)]; const w = allC.map((h, ci) => Math.max(h.length, ...r.map(row => ci === 0 ? row.feature.length : v(row.values[c[ci - 1].id] ?? "").length))); return [allC.map((h, i) => h.padEnd(w[i])).join("  │  "), w.map(x => "─".repeat(x)).join("──┼──"), ...r.map(row => [row.feature, ...c.map(x => v(row.values[x.id] ?? ""))].map((cell, i) => cell.padEnd(w[i])).join("  │  "))].join("\n"); }
+    case "imageText": { const p: string[] = []; if (block.imageTextTitle) p.push(block.imageTextTitle); if (block.imageTextDescription) p.push(block.imageTextDescription); if (block.imageTextUrl) p.push(`[Image: ${block.imageTextUrl}]`); return p.join("\n"); }
+    case "tabs": return (block.tabsData ?? []).map(tab => `[ ${tab.label} ]\n${tab.blocks ? tab.blocks.map(b => blockToText(b, depth + 1)).join("\n") : tab.content || ""}`).join("\n\n");
+    case "columns": return (block.columns ?? []).map((col, i) => `${block.columnTitles?.[i] ? `${block.columnTitles[i]}\n` : ""}${col.map(b => blockToText(b, depth + 1)).join("\n")}`).join("\n\n");
+    default: return block.content || "";
   }
 };
 
@@ -3009,7 +3051,7 @@ if(pb)pb.addEventListener('click',function(){window.print();});
 
 // ─── HTML document builder ────────────────────────────────────────────────────
 
-const buildHtml = (note: Note, forPdf = false, mediaMap: MediaMap = new Map()): string => {
+export const buildHtml = (note: Note, forPdf = false, mediaMap: MediaMap = new Map()): string => {
   _charts = [];
   _cid = 0;
   _forPdf = forPdf;
@@ -3022,11 +3064,11 @@ const buildHtml = (note: Note, forPdf = false, mediaMap: MediaMap = new Map()): 
   const chartsJson = JSON.stringify(_charts);
 
   const tagsHtml = note.tags.length
-    ? `<div class="tags-row"><span class="tags-lbl">Tags</span>${note.tags.map(t=>`<span class="tag-chip" style="background:${esc(toHex(t.color,"#6366f1"))}">${esc(t.label)}</span>`).join("")}</div>`
+    ? `<div class="tags-row"><span class="tags-lbl">Tags</span>${note.tags.map(t => `<span class="tag-chip" style="background:${esc(toHex(t.color, "#6366f1"))}">${esc(t.label)}</span>`).join("")}</div>`
     : "";
 
   const fmtDate = (iso: string) => {
-    try { return new Date(iso).toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"}); }
+    try { return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }); }
     catch { return iso; }
   };
   const created = note.createdAt ? fmtDate(note.createdAt) : "";
@@ -3116,9 +3158,9 @@ ${topbar}
     <div class="page-eyebrow"><span class="page-eyebrow-dot"></span>Note</div>
     <h1 class="page-title">${esc(note.title)}</h1>
     <div class="page-meta">
-      ${created?`<span class="meta-item"><span class="meta-icon">📅</span>${created}</span>`:""}
-      ${updated?`<span class="meta-item"><span class="meta-icon">✏️</span>Updated ${updated}</span>`:""}
-      ${note.tags.length?note.tags.map(t=>`<span class="meta-item"><span class="meta-dot" style="background:${esc(toHex(t.color,"#4c6ef5"))}"></span>${esc(t.label)}</span>`).join(""):""}
+      ${created ? `<span class="meta-item"><span class="meta-icon">📅</span>${created}</span>` : ""}
+      ${updated ? `<span class="meta-item"><span class="meta-icon">✏️</span>Updated ${updated}</span>` : ""}
+      ${note.tags.length ? note.tags.map(t => `<span class="meta-item"><span class="meta-dot" style="background:${esc(toHex(t.color, "#4c6ef5"))}"></span>${esc(t.label)}</span>`).join("") : ""}
     </div>
   </div>
   <article class="article">
@@ -3127,7 +3169,7 @@ ${body}
   ${tagsHtml}
   <footer class="page-footer">
     <span class="footer-brand"><span class="footer-brand-dot"></span>Exported from Notes</span>
-    <span>${new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}</span>
+    <span>${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</span>
   </footer>
 </main>
 <script>${makeJS(forPdf, hasCharts, hasEquations)}<\/script>
@@ -3177,16 +3219,16 @@ ${body}
 
 const dl = (content: string, name: string, mime: string) => {
   const a = Object.assign(document.createElement("a"), {
-    href: URL.createObjectURL(new Blob([content], {type:mime})),
+    href: URL.createObjectURL(new Blob([content], { type: mime })),
     download: name,
   });
   a.style.display = "none";
   document.body.appendChild(a);
   a.click();
-  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 200);
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 200);
 };
 
-const safeName = (t: string) => t.replace(/[^a-z0-9]/gi,"_").slice(0,50)||"note";
+const safeName = (t: string) => t.replace(/[^a-z0-9]/gi, "_").slice(0, 50) || "note";
 
 // ─── Media inlining for PDF ───────────────────────────────────────────────────
 //
@@ -3227,11 +3269,11 @@ const isOpfsUrl = (url: string): boolean =>
   url.startsWith("opfs://") ||
   // blob: and data: are handled elsewhere; http* is always fetchable
   (!url.startsWith("blob:") &&
-   !url.startsWith("data:") &&
-   !url.startsWith("http://") &&
-   !url.startsWith("https://") &&
-   !url.startsWith("//") &&
-   !url.startsWith("file:"));
+    !url.startsWith("data:") &&
+    !url.startsWith("http://") &&
+    !url.startsWith("https://") &&
+    !url.startsWith("//") &&
+    !url.startsWith("file:"));
 
 /**
  * Read a file from OPFS by name, trying nested sub-directories if needed.
@@ -3284,7 +3326,7 @@ const readFromOpfs = async (filename: string): Promise<File | null> => {
 const blobToDataUri = (blob: Blob): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload  = () => resolve(reader.result as string);
+    reader.onload = () => resolve(reader.result as string);
     reader.onerror = () => reject(new Error("FileReader failed"));
     reader.readAsDataURL(blob);
   });
@@ -3355,11 +3397,11 @@ const inlineNoteMedia = async (note: Note): Promise<MediaMap> => {
   // Walk every block and collect URLs that need inlining
   const urls = new Set<string>();
   const collectFromBlock = (block: NoteBlock) => {
-    if (needsInline(block.imageUrl))       urls.add(block.imageUrl!);
-    if (needsInline(block.videoUrl))       urls.add(block.videoUrl!);
-    if (needsInline(block.audioUrl))       urls.add(block.audioUrl!);
-    if (needsInline(block.fileUrl))        urls.add(block.fileUrl!);
-    if (needsInline(block.imageTextUrl))   urls.add(block.imageTextUrl!);
+    if (needsInline(block.imageUrl)) urls.add(block.imageUrl!);
+    if (needsInline(block.videoUrl)) urls.add(block.videoUrl!);
+    if (needsInline(block.audioUrl)) urls.add(block.audioUrl!);
+    if (needsInline(block.fileUrl)) urls.add(block.fileUrl!);
+    if (needsInline(block.imageTextUrl)) urls.add(block.imageTextUrl!);
     block.galleryImages?.forEach(img => { if (needsInline(img.url)) urls.add(img.url); });
     block.columns?.forEach(col => col.forEach(collectFromBlock));
     block.tabsData?.forEach(tab => tab.blocks?.forEach(collectFromBlock));
@@ -3392,7 +3434,7 @@ const exportPdf = async (note: Note): Promise<void> => {
 
   // Step 3 — Blob URL + programmatic <a> click (never blocked as popup)
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url  = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
 
   const a = document.createElement("a");
   a.href = url; a.target = "_blank"; a.rel = "noopener";
@@ -3418,15 +3460,15 @@ export const useNoteExport = () => {
     const name = safeName(note.title);
     switch (format) {
       case "markdown": {
-        const body = note.blocks.map(b=>blockToMarkdown(b)).filter(Boolean).join("\n\n");
-        const tags = note.tags.length?`\n\n---\n**Tags:** ${note.tags.map(t=>`\`${t.label}\``).join(", ")}`:"";
+        const body = note.blocks.map(b => blockToMarkdown(b)).filter(Boolean).join("\n\n");
+        const tags = note.tags.length ? `\n\n---\n**Tags:** ${note.tags.map(t => `\`${t.label}\``).join(", ")}` : "";
         dl(`# ${note.title}\n\n${body}${tags}`, `${name}.md`, "text/markdown");
         break;
       }
       case "text": {
-        const body = note.blocks.map(b=>blockToText(b)).filter(Boolean).join("\n\n");
-        const tags = note.tags.length?`\n\nTags: ${note.tags.map(t=>t.label).join(", ")}`:"";
-        dl(`${note.title}\n${"═".repeat(note.title.length||1)}\n\n${body}${tags}`, `${name}.txt`, "text/plain");
+        const body = note.blocks.map(b => blockToText(b)).filter(Boolean).join("\n\n");
+        const tags = note.tags.length ? `\n\nTags: ${note.tags.map(t => t.label).join(", ")}` : "";
+        dl(`${note.title}\n${"═".repeat(note.title.length || 1)}\n\n${body}${tags}`, `${name}.txt`, "text/plain");
         break;
       }
       case "html": {

@@ -6,25 +6,25 @@ export interface FlashcardItem {
 
 export interface NoteBlock {
   id: string;
-  type: 
-    | "text" | "heading1" | "heading2" | "heading3" 
-    | "bullet" | "numbered" | "todo" | "quote" | "divider" 
-    | "code" | "callout" | "table" | "toggle" 
-    | "image" | "bookmark" | "equation" | "progress" | "video" | "columns"
-    // New block types
-    | "file" | "audio" | "timeline" | "kanban" | "rating" | "embed" | "mindmap" | "gallery"
-    // Flashcard block type
-    | "flashcard"
-    // Tabs block type
-    | "tabs"
-    // Chart block type
-    | "chart"
-    // New creative blocks
-    | "swot"
-    // Layout & formatting blocks
-    | "steps" | "labeledDivider" | "faq"
-    // New premium blocks
-    | "comparisonTable" | "imageText";
+  type:
+  | "text" | "heading1" | "heading2" | "heading3"
+  | "bullet" | "numbered" | "todo" | "quote" | "divider"
+  | "code" | "callout" | "table" | "toggle"
+  | "image" | "bookmark" | "equation" | "progress" | "video" | "columns"
+  // New block types
+  | "file" | "audio" | "timeline" | "kanban" | "rating" | "embed" | "mindmap" | "gallery"
+  // Flashcard block type
+  | "flashcard"
+  // Tabs block type
+  | "tabs"
+  // Chart block type
+  | "chart"
+  // New creative blocks
+  | "swot"
+  // Layout & formatting blocks
+  | "steps" | "labeledDivider" | "faq"
+  // New premium blocks
+  | "comparisonTable" | "imageText";
   content: string;
   checked?: boolean;
   tableData?: string[][];
@@ -54,12 +54,12 @@ export interface NoteBlock {
   mermaidCode?: string;
   galleryImages?: { id: string; url: string; caption?: string }[];
   // Mind map data
-  mindMapNodes?: { 
-    id: string; 
-    text: string; 
-    x: number; 
-    y: number; 
-    color: string; 
+  mindMapNodes?: {
+    id: string;
+    text: string;
+    x: number;
+    y: number;
+    color: string;
     shape?: 'rectangle' | 'diamond' | 'oval';
     bold?: boolean;
     italic?: boolean;
@@ -123,6 +123,7 @@ export interface NoteIndex {
   createdAt: string;
   updatedAt: string;
   isPinned?: boolean;
+  githubDeployment?: GHDeployment; // Optional GitHub deployment info
 }
 
 export interface Folder {
@@ -148,3 +149,24 @@ export interface FlashcardDeck {
   cards: FlashcardItem[];
   createdAt: string;
 }
+
+// New interface for github page hosting
+export interface GHDeployment {
+  repoName: string;
+  repoFullName: string;
+  pagesUrl: string;
+  deployedAt: string;
+  noteTitle: string;
+}
+
+// ─── Phase types ──────────────────────────────────────────────────────────────
+export type GHPublishPhase =
+  | { phase: "idle" }
+  | { phase: "collecting" }
+  | { phase: "building" }
+  | { phase: "creating_repo" }
+  | { phase: "enabling_pages" }
+  | { phase: "uploading"; done: number; total: number }
+  | { phase: "redeploying"; done: number; total: number }
+  | { phase: "done"; url: string; isNew: boolean }
+  | { phase: "error"; message: string; tokenExpired?: boolean };
