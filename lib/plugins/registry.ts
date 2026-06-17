@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type {
+    BranchCondition,
     PluginManifest,
     PluginRecord,
     PluginNotification,
     ReminderHit,
-    WorkflowDef,
+    WorkflowAction,
     WorkflowCondition,
+    WorkflowDef,
 } from "./types";
 import { applyTemplate, matchOperator } from "./formula";
 
@@ -406,55 +408,96 @@ function runActions(plugin: PluginManifest, wf: WorkflowDef, record: PluginRecor
     const mutated = { ...record, data: { ...record.data } };
     let changed = false;
 
-    for (const action of wf.actions) {
-        switch (action.kind) {
-            case "setField": {
-                if (!action.fieldKey) break;
-                const value =
-                    typeof action.value === "string"
-                        ? applyTemplate(action.value, mutated.data)
-                        : action.value;
-                mutated.data[action.fieldKey] = value;
-                changed = true;
-                break;
-            }
-            case "increment": {
-                if (!action.fieldKey) break;
-                const cur = Number(mutated.data[action.fieldKey] ?? 0);
-                mutated.data[action.fieldKey] = cur + Number(action.value ?? 1);
-                changed = true;
-                break;
-            }
-            case "stampDate": {
-                if (!action.fieldKey) break;
-                mutated.data[action.fieldKey] = new Date().toISOString().slice(0, 10);
-                changed = true;
-                break;
-            }
-            case "clearField": {
-                if (!action.fieldKey) break;
-                const field = entity?.fields.find((f) => f.key === action.fieldKey);
-                mutated.data[action.fieldKey] = defaultForFieldType(field?.type);
-                changed = true;
-                break;
-            }
-            case "copyField": {
-                if (!action.fieldKey || !action.sourceFieldKey) break;
-                mutated.data[action.fieldKey] = mutated.data[action.sourceFieldKey];
-                changed = true;
-                break;
-            }
-            case "notify": {
-                addNotification({
-                    pluginId: plugin.id,
-                    title: applyTemplate(action.message || wf.name, mutated.data),
-                    entityId: record.entityId,
-                    recordId: opts?.deleted ? undefined : record.id,
-                });
-                break;
+    // Recursive executor — processes a flat or nested list of actions.
+    // Captured in a closure so that `mutated` and `changed` are always
+    // the same mutable references regardless of call depth.
+    function execActions(actions: WorkflowAction[]) {
+        for (const action of actions) {
+            switch (action.kind) {
+                case "setField": {
+                    if (!action.fieldKey) break;
+                    const value =
+                        typeof action.value === "string"
+                            ? applyTemplate(action.value, mutated.data)
+                            : action.value;
+                    mutated.data[action.fieldKey] = value;
+                    changed = true;
+                    break;
+                }
+                case "increment": {
+                    if (!action.fieldKey) break;
+                    const cur = Number(mutated.data[action.fieldKey] ?? 0);
+                    mutated.data[action.fieldKey] = cur + Number(action.value ?? 1);
+                    changed = true;
+                    break;
+                }
+                case "stampDate": {
+                    if (!action.fieldKey) break;
+                    mutated.data[action.fieldKey] = new Date().toISOString().slice(0, 10);
+                    changed = true;
+                    break;
+                }
+                case "clearField": {
+                    if (!action.fieldKey) break;
+                    const field = entity?.fields.find((f) => f.key === action.fieldKey);
+                    mutated.data[action.fieldKey] = defaultForFieldType(field?.type);
+                    changed = true;
+                    break;
+                }
+                case "copyField": {
+                    if (!action.fieldKey || !action.sourceFieldKey) break;
+                    mutated.data[action.fieldKey] = mutated.data[action.sourceFieldKey];
+                    changed = true;
+                    break;
+                }
+                case "notify": {
+                    addNotification({
+                        pluginId: plugin.id,
+                        title: applyTemplate(action.message || wf.name, mutated.data),
+                        entityId: record.entityId,
+                        recordId: opts?.deleted ? undefined : record.id,
+                    });
+                    break;
+                }
+                case "branch": {
+                    // Evaluate every condition against the current (possibly already
+                    // mutated) record data so that earlier actions in the same workflow
+                    // can influence which branch fires.
+                    const conditions = action.branchConditions ?? [];
+                    const logic = action.branchConditionLogic ?? "all";
+
+                    let passes: boolean;
+                    if (conditions.length === 0) {
+                        // A branch with no conditions always takes the THEN path —
+                        // useful as a "group" container for a set of actions.
+                        passes = true;
+                    } else {
+                        const results = conditions.map((c: BranchCondition) =>
+                            matchOperator(mutated.data[c.fieldKey], c.op, c.value),
+                        );
+                        passes = logic === "any"
+                            ? results.some(Boolean)
+                            : results.every(Boolean);
+                    }
+
+                    if (passes) {
+                        if (action.thenActions && action.thenActions.length > 0) {
+                            execActions(action.thenActions);
+                        }
+                    } else {
+                        if (action.elseActions && action.elseActions.length > 0) {
+                            execActions(action.elseActions);
+                        }
+                    }
+                    break;
+                }
+                // Future-proof: unknown action kinds are silently ignored.
+                default: break;
             }
         }
     }
+
+    execActions(wf.actions);
 
     if (changed && !opts?.deleted) {
         const all = readJSON<PluginRecord[]>(RECORDS_KEY(plugin.id), []);

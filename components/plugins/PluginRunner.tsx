@@ -37,6 +37,7 @@ import type {
     EntityDef, FieldDef, FieldFilter, FilterOp, PageBlock, PageDef,
     PluginManifest, PluginRecord, ViewDef, WidgetDef, WorkflowDef,
 } from "@/lib/plugins/types";
+import type { BranchCondition, WorkflowAction } from "@/lib/plugins/types";
 
 /* ---------- helpers ---------- */
 
@@ -1045,7 +1046,7 @@ function KanbanView({ entity, view, records, plugin, onEdit, accent }: {
     };
 
     return (
-        <div className="overflow-x-auto pb-4">
+        <div className="overflow-x-auto pb-4 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
             <div className="flex gap-3 min-w-max">
                 {statuses.map((s) => {
                     const inCol = records.filter((r) => (r.data[groupKey] ?? "") === s);
@@ -1335,36 +1336,42 @@ function EmbeddedView({ plugin, entity }: { plugin: PluginManifest; entity: Enti
 /* ---------- Workflows panel ---------- */
 
 function WorkflowsPanel({ plugin }: { plugin: PluginManifest }) {
+    if (!plugin.workflows?.length) return (
+        <div className="py-12 text-center text-sm text-muted-foreground">No workflows configured.</div>
+    );
     return (
         <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-                These automations run whenever your data changes — no manual steps needed.
+                These automations run whenever your data changes. Branches evaluate conditions at runtime against the current record state.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {(plugin.workflows ?? []).map((wf) => {
+                {plugin.workflows.map((wf) => {
                     const entity = plugin.entities.find((e) => e.id === wf.entityId);
                     return (
                         <Card key={wf.id} className="overflow-hidden">
                             <div className="h-0.5" style={{ background: wf.enabled === false ? "hsl(var(--muted))" : plugin.accent }} />
-                            <div className="p-4">
-                                <div className="flex items-center justify-between mb-2">
+                            <div className="p-4 space-y-3">
+                                {/* Header */}
+                                <div className="flex items-start justify-between gap-2">
                                     <div className="font-medium text-sm">{wf.name}</div>
-                                    <Badge variant={wf.enabled === false ? "outline" : "secondary"} className="text-[10px]">
+                                    <Badge variant={wf.enabled === false ? "outline" : "secondary"} className="text-[10px] shrink-0">
                                         {wf.enabled === false ? "Off" : "Active"}
                                     </Badge>
                                 </div>
-                                <div className="text-xs text-muted-foreground mb-3">
-                                    When <strong className="text-foreground">{entity?.name ?? "record"}</strong>{" "}
-                                    {triggerLabel(wf)}
+
+                                {/* Trigger pill */}
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded-md uppercase tracking-wide shrink-0">
+                                        When
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        <strong className="text-foreground font-medium">{entity?.name ?? "record"}</strong>{" "}
+                                        {triggerLabel(wf)}
+                                    </span>
                                 </div>
-                                <div className="space-y-1.5">
-                                    {wf.actions.map((a) => (
-                                        <div key={a.id} className="flex items-center gap-2 text-xs">
-                                            <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-[10px] shrink-0">→</span>
-                                            <span>{actionLabel(a)}</span>
-                                        </div>
-                                    ))}
-                                </div>
+
+                                {/* Recursive action tree */}
+                                <ActionTreeDisplay actions={wf.actions} entity={entity} depth={0} />
                             </div>
                         </Card>
                     );
@@ -1374,12 +1381,101 @@ function WorkflowsPanel({ plugin }: { plugin: PluginManifest }) {
     );
 }
 
+/** Recursively renders a list of WorkflowActions as an indented tree. */
+function ActionTreeDisplay({ actions, entity, depth }: {
+    actions: WorkflowAction[];
+    entity: EntityDef | undefined;
+    depth: number;
+}) {
+    if (!actions.length) {
+        return <p className="text-[10px] text-muted-foreground/50 italic ml-1">no actions</p>;
+    }
+    return (
+        <div className={depth > 0 ? "ml-3 pl-2.5 border-l-2 border-dashed border-muted-foreground/20 space-y-1.5" : "space-y-1.5"}>
+            {actions.map((a) => (
+                <ActionTreeNode key={a.id} action={a} entity={entity} depth={depth} />
+            ))}
+        </div>
+    );
+}
+
+function ActionTreeNode({ action, entity, depth }: {
+    action: WorkflowAction;
+    entity: EntityDef | undefined;
+    depth: number;
+}) {
+    if (action.kind === "branch") {
+        const conditions = action.branchConditions ?? [];
+        const logic = action.branchConditionLogic ?? "all";
+
+        const condText = conditions.length === 0
+            ? "always"
+            : conditions
+                .map((c: BranchCondition) => {
+                    const field = entity?.fields.find((f) => f.key === c.fieldKey);
+                    const fieldLabel = field?.label ?? c.fieldKey;
+                    const opLabel = OP_LABELS[c.op] ?? c.op;
+                    const valPart = ["isEmpty", "isNotEmpty"].includes(c.op) ? "" : ` "${c.value ?? ""}"`;
+                    return `${fieldLabel} ${opLabel}${valPart}`;
+                })
+                .join(logic === "any" ? "  OR  " : "  AND  ");
+
+        const hasThen = (action.thenActions?.length ?? 0) > 0;
+        const hasElse = (action.elseActions?.length ?? 0) > 0;
+
+        return (
+            <div className="rounded-lg border border-amber-200/70 bg-amber-50/30 dark:bg-amber-950/10 overflow-hidden">
+                {/* IF row */}
+                <div className="flex items-start gap-1.5 px-2.5 py-1.5 bg-amber-100/60 dark:bg-amber-900/20 border-b border-amber-200/40">
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-200 dark:bg-amber-800 dark:text-amber-200 px-1.5 py-0.5 rounded shrink-0 mt-0.5 tracking-wide">
+                        IF
+                    </span>
+                    <span className="text-[11px] text-amber-800 dark:text-amber-300 leading-snug">{condText}</span>
+                </div>
+
+                <div className="p-2 space-y-2">
+                    {/* THEN branch */}
+                    <div>
+                        <div className="flex items-center gap-1 mb-1">
+                            <div className="w-0.5 h-3 bg-emerald-500 rounded-full" />
+                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Then</span>
+                        </div>
+                        {hasThen
+                            ? <ActionTreeDisplay actions={action.thenActions!} entity={entity} depth={depth + 1} />
+                            : <p className="text-[10px] text-muted-foreground/50 italic ml-3">nothing</p>
+                        }
+                    </div>
+
+                    {/* ELSE branch — only rendered when it has actions */}
+                    {hasElse && (
+                        <div>
+                            <div className="flex items-center gap-1 mb-1">
+                                <div className="w-0.5 h-3 bg-slate-400 rounded-full" />
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Else</span>
+                            </div>
+                            <ActionTreeDisplay actions={action.elseActions!} entity={entity} depth={depth + 1} />
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
+    /* Plain action */
+    return (
+        <div className="flex items-start gap-2 text-xs">
+            <span className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground shrink-0 mt-0.5">→</span>
+            <span className="text-muted-foreground leading-snug">{actionLabel(action)}</span>
+        </div>
+    );
+}
+
 function triggerLabel(wf: WorkflowDef): string {
     switch (wf.trigger) {
         case "onCreate": return "is created";
         case "onUpdate": return "is updated";
         case "onDelete": return "is deleted";
-        case "onFieldEquals": return `'s ${wf.whenField ?? "field"} becomes "${wf.whenValue ?? ""}"`;
+        case "onFieldEquals": return `'s "${wf.whenField ?? "field"}" becomes "${wf.whenValue ?? ""}"`;
         default: return "";
     }
 }
@@ -1391,7 +1487,8 @@ function actionLabel(a: { kind: string; fieldKey?: string; value?: unknown; sour
         case "stampDate": return `Stamp "${a.fieldKey}" with today's date`;
         case "clearField": return `Clear "${a.fieldKey}"`;
         case "copyField": return `Copy "${a.sourceFieldKey}" → "${a.fieldKey}"`;
-        case "notify": return `Notify: "${a.message ?? a.fieldKey}"`;
+        case "notify": return `Notify: "${a.message ?? ""}"`;
+        case "branch": return "Branch (IF / THEN / ELSE)";
         default: return String(a.kind);
     }
 }

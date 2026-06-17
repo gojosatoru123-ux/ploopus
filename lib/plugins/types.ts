@@ -145,9 +145,22 @@ export type ActionKind =
     | "stampDate"
     | "clearField"
     | "copyField"
-    | "notify";
+    | "notify"
+    | "branch";
 
 export interface WorkflowCondition {
+    id: string;
+    fieldKey: string;
+    op: FilterOp;
+    value?: string;
+}
+
+/**
+ * A single condition used inside a branch action.
+ * Identical shape to WorkflowCondition — kept as a separate
+ * named type so callers can distinguish the two contexts.
+ */
+export interface BranchCondition {
     id: string;
     fieldKey: string;
     op: FilterOp;
@@ -166,6 +179,17 @@ export interface WorkflowAction {
     sourceFieldKey?: string;
     /** for notify: message template (supports {{field}}) */
     message?: string;
+    /* ---- branch-specific ---- */
+    /** conditions evaluated when kind === "branch" */
+    branchConditions?: BranchCondition[];
+    /** "all" = AND logic (default), "any" = OR logic */
+    branchConditionLogic?: "all" | "any";
+    /** actions to run when branch condition is TRUE */
+    thenActions?: WorkflowAction[];
+    /** actions to run when branch condition is FALSE (optional) */
+    elseActions?: WorkflowAction[];
+    /** optional human-readable label shown in the workflow tree */
+    branchLabel?: string;
 }
 
 export interface WorkflowDef {

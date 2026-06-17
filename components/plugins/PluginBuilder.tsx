@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Plus, Sparkles, Trash2, Wand2, Workflow, Database, Palette } from "lucide-react";
+import { ChevronDown, ChevronUp, GitBranch, Plus, Sparkles, Trash2, Wand2, Workflow, Database, Palette, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,9 +15,20 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { installPlugin } from "@/lib/plugins/registry";
 import type {
-    EntityDef, FieldDef, FieldType, PluginManifest, ViewDef, WidgetDef, WorkflowDef, WorkflowAction,
+    BranchCondition, EntityDef, FieldDef, FieldType, FilterOp,
+    PluginManifest, ViewDef, WidgetDef, WorkflowDef, WorkflowAction,
 } from "@/lib/plugins/types";
 import { toast } from "sonner";
+
+/* ---------- Shared filter operator labels ---------- */
+
+const OP_LABELS: Record<FilterOp, string> = {
+    eq: "equals", neq: "not equals", gt: ">", gte: "≥",
+    lt: "<", lte: "≤", contains: "contains", notContains: "doesn't contain",
+    isEmpty: "is empty", isNotEmpty: "is not empty",
+};
+
+const MAX_BRANCH_DEPTH = 4;
 
 /* ---------- Field type groups ---------- */
 
@@ -181,7 +192,7 @@ export default function PluginBuilder({ onCreated }: Props) {
                     <Sparkles className="w-4 h-4" /> Build a plugin
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+            <DialogContent className="max-w-3xl! max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
                 {/* Dialog header strip */}
                 <div className="p-6 pb-5 border-b" style={{ background: `linear-gradient(135deg, ${accent}1f, transparent 70%)` }}>
                     <DialogHeader className="space-y-1">
@@ -561,10 +572,7 @@ function WorkflowEditor({ workflow, entities, onChange, onRemove }: {
 }) {
     const entity = entities.find((e) => e.id === workflow.entityId) ?? entities[0];
     const fields = entity?.fields ?? [];
-    const selectFields = fields.filter((f) => f.type === "select");
     const set = <K extends keyof WorkflowDef>(k: K, v: WorkflowDef[K]) => onChange({ ...workflow, [k]: v });
-    const updateAction = (id: string, patch: Partial<WorkflowAction>) =>
-        set("actions", workflow.actions.map((a) => a.id === id ? { ...a, ...patch } : a));
 
     return (
         <Card className="overflow-hidden border-border/60">
@@ -632,73 +640,307 @@ function WorkflowEditor({ workflow, entities, onChange, onRemove }: {
 
                 <div className="space-y-2">
                     <Label className="text-[11px] uppercase tracking-[0.15em] text-muted-foreground">Then do</Label>
-                    {workflow.actions.map((a) => (
-                        <div key={a.id} className="flex flex-wrap items-center gap-2">
-                            <Select value={a.kind} onValueChange={(v) => updateAction(a.id, { kind: v as WorkflowAction["kind"] })}>
-                                <SelectTrigger className="rounded-lg h-7 text-xs w-40"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="setField">Set field</SelectItem>
-                                    <SelectItem value="increment">Increment</SelectItem>
-                                    <SelectItem value="stampDate">Stamp date</SelectItem>
-                                    <SelectItem value="clearField">Clear field</SelectItem>
-                                    <SelectItem value="copyField">Copy field</SelectItem>
-                                    <SelectItem value="notify">Send notification</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            {a.kind !== "notify" && (
-                                <Select value={a.fieldKey ?? ""} onValueChange={(v) => updateAction(a.id, { fieldKey: v })}>
-                                    <SelectTrigger className="rounded-lg h-7 text-xs w-32"><SelectValue placeholder="Field" /></SelectTrigger>
-                                    <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.key}>{f.label}</SelectItem>)}</SelectContent>
-                                </Select>
-                            )}
-
-                            {a.kind === "stampDate" && (
-                                <span className="text-xs text-muted-foreground italic">→ today</span>
-                            )}
-                            {a.kind === "clearField" && (
-                                <span className="text-xs text-muted-foreground italic">→ clears</span>
-                            )}
-                            {a.kind === "copyField" && (
-                                <Select value={a.sourceFieldKey ?? ""} onValueChange={(v) => updateAction(a.id, { sourceFieldKey: v })}>
-                                    <SelectTrigger className="rounded-lg h-7 text-xs w-32"><SelectValue placeholder="From field" /></SelectTrigger>
-                                    <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.key}>{f.label}</SelectItem>)}</SelectContent>
-                                </Select>
-                            )}
-                            {a.kind === "setField" && (() => {
-                                const sf = selectFields.find((f) => f.key === a.fieldKey);
-                                return sf ? (
-                                    <Select value={String(a.value ?? "")} onValueChange={(v) => updateAction(a.id, { value: v })}>
-                                        <SelectTrigger className="rounded-lg h-7 text-xs w-28"><SelectValue placeholder="Value" /></SelectTrigger>
-                                        <SelectContent>{(sf.options ?? []).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                ) : (
-                                    <Input value={String(a.value ?? "")} onChange={(e) => updateAction(a.id, { value: e.target.value })}
-                                        placeholder="Value" className="rounded-lg h-7 text-xs w-28" />
-                                );
-                            })()}
-                            {a.kind === "increment" && (
-                                <Input type="number" value={String(a.value ?? 1)} onChange={(e) => updateAction(a.id, { value: Number(e.target.value) })}
-                                    placeholder="Amount" className="rounded-lg h-7 text-xs w-20" />
-                            )}
-                            {a.kind === "notify" && (
-                                <Input value={String(a.message ?? "")} onChange={(e) => updateAction(a.id, { message: e.target.value })}
-                                    placeholder="Message (supports {{field}})" className="rounded-lg h-7 text-xs flex-1 min-w-40" />
-                            )}
-
-                            <button onClick={() => set("actions", workflow.actions.filter((x) => x.id !== a.id))}
-                                className="p-1.5 text-muted-foreground hover:text-destructive rounded-lg hover:bg-muted">
-                                <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
-                    ))}
-                    <Button variant="ghost" size="sm" className="rounded-full h-7 text-xs"
-                        onClick={() => set("actions", [...workflow.actions, { id: crypto.randomUUID(), kind: "setField", fieldKey: fields[0]?.key }])}>
-                        <Plus className="w-3 h-3" /> Add action
-                    </Button>
+                    <ActionList
+                        actions={workflow.actions}
+                        fields={fields}
+                        entities={entities}
+                        onChange={(actions) => set("actions", actions)}
+                        depth={0}
+                    />
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Recursive action tree — ActionList → ActionRow → SimpleActionRow
+                                                   └─ BranchActionRow
+                                                        ├─ ActionList (thenActions)
+                                                        └─ ActionList (elseActions)
+───────────────────────────────────────────────────────────────────────── */
+
+function makeBlankAction(fields: FieldDef[]): WorkflowAction {
+    return { id: crypto.randomUUID(), kind: "setField", fieldKey: fields[0]?.key };
+}
+
+function makeBranchAction(fields: FieldDef[]): WorkflowAction {
+    return {
+        id: crypto.randomUUID(),
+        kind: "branch",
+        branchConditions: [{
+            id: crypto.randomUUID(),
+            fieldKey: fields[0]?.key ?? "",
+            op: "eq",
+            value: "",
+        }],
+        branchConditionLogic: "all",
+        thenActions: [makeBlankAction(fields)],
+        elseActions: [],
+    };
+}
+
+function ActionList({ actions, fields, entities, onChange, depth }: {
+    actions: WorkflowAction[];
+    fields: FieldDef[];
+    entities: EntityDef[];
+    onChange: (actions: WorkflowAction[]) => void;
+    depth: number;
+}) {
+    const update = (id: string, next: WorkflowAction) =>
+        onChange(actions.map((a) => a.id === id ? next : a));
+    const remove = (id: string) =>
+        onChange(actions.filter((a) => a.id !== id));
+
+    return (
+        <div className="space-y-2">
+            {actions.map((a) => (
+                <ActionRow
+                    key={a.id}
+                    action={a}
+                    fields={fields}
+                    entities={entities}
+                    depth={depth}
+                    onChange={(next) => update(a.id, next)}
+                    onRemove={() => remove(a.id)}
+                />
+            ))}
+            <div className="flex gap-2">
+                <Button variant="ghost" size="sm" className="rounded-full h-7 text-xs"
+                    onClick={() => onChange([...actions, makeBlankAction(fields)])}>
+                    <Plus className="w-3 h-3" /> Add action
+                </Button>
+                {depth < MAX_BRANCH_DEPTH && (
+                    <Button variant="ghost" size="sm"
+                        className="rounded-full h-7 text-xs text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                        onClick={() => onChange([...actions, makeBranchAction(fields)])}>
+                        <GitBranch className="w-3 h-3" /> Add branch
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function ActionRow({ action, fields, entities, depth, onChange, onRemove }: {
+    action: WorkflowAction;
+    fields: FieldDef[];
+    entities: EntityDef[];
+    depth: number;
+    onChange: (a: WorkflowAction) => void;
+    onRemove: () => void;
+}) {
+    if (action.kind === "branch") {
+        return (
+            <BranchActionRow
+                action={action}
+                fields={fields}
+                entities={entities}
+                depth={depth}
+                onChange={onChange}
+                onRemove={onRemove}
+            />
+        );
+    }
+    return <SimpleActionRow action={action} fields={fields} onChange={onChange} onRemove={onRemove} />;
+}
+
+function SimpleActionRow({ action, fields, onChange, onRemove }: {
+    action: WorkflowAction;
+    fields: FieldDef[];
+    onChange: (a: WorkflowAction) => void;
+    onRemove: () => void;
+}) {
+    const selectFields = fields.filter((f) => f.type === "select");
+    const up = (patch: Partial<WorkflowAction>) => onChange({ ...action, ...patch });
+
+    return (
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/40">
+            <Select value={action.kind} onValueChange={(v) => up({ kind: v as WorkflowAction["kind"] })}>
+                <SelectTrigger className="rounded-md h-7 text-xs w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="setField">Set field</SelectItem>
+                    <SelectItem value="increment">Increment</SelectItem>
+                    <SelectItem value="stampDate">Stamp date</SelectItem>
+                    <SelectItem value="clearField">Clear field</SelectItem>
+                    <SelectItem value="copyField">Copy field</SelectItem>
+                    <SelectItem value="notify">Send notification</SelectItem>
+                </SelectContent>
+            </Select>
+
+            {action.kind !== "notify" && (
+                <Select value={action.fieldKey ?? ""} onValueChange={(v) => up({ fieldKey: v })}>
+                    <SelectTrigger className="rounded-md h-7 text-xs w-32"><SelectValue placeholder="Field" /></SelectTrigger>
+                    <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.key}>{f.label}</SelectItem>)}</SelectContent>
+                </Select>
+            )}
+
+            {action.kind === "stampDate" && <span className="text-xs text-muted-foreground italic">→ today</span>}
+            {action.kind === "clearField" && <span className="text-xs text-muted-foreground italic">→ clears value</span>}
+
+            {action.kind === "copyField" && (
+                <Select value={action.sourceFieldKey ?? ""} onValueChange={(v) => up({ sourceFieldKey: v })}>
+                    <SelectTrigger className="rounded-md h-7 text-xs w-32"><SelectValue placeholder="From field" /></SelectTrigger>
+                    <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.key}>{f.label}</SelectItem>)}</SelectContent>
+                </Select>
+            )}
+
+            {action.kind === "setField" && (() => {
+                const sf = selectFields.find((f) => f.key === action.fieldKey);
+                return sf ? (
+                    <Select value={String(action.value ?? "")} onValueChange={(v) => up({ value: v })}>
+                        <SelectTrigger className="rounded-md h-7 text-xs w-28"><SelectValue placeholder="Value" /></SelectTrigger>
+                        <SelectContent>{(sf.options ?? []).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                    </Select>
+                ) : (
+                    <Input value={String(action.value ?? "")} onChange={(e) => up({ value: e.target.value })}
+                        placeholder="Value" className="rounded-md h-7 text-xs w-28" />
+                );
+            })()}
+
+            {action.kind === "increment" && (
+                <Input type="number" value={String(action.value ?? 1)}
+                    onChange={(e) => up({ value: Number(e.target.value) })}
+                    placeholder="Amount" className="rounded-md h-7 text-xs w-20" />
+            )}
+
+            {action.kind === "notify" && (
+                <Input value={String(action.message ?? "")} onChange={(e) => up({ message: e.target.value })}
+                    placeholder="Message — supports {{field}}" className="rounded-md h-7 text-xs flex-1 min-w-40" />
+            )}
+
+            <button onClick={onRemove} className="p-1.5 ml-auto text-muted-foreground hover:text-destructive rounded-md hover:bg-muted">
+                <Trash2 className="w-3.5 h-3.5" />
+            </button>
+        </div>
+    );
+}
+
+function BranchActionRow({ action, fields, entities, depth, onChange, onRemove }: {
+    action: WorkflowAction;
+    fields: FieldDef[];
+    entities: EntityDef[];
+    depth: number;
+    onChange: (a: WorkflowAction) => void;
+    onRemove: () => void;
+}) {
+    const up = (patch: Partial<WorkflowAction>) => onChange({ ...action, ...patch });
+    const conditions = action.branchConditions ?? [];
+    const logic = action.branchConditionLogic ?? "all";
+
+    const updateCond = (id: string, patch: Partial<BranchCondition>) =>
+        up({ branchConditions: conditions.map((c) => c.id === id ? { ...c, ...patch } : c) });
+    const addCond = () =>
+        up({ branchConditions: [...conditions, { id: crypto.randomUUID(), fieldKey: fields[0]?.key ?? "", op: "eq" as FilterOp, value: "" }] });
+    const removeCond = (id: string) =>
+        up({ branchConditions: conditions.filter((c) => c.id !== id) });
+
+    const noValueOps = new Set<FilterOp>(["isEmpty", "isNotEmpty"]);
+    const allOps: FilterOp[] = ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "notContains", "isEmpty", "isNotEmpty"];
+
+    return (
+        <div className="rounded-xl border border-amber-300/60 bg-amber-50/40 dark:bg-amber-950/20 overflow-hidden">
+            {/* ── IF header ── */}
+            <div className="flex items-start gap-2 px-3 py-2.5 bg-amber-100/60 dark:bg-amber-900/30 border-b border-amber-200/50">
+                <span className="text-[11px] font-bold text-amber-700 bg-amber-200 dark:bg-amber-800 dark:text-amber-200 px-2 py-0.5 rounded-md shrink-0 mt-0.5 tracking-wide">
+                    IF
+                </span>
+                <div className="flex-1 space-y-1.5 min-w-0">
+                    {conditions.map((c, idx) => {
+                        const fieldDef = fields.find((f) => f.key === c.fieldKey);
+                        const isSelect = fieldDef?.type === "select" || fieldDef?.type === "multiselect";
+                        return (
+                            <div key={c.id} className="flex flex-wrap items-center gap-1.5">
+                                {idx > 0 && (
+                                    <span className="text-[10px] font-bold text-amber-600 uppercase w-8 text-center shrink-0">
+                                        {logic}
+                                    </span>
+                                )}
+                                <Select value={c.fieldKey} onValueChange={(v) => updateCond(c.id, { fieldKey: v, value: "" })}>
+                                    <SelectTrigger className="h-6 text-xs rounded-md w-28"><SelectValue placeholder="Field" /></SelectTrigger>
+                                    <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.key}>{f.label}</SelectItem>)}</SelectContent>
+                                </Select>
+                                <Select value={c.op} onValueChange={(v) => updateCond(c.id, { op: v as FilterOp })}>
+                                    <SelectTrigger className="h-6 text-xs rounded-md w-32"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {allOps.map((op) => <SelectItem key={op} value={op}>{OP_LABELS[op]}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                {!noValueOps.has(c.op) && (
+                                    isSelect && fieldDef?.options ? (
+                                        <Select value={c.value ?? ""} onValueChange={(v) => updateCond(c.id, { value: v })}>
+                                            <SelectTrigger className="h-6 text-xs rounded-md w-24"><SelectValue placeholder="Value" /></SelectTrigger>
+                                            <SelectContent>{fieldDef.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <Input value={c.value ?? ""} onChange={(e) => updateCond(c.id, { value: e.target.value })}
+                                            placeholder="Value" className="h-6 text-xs rounded-md w-24" />
+                                    )
+                                )}
+                                {conditions.length > 1 && (
+                                    <button onClick={() => removeCond(c.id)}
+                                        className="text-muted-foreground hover:text-destructive">
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                    <div className="flex items-center gap-2">
+                        <button onClick={addCond} className="text-[11px] text-amber-600 hover:underline flex items-center gap-1">
+                            <Plus className="w-3 h-3" /> condition
+                        </button>
+                        {conditions.length > 1 && (
+                            <Select value={logic} onValueChange={(v) => up({ branchConditionLogic: v as "all" | "any" })}>
+                                <SelectTrigger className="h-5 text-[10px] rounded w-16 px-1.5"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">ALL (AND)</SelectItem>
+                                    <SelectItem value="any">ANY (OR)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        )}
+                    </div>
+                </div>
+                <button onClick={onRemove} className="p-1 text-muted-foreground hover:text-destructive rounded shrink-0 mt-0.5">
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
+
+            {/* ── THEN ── */}
+            <div className="px-3 py-2.5 border-b border-amber-200/30">
+                <div className="flex items-center gap-1.5 mb-2">
+                    <div className="w-0.5 h-3.5 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Then</span>
+                </div>
+                <div className="ml-3">
+                    <ActionList
+                        actions={action.thenActions ?? []}
+                        fields={fields}
+                        entities={entities}
+                        onChange={(acts) => up({ thenActions: acts })}
+                        depth={depth + 1}
+                    />
+                </div>
+            </div>
+
+            {/* ── ELSE ── */}
+            <div className="px-3 py-2.5">
+                <div className="flex items-center gap-1.5 mb-2">
+                    <div className="w-0.5 h-3.5 rounded-full bg-slate-400" />
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Else</span>
+                    <span className="text-[10px] text-muted-foreground">(optional)</span>
+                </div>
+                <div className="ml-3">
+                    <ActionList
+                        actions={action.elseActions ?? []}
+                        fields={fields}
+                        entities={entities}
+                        onChange={(acts) => up({ elseActions: acts })}
+                        depth={depth + 1}
+                    />
+                </div>
+            </div>
+        </div>
     );
 }
 
