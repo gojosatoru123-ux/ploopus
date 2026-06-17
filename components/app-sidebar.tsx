@@ -20,7 +20,8 @@ import {
   CreditCard,
   User,
   ExternalLink,
-  BrainCircuitIcon
+  BrainCircuitIcon,
+  AppWindowMac
 } from "lucide-react";
 import { Sidebar } from "./ui/sidebar";
 import { authClient } from "@/lib/auth-client";
@@ -54,6 +55,7 @@ const AppSidebar = () => {
 
   const memoryItems = [
     { id: "feed", icon: BrainCircuitIcon, label: "Memory Hub", href: "/memory-feed" },
+    { id: "plateforms", icon: AppWindowMac, label: "Plateform", href: "/plateforms"}
   ];
 
   const noteSubItems = [
