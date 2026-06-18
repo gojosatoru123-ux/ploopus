@@ -162,6 +162,22 @@ export default function PluginBuilder({ onCreated }: Props) {
         });
 
         const finalIcon = customEmoji.trim() || icon;
+
+        // Enrich each entity: if it has a statusField, generate a `statuses` array
+        // from that field's options so the kanban always shows all columns.
+        const enrichedEntities = entities.map((e) => {
+            if (!e.statusField) return e;
+            const sf = e.fields.find((f) => f.key === e.statusField);
+            if (!sf?.options?.length) return e;
+            const PALETTE = ["slate", "sky", "amber", "emerald", "violet", "rose", "orange", "indigo"];
+            const statuses = sf.options.map((opt, i) => ({
+                id: opt,
+                label: opt.charAt(0).toUpperCase() + opt.slice(1).replace(/-/g, " "),
+                color: PALETTE[i % PALETTE.length],
+            }));
+            return { ...e, statuses };
+        });
+
         const manifest: PluginManifest = {
             id: crypto.randomUUID(),
             slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
@@ -171,7 +187,7 @@ export default function PluginBuilder({ onCreated }: Props) {
             icon: finalIcon,
             accent,
             category,
-            entities,
+            entities: enrichedEntities,
             views: autoViews,
             dashboards: [{ id: crypto.randomUUID(), name: "Overview", widgets: autoWidgets }],
             workflows,
@@ -369,10 +385,29 @@ function EntityEditor({ entity, onChange, onRemove, accent, allEntities }: {
         set("fields", [...entity.fields, { id, key: `field_${entity.fields.length + 1}`, label: "New field", type: "text" }]);
     };
 
-    const updateField = (id: string, patch: Partial<FieldDef>) =>
-        set("fields", entity.fields.map((f) => f.id === id ? { ...f, ...patch } : f));
+    const updateField = (id: string, patch: Partial<FieldDef>) => {
+        const updated = entity.fields.map((f) => f.id === id ? { ...f, ...patch } : f);
+        // If the statusField's key was renamed, follow it
+        if (patch.key !== undefined && entity.statusField) {
+            const oldKey = entity.fields.find((f) => f.id === id)?.key;
+            if (oldKey === entity.statusField) {
+                onChange({ ...entity, fields: updated, statusField: patch.key });
+                return;
+            }
+        }
+        set("fields", updated);
+    };
 
-    const removeField = (id: string) => set("fields", entity.fields.filter((f) => f.id !== id));
+    const removeField = (id: string) => {
+        const removed = entity.fields.find((f) => f.id === id);
+        const nextFields = entity.fields.filter((f) => f.id !== id);
+        // Clear statusField if the removed field was it
+        if (removed && removed.key === entity.statusField) {
+            onChange({ ...entity, fields: nextFields, statusField: undefined });
+        } else {
+            set("fields", nextFields);
+        }
+    };
 
     const moveField = (id: string, dir: -1 | 1) => {
         const idx = entity.fields.findIndex((f) => f.id === id);
@@ -384,7 +419,7 @@ function EntityEditor({ entity, onChange, onRemove, accent, allEntities }: {
         set("fields", next);
     };
 
-    const selectFields = entity.fields.filter((f) => f.type === "select");
+    const selectFields = entity.fields.filter((f) => f.type === "select" || f.type === "multiselect");
 
     return (
         <Card className="overflow-hidden border-border/60">
@@ -470,10 +505,14 @@ function FieldRow({ field, index, total, allEntities, onChange, onRemove, onMove
     onRemove: () => void;
     onMove: (dir: -1 | 1) => void;
 }) {
-    const needsOptions = field.type === "select" || field.type === "multiselect";
+    const needsOptions = field.type === "select" || field.type === "multiselect" || field.type === "tags";
     const needsRelation = field.type === "relation";
     const needsFormula = field.type === "formula";
     const needsMax = field.type === "rating";
+
+    // Local raw text state so commas can be typed without being eaten on every keystroke
+    const [optionsRaw, setOptionsRaw] = useState<string | null>(null);
+    const displayOptions = optionsRaw ?? (field.options ?? []).join(", ");
 
     return (
         <div className="space-y-1.5">
@@ -495,7 +534,12 @@ function FieldRow({ field, index, total, allEntities, onChange, onRemove, onMove
                     placeholder="Field label"
                     className="rounded-lg flex-1 h-8 text-sm"
                 />
-                <Select value={field.type} onValueChange={(v) => onChange({ type: v as FieldType, options: undefined, formula: undefined })}>
+                <Select value={field.type} onValueChange={(v) => {
+                    const newType = v as FieldType;
+                    const keepOptions = (field.type === "select" || field.type === "multiselect" || field.type === "tags") &&
+                        (newType === "select" || newType === "multiselect" || newType === "tags");
+                    onChange({ type: newType, options: keepOptions ? field.options : undefined, formula: undefined });
+                }}>
                     <SelectTrigger className="rounded-lg w-44 h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                         {FIELD_TYPE_GROUPS.map((g) => (
@@ -519,8 +563,13 @@ function FieldRow({ field, index, total, allEntities, onChange, onRemove, onMove
             {needsOptions && (
                 <div className="ml-8">
                     <Input
-                        value={(field.options ?? []).join(", ")}
-                        onChange={(e) => onChange({ options: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+                        value={displayOptions}
+                        onChange={(e) => setOptionsRaw(e.target.value)}
+                        onBlur={() => {
+                            const parsed = (optionsRaw ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+                            onChange({ options: parsed });
+                            setOptionsRaw(null);
+                        }}
                         placeholder="Comma-separated options · e.g. Todo, Doing, Done"
                         className="rounded-lg h-7 text-xs"
                     />

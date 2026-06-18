@@ -687,8 +687,10 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
                 </div>
             )}
 
-            {/* Empty state */}
-            {records.length === 0 ? (
+            {/* Kanban always renders (columns must show even when empty or filtered) */}
+            {activeView?.kind === "kanban" ? (
+                <KanbanView {...viewProps} view={activeView} />
+            ) : records.length === 0 ? (
                 <Card>
                     <CardContent className="py-14 text-center">
                         <div className="text-4xl mb-3">{entity.icon}</div>
@@ -710,8 +712,6 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
                 </Card>
             ) : activeView?.kind === "table" ? (
                 <TableView {...viewProps} allSelected={allSelected} onSelectAll={allSelected ? clearSel : selectAll} hiddenCols={hiddenCols} />
-            ) : activeView?.kind === "kanban" ? (
-                <KanbanView {...viewProps} view={activeView} />
             ) : activeView?.kind === "grid" ? (
                 <GridView {...viewProps} />
             ) : activeView?.kind === "calendar" ? (
@@ -1036,13 +1036,22 @@ function KanbanView({ entity, view, records, plugin, onEdit, accent }: {
     plugin: PluginManifest; onEdit: (r: PluginRecord) => void; accent: string;
 }) {
     const groupKey = view.groupBy ?? entity.statusField ?? "";
-    const statuses = entity.statuses?.map((s) => s.id)
-        ?? Array.from(new Set(records.map((r) => (r.data[groupKey] as string) || ""))).filter(Boolean);
+
+    // Derive full column list from the field definition (options or statuses),
+    // so every column is always visible even when no records exist for that status.
+    const groupField = entity.fields.find((f) => f.key === groupKey);
+    const statuses: string[] =
+        entity.statuses?.map((s) => s.id) ??
+        groupField?.options ??
+        Array.from(new Set(records.map((r) => (r.data[groupKey] as string) || ""))).filter(Boolean);
 
     const [dragOver, setDragOver] = useState<string | null>(null);
 
-    const moveTo = (r: PluginRecord, status: string) => {
-        upsertRecord(plugin.id, { ...r, data: { ...r.data, [groupKey]: status } });
+    const moveTo = (id: string, status: string) => {
+        // Look up from full record store so drop works even when cards are filtered
+        const all = getRecords(plugin.id, entity.id);
+        const r = all.find((x) => x.id === id);
+        if (r) upsertRecord(plugin.id, { ...r, data: { ...r.data, [groupKey]: status } });
     };
 
     return (
@@ -1060,13 +1069,14 @@ function KanbanView({ entity, view, records, plugin, onEdit, accent }: {
                             onDrop={(e) => {
                                 setDragOver(null);
                                 const id = e.dataTransfer.getData("text/plain");
-                                const r = records.find((x) => x.id === id);
-                                if (r) moveTo(r, s);
+                                if (id) moveTo(id, s);
                             }}>
                             <div className="flex items-center justify-between px-1 py-1">
                                 <div className="flex items-center gap-1.5">
-                                    {statusDef && (
+                                    {statusDef ? (
                                         <span className={`w-2 h-2 rounded-full bg-${statusDef.color}-500`} />
+                                    ) : (
+                                        <span className="w-2 h-2 rounded-full bg-muted-foreground/40" />
                                     )}
                                     <span className="text-xs font-semibold uppercase tracking-wide">{statusDef?.label ?? s}</span>
                                 </div>

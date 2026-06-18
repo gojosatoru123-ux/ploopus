@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Star, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,12 +100,17 @@ export default function RecordForm({ entity, plugin, initial, onSubmit, onCancel
                         ) : f.type === "select" ? (
                             <Select
                                 value={(data[f.key] as string) ?? ""}
-                                onValueChange={(v) => set(f.key, v)}
+                                onValueChange={(v) => set(f.key, v === "__clear__" ? "" : v)}
                             >
                                 <SelectTrigger aria-invalid={!!error} className={error ? "border-destructive" : undefined}>
                                     <SelectValue placeholder="Choose..." />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    {!f.required && (
+                                        <SelectItem value="__clear__">
+                                            <span className="text-muted-foreground italic">— None —</span>
+                                        </SelectItem>
+                                    )}
                                     {(f.options ?? []).map((o) => (
                                         <SelectItem key={o} value={o}>
                                             {o}
@@ -348,6 +353,7 @@ function RelationInput({ field, plugin, value, onChange, error }: {
 
 function TagsInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
     const [input, setInput] = useState("");
+    const containerRef = React.useRef<HTMLDivElement>(null);
     const add = () => {
         const t = input.trim();
         if (!t) return;
@@ -355,7 +361,7 @@ function TagsInput({ value, onChange }: { value: string[]; onChange: (v: string[
         setInput("");
     };
     return (
-        <div className="flex flex-wrap items-center gap-1 px-2 py-1.5 border rounded-md bg-background min-h-9">
+        <div ref={containerRef} className="flex flex-wrap items-center gap-1 px-2 py-1.5 border rounded-md bg-background min-h-9">
             {value.map((t) => (
                 <Badge key={t} variant="secondary" className="gap-1">
                     {t}
@@ -375,7 +381,11 @@ function TagsInput({ value, onChange }: { value: string[]; onChange: (v: string[
                         onChange(value.slice(0, -1));
                     }
                 }}
-                onBlur={add}
+                onBlur={(e) => {
+                    // Don't add a tag if focus is moving to a button inside the same container
+                    if (containerRef.current?.contains(e.relatedTarget as Node)) return;
+                    add();
+                }}
                 placeholder="Add tag…"
                 className="flex-1 min-w-20 bg-transparent outline-none text-sm py-1"
             />
