@@ -188,12 +188,18 @@ export default function PlatformPage() {
                 {notifOpen && (
                     <motion.div
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm flex items-start justify-end"
+                        className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] flex items-start justify-end"
                         onClick={() => setNotifOpen(false)}>
                         <motion.div
                             initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
                             transition={{ type: "spring", damping: 28, stiffness: 300 }}
-                            className="h-full w-full max-w-sm bg-card border-l shadow-2xl overflow-y-auto"
+                            className="fixed top-3 right-0.5 sm:right-3 bottom-3 z-50 w-full max-w-100 flex flex-col overflow-hidden"
+                            style={{
+                                background: "#FFFFFF",
+                                borderRadius: "20px",
+                                border: "0.5px solid #E2DDD8",
+                                boxShadow: "0 12px 48px -8px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.05)",
+                            }}
                             onClick={(e) => e.stopPropagation()}>
                             <div className="px-5 py-4 border-b flex items-center justify-between sticky top-0 bg-card z-10">
                                 <div className="flex items-center gap-2 font-semibold">
@@ -352,13 +358,13 @@ export default function PlatformPage() {
 
                 <Tabs defaultValue="installed">
                     <TabsList className="rounded-full p-1 h-auto bg-muted/60">
-                        <TabsTrigger value="installed" className="rounded-full px-4 py-1.5 text-sm gap-1.5">
-                            <Package className="w-4 h-4" /> Installed
-                            <Badge variant="secondary" className="ml-1">{installed.length}</Badge>
+                        <TabsTrigger value="installed" className="rounded-full sm:px-4 py-1.5 text-sm sm:gap-1.5">
+                            <Package className="w-4 h-4" /> <span className="hidden sm:inline">Installed</span>
+                            <Badge variant="secondary" className="sm:ml-1">{installed.length}</Badge>
                         </TabsTrigger>
                         <TabsTrigger value="marketplace" className="rounded-full px-4 py-1.5 text-sm gap-1.5">
-                            <Store className="w-4 h-4" /> Marketplace
-                            <Badge variant="secondary" className="ml-1">{BUILTIN_PLUGINS.length}</Badge>
+                            <Store className="w-4 h-4" /> <span className="hidden sm:inline">Marketplace</span>
+                            <Badge variant="secondary" className="sm:ml-1">{BUILTIN_PLUGINS.length}</Badge>
                         </TabsTrigger>
                     </TabsList>
 

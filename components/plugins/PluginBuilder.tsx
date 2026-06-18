@@ -1,3 +1,4 @@
+'use client';
 import { useState } from "react";
 import { ChevronDown, ChevronUp, GitBranch, Plus, Sparkles, Trash2, Wand2, Workflow, Database, Palette, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -208,9 +209,9 @@ export default function PluginBuilder({ onCreated }: Props) {
                     <Sparkles className="w-4 h-4" /> Build a plugin
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-3xl! max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+            <DialogContent className="w-full max-w-3xl! max-h-[95vh] sm:max-h-[90vh] overflow-y-auto p-0 gap-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
                 {/* Dialog header strip */}
-                <div className="p-6 pb-5 border-b" style={{ background: `linear-gradient(135deg, ${accent}1f, transparent 70%)` }}>
+                <div className="p-4 sm:p-6 pb-4 sm:pb-5 border-b" style={{ background: `linear-gradient(135deg, ${accent}1f, transparent 70%)` }}>
                     <DialogHeader className="space-y-1">
                         <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
                             <Wand2 className="w-3 h-3" /> Plugin Studio
@@ -222,18 +223,18 @@ export default function PluginBuilder({ onCreated }: Props) {
                     </DialogHeader>
                 </div>
 
-                <div className="p-6">
+                <div className="p-1 sm:p-6">
                     <Tabs value={tab} onValueChange={setTab} className="space-y-5">
                         <TabsList className="rounded-full p-1 h-auto bg-muted/60">
-                            <TabsTrigger value="identity" className="rounded-full px-4 py-1.5 text-xs gap-1.5">
+                            <TabsTrigger value="identity" className="rounded-full sm:px-4 py-1.5 text-xs sm:gap-1.5">
                                 <Palette className="w-3.5 h-3.5" /> Identity
                             </TabsTrigger>
-                            <TabsTrigger value="data" className="rounded-full px-4 py-1.5 text-xs gap-1.5">
-                                <Database className="w-3.5 h-3.5" /> Data <Badge variant="secondary" className="ml-1 text-[10px]">{totalFields}</Badge>
+                            <TabsTrigger value="data" className="rounded-full sm:px-4 py-1.5 text-xs sm:gap-1.5">
+                                <Database className="w-3.5 h-3.5" /> Data <Badge variant="secondary" className="sm:ml-1 text-[10px]">{totalFields}</Badge>
                             </TabsTrigger>
-                            <TabsTrigger value="workflows" className="rounded-full px-4 py-1.5 text-xs gap-1.5">
-                                <Workflow className="w-3.5 h-3.5" /> Workflows
-                                {workflows.length > 0 && <Badge variant="secondary" className="ml-1 text-[10px]">{workflows.length}</Badge>}
+                            <TabsTrigger value="workflows" className="rounded-full sm:px-4 py-1.5 text-xs sm:gap-1.5">
+                                <Workflow className="w-3.5 h-3.5" /> Workflow
+                                {workflows.length > 0 && <Badge variant="secondary" className="sm:ml-1 text-[10px]">{workflows.length}</Badge>}
                             </TabsTrigger>
                         </TabsList>
 
@@ -355,11 +356,11 @@ export default function PluginBuilder({ onCreated }: Props) {
                     </Tabs>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 px-6 py-4 border-t bg-muted/20">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t bg-muted/20">
                     <div className="text-xs text-muted-foreground">
                         {entities.length} object{entities.length !== 1 ? "s" : ""} · {totalFields} field{totalFields !== 1 ? "s" : ""} · {workflows.length} workflow{workflows.length !== 1 ? "s" : ""}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-full sm:w-auto justify-end">
                         <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
                         <Button onClick={save} className="rounded-full px-5" style={{ background: accent, color: "white" }}>
                             <Sparkles className="w-4 h-4" /> Install plugin
@@ -516,7 +517,7 @@ function FieldRow({ field, index, total, allEntities, onChange, onRemove, onMove
 
     return (
         <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                 <div className="flex flex-col gap-0.5 shrink-0">
                     <button onClick={() => onMove(-1)} disabled={index === 0} className="p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-20">
                         <ChevronUp className="w-3 h-3" />
@@ -532,7 +533,7 @@ function FieldRow({ field, index, total, allEntities, onChange, onRemove, onMove
                         key: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "_") || field.key,
                     })}
                     placeholder="Field label"
-                    className="rounded-lg flex-1 h-8 text-sm"
+                    className="rounded-lg flex-1 min-w-28 h-8 text-sm"
                 />
                 <Select value={field.type} onValueChange={(v) => {
                     const newType = v as FieldType;
@@ -540,7 +541,7 @@ function FieldRow({ field, index, total, allEntities, onChange, onRemove, onMove
                         (newType === "select" || newType === "multiselect" || newType === "tags");
                     onChange({ type: newType, options: keepOptions ? field.options : undefined, formula: undefined });
                 }}>
-                    <SelectTrigger className="rounded-lg w-44 h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="rounded-lg w-full sm:w-44 h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
                         {FIELD_TYPE_GROUPS.map((g) => (
                             <div key={g.label}>
@@ -906,11 +907,11 @@ function BranchActionRow({ action, fields, entities, depth, onChange, onRemove }
                                     </span>
                                 )}
                                 <Select value={c.fieldKey} onValueChange={(v) => updateCond(c.id, { fieldKey: v, value: "" })}>
-                                    <SelectTrigger className="h-6 text-xs rounded-md w-28"><SelectValue placeholder="Field" /></SelectTrigger>
+                                    <SelectTrigger className="h-6 text-xs rounded-md w-full sm:w-28 flex-1 sm:flex-none min-w-20"><SelectValue placeholder="Field" /></SelectTrigger>
                                     <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.key}>{f.label}</SelectItem>)}</SelectContent>
                                 </Select>
                                 <Select value={c.op} onValueChange={(v) => updateCond(c.id, { op: v as FilterOp })}>
-                                    <SelectTrigger className="h-6 text-xs rounded-md w-32"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="h-6 text-xs rounded-md w-full sm:w-32 flex-1 sm:flex-none min-w-20"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {allOps.map((op) => <SelectItem key={op} value={op}>{OP_LABELS[op]}</SelectItem>)}
                                     </SelectContent>
@@ -918,12 +919,12 @@ function BranchActionRow({ action, fields, entities, depth, onChange, onRemove }
                                 {!noValueOps.has(c.op) && (
                                     isSelect && fieldDef?.options ? (
                                         <Select value={c.value ?? ""} onValueChange={(v) => updateCond(c.id, { value: v })}>
-                                            <SelectTrigger className="h-6 text-xs rounded-md w-24"><SelectValue placeholder="Value" /></SelectTrigger>
+                                            <SelectTrigger className="h-6 text-xs rounded-md w-full sm:w-24 flex-1 sm:flex-none min-w-20"><SelectValue placeholder="Value" /></SelectTrigger>
                                             <SelectContent>{fieldDef.options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                                         </Select>
                                     ) : (
                                         <Input value={c.value ?? ""} onChange={(e) => updateCond(c.id, { value: e.target.value })}
-                                            placeholder="Value" className="h-6 text-xs rounded-md w-24" />
+                                            placeholder="Value" className="h-6 text-xs rounded-md w-full sm:w-24 flex-1 sm:flex-none min-w-20" />
                                     )
                                 )}
                                 {conditions.length > 1 && (
