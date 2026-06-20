@@ -16,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import type { EntityDef, FieldDef, PluginManifest, PluginRecord } from "@/lib/plugins/types";
 import { evalFormula } from "@/lib/plugins/formula";
-import { getRecords } from "@/lib/plugins/registry";
+import { usePluginContext } from "@/contexts/PluginsContext";
 
 interface Props {
     entity: EntityDef;
@@ -295,11 +295,11 @@ function RelationInput({ field, plugin, value, onChange, error }: {
 }) {
     const [query, setQuery] = useState("");
     const target = plugin?.entities.find((e) => e.id === field.relationEntityId);
-
+    const { getRecordsForEntity } = usePluginContext();
     const options = useMemo(() => {
         if (!plugin || !target) return [];
-        return getRecords(plugin.id, target.id);
-    }, [plugin, target]);
+        return getRecordsForEntity(target.id);
+    }, [plugin, target, getRecordsForEntity]);
 
     if (!plugin || !target) {
         return (

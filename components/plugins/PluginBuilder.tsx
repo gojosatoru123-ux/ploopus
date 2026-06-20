@@ -14,12 +14,12 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { installPlugin } from "@/lib/plugins/registry";
 import type {
     BranchCondition, EntityDef, FieldDef, FieldType, FilterOp,
     PluginManifest, ViewDef, WidgetDef, WorkflowDef, WorkflowAction,
 } from "@/lib/plugins/types";
 import { toast } from "sonner";
+import { usePluginContext } from "@/contexts/PluginsContext";
 
 /* ---------- Shared filter operator labels ---------- */
 
@@ -102,6 +102,7 @@ const TEMPLATES: Template[] = [
 interface Props { onCreated?: (m: PluginManifest) => void }
 
 export default function PluginBuilder({ onCreated }: Props) {
+    const { installPlugin } = usePluginContext();
     const [open, setOpen] = useState(false);
     const [tab, setTab] = useState("identity");
     const [name, setName] = useState("");

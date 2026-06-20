@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     ArrowLeft, Bell, BellOff, Boxes, Check, ChevronRight, Clock,
-    Download, Package, Search, Share2, Sparkles, Store, Upload, X,
+    Download, Link as LinkIcon, Loader2, Package, Search, Share2, Sparkles, Store, Upload, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,25 +15,10 @@ import {
 } from "@/components/ui/dialog";
 import PluginRunner from "@/components/plugins/PluginRunner";
 import PluginBuilder from "@/components/plugins/PluginBuilder";
-import {
-    buildShareLink,
-    clearNotifications,
-    exportPlugin,
-    importPlugin,
-    installPlugin,
-    markAllNotificationsRead,
-    markNotificationRead,
-    onStorageError,
-    searchAll,
-    tryInstallFromHash,
-    uninstallPlugin,
-    useDueReminders,
-    useInstalledPlugins,
-    useNotifications,
-} from "@/lib/plugins/registry";
 import { BUILTIN_PLUGINS } from "@/lib/plugins/builtins";
 import { toast } from "sonner";
 import type { PluginManifest } from "@/lib/plugins/types";
+import { usePluginContext } from "@/contexts/PluginsContext";
 
 const CATEGORIES = [
     "all", "work", "personal", "fitness", "finance",
@@ -41,9 +26,27 @@ const CATEGORIES = [
 ] as const;
 
 export default function PlatformPage() {
-    const installed = useInstalledPlugins();
-    const notifications = useNotifications();
-    const reminders = useDueReminders();
+    const {
+        pluginIndexes: installed,
+        notifications,
+        installPlugin,
+        uninstallPlugin,
+        exportPlugin,
+        importPlugin,
+        buildShareLink,
+        tryInstallFromHash,
+        installFromUrl,
+        installError,
+        clearInstallError,
+        markNotificationRead,
+        markAllNotificationsRead,
+        clearNotifications,
+        searchRecords: searchAll,
+        getDueReminders,
+        isInitialized,
+    } = usePluginContext();
+
+    const reminders = getDueReminders();
     const [openId, setOpenId] = useState<string | null>(null);
     const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("all");
     const [marketSearch, setMarketSearch] = useState("");
@@ -51,6 +54,9 @@ export default function PlatformPage() {
     const [globalOpen, setGlobalOpen] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
     const [uninstallTarget, setUninstallTarget] = useState<PluginManifest | null>(null);
+    const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+    const [urlInput, setUrlInput] = useState("");
+    const [urlInstalling, setUrlInstalling] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
 
     // Global keyboard shortcut: Ctrl/Cmd + K
@@ -67,13 +73,21 @@ export default function PlatformPage() {
     }, []);
 
     // Surface storage quota errors as toasts
-    useEffect(() => onStorageError((msg) => toast.error(msg)), []);
+    // useEffect(() => onStorageError((msg) => toast.error(msg)), []);
 
-    // Auto-install from #plugin= hash
+    // Auto-install from #plugin= hash — must wait until storage has finished
+    // loading (isInitialized), otherwise the install can race the initial
+    // OPFS load: if storage finishes loading *after* the hash-install runs,
+    // its plain setPluginIndexes(indexes) overwrite would silently wipe out
+    // the just-installed plugin. Gating on isInitialized guarantees the
+    // install always happens last.
+    const hashInstallRan = useRef(false);
     useEffect(() => {
+        if (!isInitialized || hashInstallRan.current) return;
+        hashInstallRan.current = true;
         const m = tryInstallFromHash();
         if (m) { toast.success(`Installed "${m.name}" from share link`); setOpenId(m.id); }
-    }, []);
+    }, [isInitialized, tryInstallFromHash]);
 
     const open = installed.find((p) => p.id === openId);
 
@@ -100,6 +114,21 @@ export default function PlatformPage() {
         } catch {
             toast.error("Could not import plugin file — is it a valid .plugin.json?");
         }
+    };
+
+    const handleInstallFromUrl = async () => {
+        const url = urlInput.trim();
+        if (!url) return;
+        setUrlInstalling(true);
+        const m = await installFromUrl(url);
+        setUrlInstalling(false);
+        if (m) {
+            toast.success(`Installed "${m.name}" from URL`);
+            setUrlDialogOpen(false);
+            setUrlInput("");
+            setOpenId(m.id);
+        }
+        // On failure, installError is set by the hook and rendered in the dialog below.
     };
 
     const unreadCount = notifications.filter((n) => !n.read).length;
@@ -297,6 +326,50 @@ export default function PlatformPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* Install from URL dialog */}
+            <Dialog
+                open={urlDialogOpen}
+                onOpenChange={(open) => {
+                    setUrlDialogOpen(open);
+                    if (!open) { setUrlInput(""); clearInstallError(); }
+                }}
+            >
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Install from URL</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground">
+                        Paste a share link (<code>...#plugin=...</code>) or a direct link to a
+                        plugin's JSON file. Share links install instantly — no network request needed.
+                    </p>
+                    <Input
+                        autoFocus
+                        value={urlInput}
+                        onChange={(e) => { setUrlInput(e.target.value); if (installError) clearInstallError(); }}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !urlInstalling) handleInstallFromUrl(); }}
+                        placeholder="Paste a share link or plugin JSON URL"
+                        disabled={urlInstalling}
+                    />
+                    {installError && (
+                        <p className="text-xs text-destructive">{installError}</p>
+                    )}
+                    <div className="flex gap-2 justify-end">
+                        <Button variant="ghost" onClick={() => setUrlDialogOpen(false)} disabled={urlInstalling}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleInstallFromUrl} disabled={urlInstalling || !urlInput.trim()}>
+                            {urlInstalling ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" /> Installing…
+                                </>
+                            ) : (
+                                "Install"
+                            )}
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             <div className="max-w-6xl mx-auto p-5 sm:p-10 space-y-8">
                 {/* Page header */}
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -334,6 +407,13 @@ export default function PlatformPage() {
 
                         <Button variant="outline" className="rounded-full" onClick={() => fileRef.current?.click()}>
                             <Upload className="w-4 h-4" /> Import
+                        </Button>
+                        <Button
+                            variant="outline"
+                            className="rounded-full"
+                            onClick={() => { clearInstallError(); setUrlInput(""); setUrlDialogOpen(true); }}
+                        >
+                            <LinkIcon className="w-4 h-4" /> Install from URL
                         </Button>
                         <PluginBuilder onCreated={(m) => setOpenId(m.id)} />
                     </div>

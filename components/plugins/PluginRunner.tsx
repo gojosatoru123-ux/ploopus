@@ -28,11 +28,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import RecordForm from "./RecordForm";
-import {
-    buildShareLink, bulkDeleteRecords, bulkUpdateRecords, deleteRecord,
-    duplicatePlugin, exportPlugin, getRecords, markAllNotificationsRead,
-    restoreRecords, uninstallPlugin, upsertRecord, useNotifications, useRecords,
-} from "@/lib/plugins/registry";
+import { usePluginContext } from "@/contexts/PluginsContext";
 import { matchOperator } from "@/lib/plugins/formula";
 import type {
     EntityDef, FieldDef, FieldFilter, FilterOp, PageBlock, PageDef,
@@ -50,13 +46,14 @@ function fmt(v: unknown): string {
     return String(v);
 }
 
-function renderCell(field: FieldDef | undefined, value: unknown, plugin: PluginManifest): string {
+function renderCell(field: FieldDef | undefined, value: unknown, plugin: PluginManifest, getRecordsForEntity: (entityId: string) => PluginRecord[]): string {
     if (!field) return fmt(value);
     if (field.type === "relation") {
         if (!value) return "—";
         const target = plugin.entities.find((e) => e.id === field.relationEntityId);
         if (!target) return "—";
-        const rec = getRecords(plugin.id, target.id).find((r) => r.id === value);
+        // const rec = getRecords(plugin.id, target.id).find((r) => r.id === value);
+        const rec = getRecordsForEntity(target.id).find((r) => r.id === value);
         return rec ? String(rec.data[target.titleField] ?? "Untitled") : "—";
     }
     return fmt(value);
@@ -107,6 +104,28 @@ const OP_LABELS: Record<FilterOp, string> = {
 /* ---------- PluginRunner root ---------- */
 
 export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
+    const {
+        records,
+        notifications: allNotifications,
+        upsertRecord,
+        deleteRecord,
+        bulkDeleteRecords,
+        bulkUpdateRecords,
+        restoreRecords,
+        markAllNotificationsRead,
+        duplicatePlugin,
+        exportPlugin,
+        buildShareLink,
+        uninstallPlugin,
+        loadPluginRecords,
+        getRecordsForEntity,
+    } = usePluginContext();
+
+    // Load this plugin's records when it mounts
+    useEffect(() => {
+        loadPluginRecords(plugin.id);
+    }, [plugin.id]);
+
     const firstEntity = plugin.entities[0];
     const [tab, setTab] = useState<string>(
         plugin.pages?.[0]
@@ -117,7 +136,7 @@ export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
                     ? `entity:${firstEntity.id}`
                     : "dashboard",
     );
-    const notifications = useNotifications(plugin.id);
+    const notifications = allNotifications.filter(n => n.pluginId === plugin.id);
     const unread = notifications.filter((n) => !n.read).length;
     const [notifOpen, setNotifOpen] = useState(false);
 
@@ -277,7 +296,8 @@ function DashboardPanel({ plugin }: { plugin: PluginManifest }) {
 }
 
 function Widget({ plugin, widget }: { plugin: PluginManifest; widget: WidgetDef }) {
-    const records = useRecords(plugin.id, widget.entityId);
+    const { getRecordsForEntity } = usePluginContext();
+    const records = getRecordsForEntity(widget.entityId);
     const entity = plugin.entities.find((e) => e.id === widget.entityId);
     const accent = widget.accent ?? plugin.accent;
 
@@ -481,7 +501,9 @@ function Widget({ plugin, widget }: { plugin: PluginManifest; widget: WidgetDef 
 type SortState = { key: string; dir: "asc" | "desc" } | null;
 
 function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: EntityDef }) {
-    const allRecords = useRecords(plugin.id, entity.id);
+    const { getRecordsForEntity, upsertRecord, deleteRecord, bulkDeleteRecords,
+        bulkUpdateRecords, restoreRecords } = usePluginContext();
+    const allRecords = getRecordsForEntity(entity.id);
     const views = plugin.views.filter((v) => v.entityId === entity.id);
     const [activeView, setActiveView] = useState<ViewDef | undefined>(views[0]);
     const [editing, setEditing] = useState<PluginRecord | null>(null);
@@ -510,7 +532,7 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
 
     const handleSubmit = (data: Record<string, unknown>) => {
         const id = editing?.id ?? crypto.randomUUID();
-        upsertRecord(plugin.id, {
+        upsertRecord({
             id, entityId: entity.id, data,
             createdAt: editing?.createdAt ?? new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -521,20 +543,21 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
     };
 
     const handleDelete = useCallback((id: string) => {
-        deleteRecord(plugin.id, id);
+        deleteRecord(id);
         toast(`${entity.name} deleted`, {
-            action: { label: "Undo", onClick: () => { restoreRecords(plugin.id, [id]); toast.success("Restored"); } },
+            action: { label: "Undo", onClick: () => { restoreRecords([id]); toast.success("Restored"); } },
         });
     }, [plugin.id, entity.name]);
 
     const handleBulkDelete = useCallback(() => {
         const ids = [...selected];
-        bulkDeleteRecords(plugin.id, ids);
+        bulkDeleteRecords(ids);
         clearSel();
         toast(`${ids.length} ${entity.plural.toLowerCase()} deleted`, {
             action: {
                 label: "Undo", onClick: () => {
-                    restoreRecords(plugin.id, ids);
+                    // restoreRecords(plugin.id, ids);
+                    restoreRecords(ids);
                     toast.success(`${ids.length} restored`);
                 },
             },
@@ -543,7 +566,7 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
 
     const statusField = entity.fields.find((f) => f.key === entity.statusField);
     const handleBulkStatus = (status: string) => {
-        bulkUpdateRecords(plugin.id, [...selected], { [entity.statusField!]: status });
+        bulkUpdateRecords([...selected], { [entity.statusField!]: status });
         toast.success(`${selected.size} ${entity.plural.toLowerCase()} updated`);
         clearSel();
     };
@@ -696,7 +719,7 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
 
             {/* Kanban always renders (columns must show even when empty or filtered) */}
             {activeView?.kind === "kanban" ? (
-                <KanbanView {...viewProps} view={activeView} />
+                <KanbanView {...viewProps} view={activeView} getRecordsForEntity={getRecordsForEntity} />
             ) : records.length === 0 ? (
                 <Card>
                     <CardContent className="py-14 text-center">
@@ -893,6 +916,7 @@ function TableView({ plugin, entity, records, onEdit, onDelete, selected, onTogg
 
 /** Rich inline cell renderer for table view. */
 function CellRenderer({ field, value, plugin }: { field: FieldDef; value: unknown; plugin: PluginManifest }) {
+    const { getRecordsForEntity } = usePluginContext()
     if (value === undefined || value === null || value === "") return <span className="text-muted-foreground/40">—</span>;
     if (field.type === "checkbox") return value ? <Check className="w-4 h-4 text-emerald-500" /> : <X className="w-4 h-4 text-muted-foreground/40" />;
     if (field.type === "rating") {
@@ -945,7 +969,7 @@ function CellRenderer({ field, value, plugin }: { field: FieldDef; value: unknow
         return <a href={`mailto:${value}`} className="text-primary text-xs underline">{String(value)}</a>;
     }
     if (field.type === "relation") {
-        return <span className="text-xs">{renderCell(field, value, plugin)}</span>;
+        return <span className="text-xs">{renderCell(field, value, plugin, getRecordsForEntity)}</span>;
     }
     if (field.type === "currency") {
         const n = Number(value);
@@ -962,6 +986,7 @@ function ListView({ plugin, entity, records, onEdit, onDelete, selected, onToggl
     onEdit: (r: PluginRecord) => void; onDelete: (id: string) => void;
     selected: Set<string>; onToggleSelect: (id: string) => void; accent: string;
 }) {
+    const { getRecordsForEntity } = usePluginContext()
     return (
         <div className="space-y-2">
             {records.map((r) => {
@@ -978,7 +1003,7 @@ function ListView({ plugin, entity, records, onEdit, onDelete, selected, onToggl
                         <div className="min-w-0 flex-1">
                             <div className="font-medium text-sm truncate">{String(r.data[entity.titleField] ?? "Untitled")}</div>
                             <div className="text-xs text-muted-foreground truncate">
-                                {entity.fields.slice(1, 4).filter((f) => r.data[f.key]).map((f) => `${f.label}: ${renderCell(f, r.data[f.key], plugin)}`).join(" · ")}
+                                {entity.fields.slice(1, 4).filter((f) => r.data[f.key]).map((f) => `${f.label}: ${renderCell(f, r.data[f.key], plugin, getRecordsForEntity)}`).join(" · ")}
                             </div>
                         </div>
                         {(() => { const sf = entity.statusField; return sf && r.data[sf] ? <Badge variant="outline" className="text-[10px] shrink-0">{String(r.data[sf])}</Badge> : null; })()}
@@ -1038,9 +1063,10 @@ function GridView({ plugin, entity, records, onEdit, onDelete, accent, selected,
 
 /* ---------- Kanban view with drag-and-drop ---------- */
 
-function KanbanView({ entity, view, records, plugin, onEdit, accent }: {
+function KanbanView({ entity, view, records, plugin, onEdit, accent, getRecordsForEntity }: {
     entity: EntityDef; view: ViewDef; records: PluginRecord[];
     plugin: PluginManifest; onEdit: (r: PluginRecord) => void; accent: string;
+    getRecordsForEntity: (entityId: string) => PluginRecord[];
 }) {
     const groupKey = view.groupBy ?? entity.statusField ?? "";
 
@@ -1053,12 +1079,11 @@ function KanbanView({ entity, view, records, plugin, onEdit, accent }: {
         Array.from(new Set(records.map((r) => (r.data[groupKey] as string) || ""))).filter(Boolean);
 
     const [dragOver, setDragOver] = useState<string | null>(null);
-
+    const { upsertRecord } = usePluginContext();
     const moveTo = (id: string, status: string) => {
-        // Look up from full record store so drop works even when cards are filtered
-        const all = getRecords(plugin.id, entity.id);
+        const all = getRecordsForEntity(entity.id);
         const r = all.find((x) => x.id === id);
-        if (r) upsertRecord(plugin.id, { ...r, data: { ...r.data, [groupKey]: status } });
+        if (r) upsertRecord({ ...r, data: { ...r.data, [groupKey]: status } });
     };
 
     return (
@@ -1101,7 +1126,7 @@ function KanbanView({ entity, view, records, plugin, onEdit, accent }: {
                                                 ? new Date(r.data[f.key] as string).toLocaleDateString()
                                                 : f.type === "rating"
                                                     ? "★".repeat(Number(r.data[f.key]))
-                                                    : renderCell(f, r.data[f.key], plugin)}
+                                                    : renderCell(f, r.data[f.key], plugin, getRecordsForEntity)}
                                         </div>
                                     ))}
                                 </div>
@@ -1189,6 +1214,7 @@ function CalendarView({ entity, view, records, onEdit, accent }: {
 function GalleryView({ plugin, entity, records, onEdit, accent }: {
     plugin: PluginManifest; entity: EntityDef; records: PluginRecord[]; onEdit: (r: PluginRecord) => void; accent: string;
 }) {
+    const { getRecordsForEntity } = usePluginContext()
     const subtitleField = entity.fields.slice(1, 2)[0];
     return (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -1203,7 +1229,7 @@ function GalleryView({ plugin, entity, records, onEdit, accent }: {
                         <div className="font-medium text-sm truncate">{String(r.data[entity.titleField] ?? "Untitled")}</div>
                         {subtitleField && (
                             <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                                {renderCell(subtitleField, r.data[subtitleField.key], plugin)}
+                                {renderCell(subtitleField, r.data[subtitleField.key], plugin, getRecordsForEntity)}
                             </div>
                         )}
                     </div>
@@ -1218,6 +1244,7 @@ function GalleryView({ plugin, entity, records, onEdit, accent }: {
 function TimelineView({ plugin, entity, view, records, onEdit, accent }: {
     plugin: PluginManifest; entity: EntityDef; view: ViewDef; records: PluginRecord[]; onEdit: (r: PluginRecord) => void; accent: string;
 }) {
+    const { getRecordsForEntity } = usePluginContext()
     const key = pickDateField(entity, view);
     const sorted = [...records]
         .map((r) => ({ r, t: key ? new Date(r.data[key] as string).getTime() : +new Date(r.createdAt) }))
@@ -1237,7 +1264,7 @@ function TimelineView({ plugin, entity, view, records, onEdit, accent }: {
                                 <div className="font-medium text-sm mt-0.5">{String(r.data[entity.titleField] ?? "Untitled")}</div>
                                 {entity.fields.slice(1, 3).filter((f) => r.data[f.key] != null && r.data[f.key] !== "").map((f) => (
                                     <div key={f.id} className="text-xs text-muted-foreground mt-0.5">
-                                        {f.label}: {renderCell(f, r.data[f.key], plugin)}
+                                        {f.label}: {renderCell(f, r.data[f.key], plugin, getRecordsForEntity)}
                                     </div>
                                 ))}
                             </Card>
@@ -1333,7 +1360,8 @@ function PageBlockRender({ plugin, block }: { plugin: PluginManifest; block: Pag
 }
 
 function EmbeddedView({ plugin, entity }: { plugin: PluginManifest; entity: EntityDef }) {
-    const records = useRecords(plugin.id, entity.id);
+    const { getRecordsForEntity } = usePluginContext();
+    const records = getRecordsForEntity(entity.id);
     const sf = entity.statusField;
     return (
         <div className="text-sm space-y-1">

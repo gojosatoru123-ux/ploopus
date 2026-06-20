@@ -1,4 +1,4 @@
-import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, NOTES_DIR, SLIDEDECK_FILE, MEDIA_DIR } from "./constants";
+import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, NOTES_DIR, SLIDEDECK_FILE, MEDIA_DIR, PLUGINS_DIR, PLUGINS_INDEXES_FILE, PLUGINS_NOTIFICATIONS_FILE } from "./constants";
 import { CalendarEvent, FlashcardDeck, Folder, NoteBlock, NoteIndex } from "./types";
 
 export type SyncStatus = "synced" | "syncing" | "fetching" | "error" | "offline" | "nocloud";
@@ -63,6 +63,7 @@ export const StorageEngine = {
       const root = await getRoot();
       try {
         await root.getDirectoryHandle(NOTES_DIR, { create: true });
+        await root.getDirectoryHandle(PLUGINS_DIR, { create: true });
 
         // Load the journal (manifest)
         const localManifest = await this._readLocal(MANIFEST_FILE);
@@ -85,7 +86,7 @@ export const StorageEngine = {
   /**
    * INTERNAL: Orchestrates the write cycle
    */
-  async _performWrite(fileName: string, data: any, isNote: boolean) {
+  async _performWrite(fileName: string, data: any, isNote: boolean, isPlugin: boolean) {
     await this.init();
     try {
       const now = Date.now();
@@ -96,7 +97,7 @@ export const StorageEngine = {
       manifest[fileName].dirty = true;
 
       // Atomic OPFS Write
-      await this._saveToLocal(fileName, data, isNote);
+      await this._saveToLocal(fileName, data, isNote, isPlugin);
       await this._persistManifest();
 
       // Cloud Logic Branch
@@ -126,7 +127,7 @@ export const StorageEngine = {
 
         if (cloudData && cloudData.ts > manifest[fileName].ts) {
           finalData = await ConflictManager.resolve(fileName, data, cloudData);
-          await this._saveToLocal(fileName, finalData, fileName !== MANIFEST_FILE);
+          await this._saveToLocal(fileName, finalData, fileName !== MANIFEST_FILE, fileName !== MANIFEST_FILE);
         }
 
         const result = await CloudProvider.upload(fileName, finalData);
@@ -148,10 +149,10 @@ export const StorageEngine = {
   /**
    * LOW-LEVEL OPFS ACCESSORS
    */
-  async _saveToLocal(fileName: string, data: any, isNote: boolean) {
+  async _saveToLocal(fileName: string, data: any, isNote: boolean, isPlugin: boolean) {
     const root = await getRoot();
-    const dir = isNote ? await root.getDirectoryHandle(NOTES_DIR) : root;
-    const name = isNote && !fileName.endsWith('.json') ? `${fileName}.json` : fileName;
+    const dir = isNote ? await root.getDirectoryHandle(NOTES_DIR) : isPlugin ? await root.getDirectoryHandle(PLUGINS_DIR) : root;
+    const name = (isNote || isPlugin) && !fileName.endsWith('.json') ? `${fileName}.json` : fileName;
 
     const handle = await dir.getFileHandle(name, { create: true });
     const writable = await handle.createWritable();
@@ -159,11 +160,11 @@ export const StorageEngine = {
     await writable.close(); // Crucial for handle release
   },
 
-  async _readLocal(fileName: string, isNote: boolean = false) {
+  async _readLocal(fileName: string, isNote: boolean = false, isPlugin: boolean = false) {
     try {
       const root = await getRoot();
-      const dir = isNote ? await root.getDirectoryHandle(NOTES_DIR) : root;
-      const name = isNote && !fileName.endsWith('.json') ? `${fileName}.json` : fileName;
+      const dir = isNote ? await root.getDirectoryHandle(NOTES_DIR) : isPlugin ? await root.getDirectoryHandle(PLUGINS_DIR) : root;
+      const name = (isNote || isPlugin) && !fileName.endsWith('.json') ? `${fileName}.json` : fileName;
       const h = await dir.getFileHandle(name);
       return JSON.parse(await (await h.getFile()).text());
     } catch { return null; }
@@ -184,6 +185,8 @@ export const StorageEngine = {
   async loadFolders(): Promise<Folder[]> { return await this._readLocal(FOLDERS_FILE) || []; },
   async loadCalendars(): Promise<CalendarEvent[]> { return await this._readLocal(CALENDAR_FILE) || []; },
   async loadDecks(): Promise<FlashcardDeck[]> { return await this._readLocal(SLIDEDECK_FILE) || []; },
+  async loadPluginIndexes(): Promise<any[]> { return await this._readLocal(PLUGINS_INDEXES_FILE) || []; },
+  async loadPluginNotificationsFile(): Promise<any[]> { return await this._readLocal(PLUGINS_NOTIFICATIONS_FILE) || []; },
 
   async loadNoteBlocks(id: string): Promise<NoteBlock[]> {
     const local = await this._readLocal(id, true);
@@ -191,25 +194,34 @@ export const StorageEngine = {
     return [{ id: crypto.randomUUID(), type: "text", content: "" }];
   },
 
+  async loadPluginData(id: string): Promise<any[]> {
+    const local = await this._readLocal(id, false, true);
+    if (local) return local;
+    return [];
+  },
+
   /**
    * ORIGINAL PUBLIC DEBOUNCED WRITERS
    */
-  saveIndexesDebounced(i: NoteIndex[]) { this._writeFile(INDEXES_FILE, i, false); },
-  saveFoldersDebounced(f: Folder[]) { this._writeFile(FOLDERS_FILE, f, false); },
-  saveNoteBlocksDebounced(id: string, b: NoteBlock[]) { this._writeFile(id, b, true); },
-  saveCalendarDebounced(c: CalendarEvent[]) { this._writeFile(CALENDAR_FILE, c, false); },
-  saveSlideDebounced(d: FlashcardDeck[]) { this._writeFile(SLIDEDECK_FILE, d, false); },
+  saveIndexesDebounced(i: NoteIndex[]) { this._writeFile(INDEXES_FILE, i, false, false); },
+  saveFoldersDebounced(f: Folder[]) { this._writeFile(FOLDERS_FILE, f, false, false); },
+  saveNoteBlocksDebounced(id: string, b: NoteBlock[]) { this._writeFile(id, b, true, false); },
+  saveCalendarDebounced(c: CalendarEvent[]) { this._writeFile(CALENDAR_FILE, c, false, false); },
+  saveSlideDebounced(d: FlashcardDeck[]) { this._writeFile(SLIDEDECK_FILE, d, false, false); },
+  savePluginIndexesDebounced(i: any[]) { this._writeFile(PLUGINS_INDEXES_FILE, i, false, false); },
+  savePluginNotificationsDebounced(i: any[]) { this._writeFile(PLUGINS_NOTIFICATIONS_FILE, i, false, false); },
+  savePluginDataDebounced(id: string, d: any[]) { this._writeFile(id, d, false, true); },
 
   /**
    * INTERNAL COORDINATOR
    */
-  _writeFile(name: string, data: any, isNote: boolean) {
+  _writeFile(name: string, data: any, isNote: boolean, isPlugin: boolean) {
     if (saveTimeouts.has(name)) {
       clearTimeout(saveTimeouts.get(name));
     }
 
     const timeout = setTimeout(() => {
-      this._performWrite(name, data, isNote);
+      this._performWrite(name, data, isNote, isPlugin);
       saveTimeouts.delete(name);
     }, 800);
 
@@ -245,6 +257,29 @@ export const StorageEngine = {
       this._emitStatus(CloudProvider.isEnabled ? "synced" : "nocloud");
     } catch (e) {
       console.warn(`Local file ${id} was already removed or doesn't exist.`);
+    } finally {
+      this._emitProgress(0, 0);
+    }
+  },
+
+  async deletePluginFile(id: string) {
+    await this.init()
+    try {
+      this._emitProgress(1, 1);
+      const root = await getRoot();
+      const dir = await root.getDirectoryHandle(PLUGINS_DIR);
+      await dir.removeEntry(`${id}.json`);
+
+      const cloudId = manifest[id]?.id;
+      delete manifest[id];
+      await this._persistManifest();
+
+      if (CloudProvider.isEnabled && cloudId) {
+        await CloudProvider.delete(cloudId);
+      }
+      this._emitStatus(CloudProvider.isEnabled ? "synced" : "nocloud");
+    } catch (e) {
+      console.warn(`Local plugin file ${id} was already removed or doesn't exist.`);
     } finally {
       this._emitProgress(0, 0);
     }
