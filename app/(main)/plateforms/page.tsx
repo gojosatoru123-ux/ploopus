@@ -19,6 +19,8 @@ import { BUILTIN_PLUGINS } from "@/lib/plugins/builtins";
 import { toast } from "sonner";
 import type { PluginManifest } from "@/lib/plugins/types";
 import { usePluginContext } from "@/contexts/PluginsContext";
+import { useRouter } from "next/navigation";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 const CATEGORIES = [
     "all", "work", "personal", "fitness", "finance",
@@ -47,7 +49,7 @@ export default function PlatformPage() {
     } = usePluginContext();
 
     const reminders = getDueReminders();
-    const [openId, setOpenId] = useState<string | null>(null);
+    const router = useRouter();
     const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("all");
     const [marketSearch, setMarketSearch] = useState("");
     const [globalQuery, setGlobalQuery] = useState("");
@@ -58,6 +60,10 @@ export default function PlatformPage() {
     const [urlInput, setUrlInput] = useState("");
     const [urlInstalling, setUrlInstalling] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
+
+    const handlePluginRoute = (id: string) => {
+        router.push(`/plateforms/${id}`)
+    }
 
     // Global keyboard shortcut: Ctrl/Cmd + K
     useEffect(() => {
@@ -86,10 +92,8 @@ export default function PlatformPage() {
         if (!isInitialized || hashInstallRan.current) return;
         hashInstallRan.current = true;
         const m = tryInstallFromHash();
-        if (m) { toast.success(`Installed "${m.name}" from share link`); setOpenId(m.id); }
+        if (m) { toast.success(`Installed "${m.name}" from share link`); handlePluginRoute(m.id); }
     }, [isInitialized, tryInstallFromHash]);
-
-    const open = installed.find((p) => p.id === openId);
 
     const filteredMarketplace = useMemo(() => {
         return BUILTIN_PLUGINS.filter((p) => {
@@ -126,29 +130,13 @@ export default function PlatformPage() {
             toast.success(`Installed "${m.name}" from URL`);
             setUrlDialogOpen(false);
             setUrlInput("");
-            setOpenId(m.id);
+            handlePluginRoute(m.id);
         }
         // On failure, installError is set by the hook and rendered in the dialog below.
     };
 
     const unreadCount = notifications.filter((n) => !n.read).length;
     const overdueReminders = reminders.filter((r) => r.overdue);
-
-    // If a plugin is open, render the runner full-screen
-    if (open) {
-        return (
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="border-b bg-card/80 backdrop-blur-sm px-6 py-3 flex items-center gap-3 sticky top-0 z-10">
-                    <Button variant="ghost" size="sm" onClick={() => setOpenId(null)} className="rounded-full">
-                        <ArrowLeft className="w-4 h-4" /> All plugins
-                    </Button>
-                    <span className="text-muted-foreground/40">·</span>
-                    <span className="text-sm font-medium">{open.icon} {open.name}</span>
-                </div>
-                <PluginRunner plugin={open} />
-            </div>
-        );
-    }
 
     return (
         <div className="flex-1 overflow-y-auto bg-background">
@@ -193,7 +181,7 @@ export default function PlatformPage() {
                                 )}
                                 {globalHits.map((h) => (
                                     <button key={`${h.pluginId}:${h.recordId}`}
-                                        onClick={() => { setOpenId(h.pluginId); setGlobalOpen(false); setGlobalQuery(""); }}
+                                        onClick={() => { handlePluginRoute(h.pluginId); setGlobalOpen(false); setGlobalQuery(""); }}
                                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition text-left">
                                         <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
                                             style={{ background: `${h.accent}22` }}>{h.pluginIcon}</span>
@@ -259,7 +247,7 @@ export default function PlatformPage() {
                                         Reminders
                                     </div>
                                     {reminders.slice(0, 10).map((r) => (
-                                        <button key={r.id} onClick={() => { setOpenId(r.pluginId); setNotifOpen(false); }}
+                                        <button key={r.id} onClick={() => { handlePluginRoute(r.pluginId); setNotifOpen(false); }}
                                             className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/50 transition text-left">
                                             <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
                                                 style={{ background: `${r.accent}22` }}>{r.pluginIcon}</span>
@@ -284,7 +272,7 @@ export default function PlatformPage() {
                             )}
                             {notifications.slice(0, 50).map((n) => (
                                 <button key={n.id}
-                                    onClick={() => { markNotificationRead(n.id); if (n.pluginId) setOpenId(n.pluginId); setNotifOpen(false); }}
+                                    onClick={() => { markNotificationRead(n.id); if (n.pluginId) handlePluginRoute(n.pluginId); setNotifOpen(false); }}
                                     className={`w-full flex items-start gap-3 px-5 py-3 hover:bg-muted/50 transition text-left ${n.read ? "opacity-50" : ""}`}>
                                     {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />}
                                     {n.read && <span className="w-1.5 h-1.5 shrink-0" />}
@@ -370,20 +358,21 @@ export default function PlatformPage() {
                 </DialogContent>
             </Dialog>
 
-            <div className="max-w-6xl mx-auto p-5 sm:p-10 space-y-8">
+            <div className="max-w-7xl mx-auto p-2 sm:p-8 space-y-8">
                 {/* Page header */}
-                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                    className="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                        <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">
-                            <Sparkles className="w-3 h-3" /> Extensible platform
+                <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-between flex-wrap border-b border-border pb-4 pt-2">
+                    <div className="flex items-center gap-4">
+                        <SidebarTrigger />
+                        <div>
+                            <h1 className="text-3xl font-semibold tracking-tight">Plugins</h1>
+                            <p className="text-muted-foreground text-sm">
+                                Turn your workspace into anything you imagine — no code required.
+                            </p>
                         </div>
-                        <h1 className="text-4xl font-semibold tracking-tight">Plugins</h1>
-                        <p className="text-muted-foreground max-w-xl mt-2 text-sm">
-                            Turn your workspace into a CRM, research hub, or anything you imagine — no code required.
-                        </p>
                     </div>
-
                     {/* Top-right actions */}
                     <div className="flex items-center gap-2 flex-wrap">
                         {/* Global search trigger */}
@@ -415,7 +404,7 @@ export default function PlatformPage() {
                         >
                             <LinkIcon className="w-4 h-4" /> Install from URL
                         </Button>
-                        <PluginBuilder onCreated={(m) => setOpenId(m.id)} />
+                        <PluginBuilder onCreated={(m) => handlePluginRoute(m.id)} />
                     </div>
                 </motion.div>
 
@@ -462,7 +451,7 @@ export default function PlatformPage() {
                                             Build your own with the visual builder, or browse the Marketplace to install one instantly.
                                         </p>
                                         <div className="flex gap-2 justify-center flex-wrap">
-                                            <PluginBuilder onCreated={(m) => setOpenId(m.id)} />
+                                            <PluginBuilder onCreated={(m) => handlePluginRoute(m.id)} />
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -474,7 +463,7 @@ export default function PlatformPage() {
                                         <PluginCard
                                             plugin={p}
                                             actionLabel="Open"
-                                            onAction={() => setOpenId(p.id)}
+                                            onAction={() => handlePluginRoute(p.id)}
                                             onExport={() => {
                                                 const payload = exportPlugin(p.id);
                                                 const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
