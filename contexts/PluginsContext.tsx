@@ -1,7 +1,6 @@
 'use client';
 import { createContext, useContext, ReactNode } from "react";
-import { usePlugin, SearchHit } from "@/hooks/usePlugins";
-import { PluginManifest, PluginNotification, PluginRecord, ReminderHit } from "@/lib/plugins/types";
+import { usePlugin } from "@/hooks/usePlugins";
 
 type PluginContextType = ReturnType<typeof usePlugin>;
 

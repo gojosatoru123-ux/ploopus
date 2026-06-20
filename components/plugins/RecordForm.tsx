@@ -77,7 +77,19 @@ export default function RecordForm({ entity, plugin, initial, onSubmit, onCancel
             setErrors(nextErrors);
             return;
         }
-        onSubmit(data);
+
+        // Formula fields are display-only in this form (computed live from
+        // other fields, never typed into directly), so they never went through
+        // set() and are missing from `data`. Compute them here, right before
+        // saving, so the stored record actually has a value — otherwise every
+        // other view (table, kanban, widgets, filters) sees `undefined`.
+        const finalData = { ...data };
+        for (const f of entity.fields) {
+            if (f.type === "formula" && f.formula) {
+                finalData[f.key] = evalFormula(f.formula, finalData);
+            }
+        }
+        onSubmit(finalData);
     };
 
     return (

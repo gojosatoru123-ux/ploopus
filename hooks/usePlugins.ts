@@ -12,30 +12,6 @@ import {
 import { StorageEngine } from "@/lib/storage-engine";
 import { applyTemplate, matchOperator } from "@/lib/plugins/formula";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface TrashEntry {
-    record: PluginRecord;
-    deletedAt: string;
-}
-
-export interface SearchHit {
-    pluginId: string;
-    pluginName: string;
-    pluginIcon: string;
-    accent: string;
-    entityId: string;
-    entityName: string;
-    entityIcon: string;
-    recordId: string;
-    title: string;
-    snippet: string;
-}
-
-const SEARCHABLE_TYPES = new Set([
-    "text", "longtext", "email", "url", "select", "multiselect", "tags",
-]);
-
 // ─── Workflow helpers (pure — no storage access, take state as args) ──────────
 
 function conditionsPass(
@@ -216,7 +192,6 @@ export const usePlugin = () => {
     const [pluginIndexes, setPluginIndexes] = useState<PluginManifest[]>([]);
     const [notifications, setNotifications] = useState<PluginNotification[]>([]);
     const [records, setRecords] = useState<PluginRecord[]>([]);
-    const [trash, setTrash] = useState<TrashEntry[]>([]);
     const [activePluginId, setActivePluginId] = useState<string | null>(null);
     const [isInitialized, setIsInitialized] = useState(false);
     const [isRecordsLoading, setIsRecordsLoading] = useState(false);
@@ -303,7 +278,7 @@ export const usePlugin = () => {
         try {
             const data = await StorageEngine.loadPluginData(pluginId);
             setRecords(data);
-            setTrash([]);
+            // setTrash([]);
         } catch (err) {
             console.error(`[usePlugin] Failed to load records for ${pluginId}:`, err);
             setRecords([]);
@@ -333,22 +308,11 @@ export const usePlugin = () => {
         setPluginIndexes((prev) => prev.filter((p) => p.id !== pluginId));
         if (activePluginId === pluginId) {
             setRecords([]);
-            setTrash([]);
+            // setTrash([]);
             setActivePluginId(null);
         }
         if (wipeData) StorageEngine.deletePluginFile(pluginId);
     }, [activePluginId]);
-
-    const getPlugin = useCallback(
-        (pluginId: string): PluginManifest | undefined =>
-            pluginIndexesRef.current.find((p) => p.id === pluginId),
-        [],
-    );
-
-    const getRecentPlugins = useCallback(
-        (limit = 5): PluginManifest[] => pluginIndexes.slice(0, limit),
-        [pluginIndexes],
-    );
 
     const duplicatePlugin = useCallback(
         (pluginId: string): PluginManifest | null => {
@@ -403,12 +367,9 @@ export const usePlugin = () => {
     const deleteRecord = useCallback(
         (recordId: string) => {
             const plugin = pluginIndexesRef.current.find((p) => p.id === activePluginId);
-            const now = new Date().toISOString();
-
             const record = recordsRef.current.find((r) => r.id === recordId);
-            if (record) {
-                setTrash((t) => [{ record, deletedAt: now }, ...t].slice(0, 50));
-                if (plugin) runWorkflowsForDelete(plugin, record, _addNotificationRaw);
+            if (record && plugin) {
+                runWorkflowsForDelete(plugin, record, _addNotificationRaw);
             }
             setRecords((prev) => prev.filter((r) => r.id !== recordId));
         },
@@ -420,13 +381,8 @@ export const usePlugin = () => {
             if (!recordIds.length) return;
             const plugin = pluginIndexesRef.current.find((p) => p.id === activePluginId);
             const ids = new Set(recordIds);
-            const now = new Date().toISOString();
-
-            const toDelete = recordsRef.current.filter((r) => ids.has(r.id));
-            setTrash((t) =>
-                [...toDelete.map((record) => ({ record, deletedAt: now })), ...t].slice(0, 50)
-            );
             if (plugin) {
+                const toDelete = recordsRef.current.filter((r) => ids.has(r.id));
                 for (const r of toDelete) runWorkflowsForDelete(plugin, r, _addNotificationRaw);
             }
             setRecords((prev) => prev.filter((r) => !ids.has(r.id)));
@@ -462,37 +418,7 @@ export const usePlugin = () => {
 
     // ─── 7. Trash / undo ────────────────────────────────────────────────────────
 
-    const restoreRecord = useCallback((recordId: string): boolean => {
-        const entry = trash.find((t) => t.record.id === recordId);
-        if (!entry) return false;
-        setTrash((prev) => prev.filter((t) => t.record.id !== recordId));
-        setRecords((prev) =>
-            prev.some((r) => r.id === entry.record.id) ? prev : [entry.record, ...prev]
-        );
-        return true;
-    }, [trash]);
-
-    const restoreRecords = useCallback((recordIds: string[]): number => {
-        const toRestore = trash.filter((t) => recordIds.includes(t.record.id));
-        setTrash((prev) => prev.filter((t) => !recordIds.includes(t.record.id)));
-        setRecords((prev) => {
-            const existing = new Set(prev.map((r) => r.id));
-            const additions = toRestore
-                .map((t) => t.record)
-                .filter((r) => !existing.has(r.id));
-            return [...additions, ...prev];
-        });
-        return toRestore.length;
-    }, [trash]);
-
     // ─── 8. Notification actions ─────────────────────────────────────────────────
-
-    const addNotification = useCallback(
-        (n: Omit<PluginNotification, "id" | "createdAt" | "read">) => {
-            _addNotificationRaw(n);
-        },
-        [_addNotificationRaw],
-    );
 
     const markNotificationRead = useCallback((id: string, read = true) => {
         setNotifications((prev) =>
@@ -511,12 +437,6 @@ export const usePlugin = () => {
             pluginId ? prev.filter((n) => n.pluginId !== pluginId) : []
         );
     }, []);
-
-    const getNotificationsForPlugin = useCallback(
-        (pluginId: string): PluginNotification[] =>
-            notifications.filter((n) => n.pluginId === pluginId),
-        [notifications],
-    );
 
     // ─── 9. Export / import / share ─────────────────────────────────────────────
 
@@ -712,14 +632,11 @@ export const usePlugin = () => {
         pluginIndexes,
         notifications,
         records,
-        trash,
         installError,
         // Plugin manifest
         installPlugin,
-        updatePlugin,
+        updatePlugin, //WIP
         uninstallPlugin,
-        getPlugin,
-        getRecentPlugins,
         duplicatePlugin,
         // Records
         loadPluginRecords,
@@ -728,15 +645,10 @@ export const usePlugin = () => {
         bulkDeleteRecords,
         bulkUpdateRecords,
         getRecordsForEntity,
-        // Trash
-        restoreRecord,
-        restoreRecords,
         // Notifications
-        addNotification,
         markNotificationRead,
         markAllNotificationsRead,
         clearNotifications,
-        getNotificationsForPlugin,
         // Export / import / share
         exportPlugin,
         importPlugin,

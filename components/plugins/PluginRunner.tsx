@@ -105,20 +105,13 @@ const OP_LABELS: Record<FilterOp, string> = {
 
 export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
     const {
-        records,
         notifications: allNotifications,
-        upsertRecord,
-        deleteRecord,
-        bulkDeleteRecords,
-        bulkUpdateRecords,
-        restoreRecords,
         markAllNotificationsRead,
         duplicatePlugin,
         exportPlugin,
         buildShareLink,
         uninstallPlugin,
-        loadPluginRecords,
-        getRecordsForEntity,
+        loadPluginRecords
     } = usePluginContext();
 
     // Load this plugin's records when it mounts
@@ -217,7 +210,7 @@ export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
                                 <Copy className="w-4 h-4" /> Fork
                             </Button>
                             <Button variant="outline" size="sm" className="rounded-full"
-                                onClick={() => downloadJSON(`${plugin.slug}.plugin.json`, exportPlugin(plugin.id))}>
+                                onClick={async () => downloadJSON(`${plugin.slug}.plugin.json`, await exportPlugin(plugin.id))}>
                                 <Download className="w-4 h-4" /> Export
                             </Button>
                             {!plugin.builtin && (
@@ -502,7 +495,7 @@ type SortState = { key: string; dir: "asc" | "desc" } | null;
 
 function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: EntityDef }) {
     const { getRecordsForEntity, upsertRecord, deleteRecord, bulkDeleteRecords,
-        bulkUpdateRecords, restoreRecords } = usePluginContext();
+        bulkUpdateRecords } = usePluginContext();
     const allRecords = getRecordsForEntity(entity.id);
     const views = plugin.views.filter((v) => v.entityId === entity.id);
     const [activeView, setActiveView] = useState<ViewDef | undefined>(views[0]);
@@ -544,24 +537,14 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
 
     const handleDelete = useCallback((id: string) => {
         deleteRecord(id);
-        toast(`${entity.name} deleted`, {
-            action: { label: "Undo", onClick: () => { restoreRecords([id]); toast.success("Restored"); } },
-        });
+        toast(`${entity.name} deleted`);
     }, [plugin.id, entity.name]);
 
     const handleBulkDelete = useCallback(() => {
         const ids = [...selected];
         bulkDeleteRecords(ids);
         clearSel();
-        toast(`${ids.length} ${entity.plural.toLowerCase()} deleted`, {
-            action: {
-                label: "Undo", onClick: () => {
-                    // restoreRecords(plugin.id, ids);
-                    restoreRecords(ids);
-                    toast.success(`${ids.length} restored`);
-                },
-            },
-        });
+        toast(`${ids.length} ${entity.plural.toLowerCase()} deleted`);
     }, [selected, plugin.id, entity]);
 
     const statusField = entity.fields.find((f) => f.key === entity.statusField);
@@ -885,7 +868,7 @@ function TableView({ plugin, entity, records, onEdit, onDelete, selected, onTogg
                         {records.map((r) => {
                             const isSelected = selected.has(r.id);
                             return (
-                                <tr key={r.id} className={`border-t transition ${isSelected ? "bg-primary/5" : "hover:bg-muted/30"}`}>
+                                <tr key={r.id} className={`border-t transition group ${isSelected ? "bg-primary/5" : "hover:bg-muted/30"}`}>
                                     <td className="px-3 py-2.5">
                                         <button onClick={() => onToggleSelect(r.id)} className="text-muted-foreground hover:text-foreground">
                                             {isSelected ? <CheckSquare className="w-4 h-4 text-primary" /> : <Square className="w-4 h-4" />}
@@ -1320,7 +1303,7 @@ function FeedView({ entity, records, onEdit, accent }: {
 
 function PagePanel({ plugin, page }: { plugin: PluginManifest; page: PageDef }) {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-2 border-red-500">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {page.blocks.map((block) => {
                 const span = block.span === 3 ? "md:col-span-3" : block.span === 2 ? "md:col-span-2" : "md:col-span-1";
                 return (

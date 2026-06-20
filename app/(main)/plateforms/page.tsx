@@ -374,8 +374,8 @@ export default function PlatformPage() {
                                             plugin={p}
                                             actionLabel="Open"
                                             onAction={() => handlePluginRoute(p.id)}
-                                            onExport={() => {
-                                                const payload = exportPlugin(p.id);
+                                            onExport={async () => {
+                                                const payload = await exportPlugin(p.id);
                                                 const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
                                                 const url = URL.createObjectURL(blob);
                                                 Object.assign(document.createElement("a"), { href: url, download: `${p.slug}.plugin.json` }).click();
