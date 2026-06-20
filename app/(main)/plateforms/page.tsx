@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import PluginRunner from "@/components/plugins/PluginRunner";
 import PluginBuilder from "@/components/plugins/PluginBuilder";
 import { BUILTIN_PLUGINS } from "@/lib/plugins/builtins";
 import { toast } from "sonner";
@@ -22,10 +21,7 @@ import { usePluginContext } from "@/contexts/PluginsContext";
 import { useRouter } from "next/navigation";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
-const CATEGORIES = [
-    "all", "work", "personal", "fitness", "finance",
-    "research", "creative", "productivity",
-] as const;
+const CATEGORIES = ["all", "work", "personal", "fitness", "finance", "research", "creative", "productivity",] as const;
 
 export default function PlatformPage() {
     const {
@@ -43,7 +39,6 @@ export default function PlatformPage() {
         markNotificationRead,
         markAllNotificationsRead,
         clearNotifications,
-        searchRecords: searchAll,
         getDueReminders,
         isInitialized,
     } = usePluginContext();
@@ -52,8 +47,6 @@ export default function PlatformPage() {
     const router = useRouter();
     const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("all");
     const [marketSearch, setMarketSearch] = useState("");
-    const [globalQuery, setGlobalQuery] = useState("");
-    const [globalOpen, setGlobalOpen] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
     const [uninstallTarget, setUninstallTarget] = useState<PluginManifest | null>(null);
     const [urlDialogOpen, setUrlDialogOpen] = useState(false);
@@ -64,19 +57,6 @@ export default function PlatformPage() {
     const handlePluginRoute = (id: string) => {
         router.push(`/plateforms/${id}`)
     }
-
-    // Global keyboard shortcut: Ctrl/Cmd + K
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-                e.preventDefault();
-                setGlobalOpen((v) => !v);
-            }
-            if (e.key === "Escape") { setGlobalOpen(false); setNotifOpen(false); }
-        };
-        window.addEventListener("keydown", handler);
-        return () => window.removeEventListener("keydown", handler);
-    }, []);
 
     // Surface storage quota errors as toasts
     // useEffect(() => onStorageError((msg) => toast.error(msg)), []);
@@ -103,11 +83,6 @@ export default function PlatformPage() {
             return true;
         });
     }, [category, marketSearch]);
-
-    const globalHits = useMemo(() => {
-        if (!globalQuery.trim()) return [];
-        return searchAll(globalQuery, 20);
-    }, [globalQuery]);
 
     const handleImport = async (file: File) => {
         try {
@@ -142,63 +117,6 @@ export default function PlatformPage() {
         <div className="flex-1 overflow-y-auto bg-background">
             <input ref={fileRef} type="file" accept="application/json" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ""; }} />
-
-            {/* Global search modal */}
-            <AnimatePresence>
-                {globalOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-start justify-center pt-[12vh]"
-                        onClick={() => setGlobalOpen(false)}>
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.97, y: -8 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.97, y: -8 }}
-                            transition={{ duration: 0.15 }}
-                            className="w-full max-w-lg mx-4 bg-card rounded-2xl shadow-2xl border overflow-hidden"
-                            onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center gap-3 px-4 py-3 border-b">
-                                <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-                                <input
-                                    autoFocus
-                                    value={globalQuery}
-                                    onChange={(e) => setGlobalQuery(e.target.value)}
-                                    placeholder="Search across all plugins…"
-                                    className="flex-1 bg-transparent outline-none text-sm"
-                                />
-                                <kbd className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">ESC</kbd>
-                            </div>
-                            <div className="max-h-80 overflow-y-auto">
-                                {!globalQuery.trim() && (
-                                    <div className="py-8 text-center text-xs text-muted-foreground">
-                                        Start typing to search across all your plugin records…
-                                    </div>
-                                )}
-                                {globalQuery.trim() && globalHits.length === 0 && (
-                                    <div className="py-8 text-center text-xs text-muted-foreground">
-                                        No results found for "<strong>{globalQuery}</strong>"
-                                    </div>
-                                )}
-                                {globalHits.map((h) => (
-                                    <button key={`${h.pluginId}:${h.recordId}`}
-                                        onClick={() => { handlePluginRoute(h.pluginId); setGlobalOpen(false); setGlobalQuery(""); }}
-                                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition text-left">
-                                        <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                            style={{ background: `${h.accent}22` }}>{h.pluginIcon}</span>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="text-sm font-medium truncate">{h.title}</div>
-                                            <div className="text-xs text-muted-foreground truncate">
-                                                {h.entityIcon} {h.entityName} in {h.pluginName}
-                                            </div>
-                                        </div>
-                                        <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-                                    </button>
-                                ))}
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Notification drawer */}
             <AnimatePresence>
@@ -375,14 +293,6 @@ export default function PlatformPage() {
                     </div>
                     {/* Top-right actions */}
                     <div className="flex items-center gap-2 flex-wrap">
-                        {/* Global search trigger */}
-                        <button
-                            onClick={() => setGlobalOpen(true)}
-                            className="flex items-center gap-2 h-9 px-3 rounded-full border bg-card hover:bg-muted/50 transition text-sm text-muted-foreground">
-                            <Search className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Search records…</span>
-                            <kbd className="text-[10px] bg-muted px-1.5 py-0.5 rounded hidden sm:inline">⌘K</kbd>
-                        </button>
 
                         {/* Notifications bell */}
                         <Button variant="outline" size="icon" className="rounded-full relative" onClick={() => setNotifOpen(true)}>

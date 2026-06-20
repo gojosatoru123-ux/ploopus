@@ -665,48 +665,7 @@ export const usePlugin = () => {
 
     const clearInstallError = useCallback(() => setInstallError(null), []);
 
-    // ─── 10. Search ──────────────────────────────────────────────────────────────
-
-    const searchRecords = useCallback(
-        (query: string, limit = 30): SearchHit[] => {
-            const q = query.trim().toLowerCase();
-            if (!q || !activePluginId) return [];
-            const plugin = pluginIndexesRef.current.find((p) => p.id === activePluginId);
-            if (!plugin) return [];
-            const hits: SearchHit[] = [];
-
-            for (const entity of plugin.entities) {
-                for (const r of records.filter((r) => r.entityId === entity.id)) {
-                    const title = String(r.data[entity.titleField] ?? "Untitled");
-                    const text = entity.fields
-                        .filter((f) => SEARCHABLE_TYPES.has(f.type))
-                        .map((f) => {
-                            const v = r.data[f.key];
-                            return Array.isArray(v) ? v.join(" ") : String(v ?? "");
-                        })
-                        .join(" ");
-                    if (!`${title} ${text}`.toLowerCase().includes(q)) continue;
-                    hits.push({
-                        pluginId: plugin.id,
-                        pluginName: plugin.name,
-                        pluginIcon: plugin.icon,
-                        accent: plugin.accent,
-                        entityId: entity.id,
-                        entityName: entity.name,
-                        entityIcon: entity.icon,
-                        recordId: r.id,
-                        title,
-                        snippet: text.slice(0, 100),
-                    });
-                    if (hits.length >= limit) return hits;
-                }
-            }
-            return hits;
-        },
-        [activePluginId, records],
-    );
-
-    // ─── 11. Reminders ───────────────────────────────────────────────────────────
+    // ─── 10. Reminders ───────────────────────────────────────────────────────────
 
     const getDueReminders = useCallback((): ReminderHit[] => {
         if (!activePluginId) return [];
@@ -785,8 +744,7 @@ export const usePlugin = () => {
         tryInstallFromHash,
         installFromUrl,
         clearInstallError,
-        // Search & reminders
-        searchRecords,
+        //  reminders
         getDueReminders,
     };
 };
