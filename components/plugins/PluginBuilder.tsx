@@ -384,7 +384,14 @@ function EntityEditor({ entity, onChange, onRemove, accent, allEntities }: {
 
     const addField = () => {
         const id = crypto.randomUUID();
-        set("fields", [...entity.fields, { id, key: `field_${entity.fields.length + 1}`, label: "New field", type: "text" }]);
+        const existingKeys = new Set(entity.fields.map((f) => f.key));
+        let n = entity.fields.length + 1;
+        let key = `field_${n}`;
+        while (existingKeys.has(key)) {
+            n++;
+            key = `field_${n}`;
+        }
+        set("fields", [...entity.fields, { id, key, label: "New field", type: "text" }]);
     };
 
     const updateField = (id: string, patch: Partial<FieldDef>) => {
@@ -530,8 +537,7 @@ function FieldRow({ field, index, total, allEntities, onChange, onRemove, onMove
                 <Input
                     value={field.label}
                     onChange={(e) => onChange({
-                        label: e.target.value,
-                        key: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "_") || field.key,
+                        label: e.target.value
                     })}
                     placeholder="Field label"
                     className="rounded-lg flex-1 min-w-28 h-8 text-sm"
