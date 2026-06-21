@@ -103,6 +103,36 @@ const OP_LABELS: Record<FilterOp, string> = {
     isEmpty: "is empty", isNotEmpty: "is not empty",
 };
 
+/* ---------- Delete confirmation dialog ---------- */
+
+function ConfirmDeleteDialog({
+    open, title, description, confirmLabel = "Delete", onConfirm, onCancel,
+}: {
+    open: boolean;
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+}) {
+    return (
+        <Dialog open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-destructive">
+                        <Trash2 className="w-4 h-4" /> {title}
+                    </DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">{description}</p>
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
+                    <Button variant="destructive" size="sm" onClick={onConfirm}>{confirmLabel}</Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 /* ---------- PluginRunner root ---------- */
 
 export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
@@ -138,6 +168,7 @@ export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
     const notifications = allNotifications.filter(n => n.pluginId === plugin.id);
     const unread = notifications.filter((n) => !n.read).length;
     const [notifOpen, setNotifOpen] = useState(false);
+    const [uninstallConfirmOpen, setUninstallConfirmOpen] = useState(false);
 
     return (
         <div className="flex-1 overflow-y-auto bg-background">
@@ -202,10 +233,18 @@ export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
                             </Button>
                             {!plugin.builtin && (
                                 <Button variant="ghost" size="sm" className="rounded-full text-destructive hover:text-destructive"
-                                    onClick={() => { if (confirm(`Uninstall ${plugin.name}? Records will be deleted.`)) uninstallPlugin(plugin.id); }}>
+                                    onClick={() => setUninstallConfirmOpen(true)}>
                                     <Trash className="w-4 h-4" /> Uninstall
                                 </Button>
                             )}
+                            <ConfirmDeleteDialog
+                                open={uninstallConfirmOpen}
+                                title={`Uninstall ${plugin.name}?`}
+                                description="Records will be deleted. This action cannot be undone."
+                                confirmLabel="Uninstall"
+                                onCancel={() => setUninstallConfirmOpen(false)}
+                                onConfirm={() => { setUninstallConfirmOpen(false); uninstallPlugin(plugin.id); }}
+                            />
                         </div>
                     </div>
                 </motion.div>
@@ -511,6 +550,8 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
     const [sort, setSort] = useState<SortState>(null);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [showFilters, setShowFilters] = useState(false);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+    const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
 
     // Column visibility for table view
     const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set());
@@ -541,15 +582,27 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
     };
 
     const handleDelete = useCallback((id: string) => {
-        deleteRecord(id);
-        toast(`${entity.name} deleted`);
-    }, [plugin.id, entity.name]);
+        setDeleteConfirmId(id);
+    }, []);
+
+    const confirmDelete = useCallback(() => {
+        if (deleteConfirmId) {
+            deleteRecord(deleteConfirmId);
+            toast(`${entity.name} deleted`);
+        }
+        setDeleteConfirmId(null);
+    }, [deleteConfirmId, plugin.id, entity.name]);
 
     const handleBulkDelete = useCallback(() => {
+        setBulkDeleteConfirmOpen(true);
+    }, []);
+
+    const confirmBulkDelete = useCallback(() => {
         const ids = [...selected];
         bulkDeleteRecords(ids);
         clearSel();
         toast(`${ids.length} ${entity.plural.toLowerCase()} deleted`);
+        setBulkDeleteConfirmOpen(false);
     }, [selected, plugin.id, entity]);
 
     const statusField = entity.fields.find((f) => f.key === entity.statusField);
@@ -758,6 +811,24 @@ function EntityPanel({ plugin, entity }: { plugin: PluginManifest; entity: Entit
                     />
                 </DialogContent>
             </Dialog>
+
+            {/* Single delete confirmation */}
+            <ConfirmDeleteDialog
+                open={!!deleteConfirmId}
+                title={`Delete ${entity.name.toLowerCase()}?`}
+                description={`This will permanently delete this ${entity.name.toLowerCase()}. This action cannot be undone.`}
+                onCancel={() => setDeleteConfirmId(null)}
+                onConfirm={confirmDelete}
+            />
+
+            {/* Bulk delete confirmation */}
+            <ConfirmDeleteDialog
+                open={bulkDeleteConfirmOpen}
+                title={`Delete ${selected.size} ${entity.plural.toLowerCase()}?`}
+                description={`This will permanently delete ${selected.size} ${entity.plural.toLowerCase()}. This action cannot be undone.`}
+                onCancel={() => setBulkDeleteConfirmOpen(false)}
+                onConfirm={confirmBulkDelete}
+            />
         </div>
     );
 }
