@@ -29,6 +29,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import RecordForm from "./RecordForm";
+import PluginNotificationDrawer from "@/components/plugins/PluginNotificationDrawer";
 import { usePluginContext } from "@/contexts/PluginsContext";
 import { matchOperator } from "@/lib/plugins/formula";
 import type {
@@ -170,41 +171,22 @@ export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
                         </div>
                         <div className="flex gap-2 flex-wrap">
                             {/* Notifications bell */}
-                            <DropdownMenu open={notifOpen} onOpenChange={setNotifOpen}>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="rounded-full relative">
-                                        <Bell className="w-4 h-4" />
-                                        {unread > 0 && (
-                                            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold bg-destructive text-white flex items-center justify-center">
-                                                {unread > 9 ? "9+" : unread}
-                                            </span>
-                                        )}
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto">
-                                    <DropdownMenuLabel className="flex items-center justify-between">
-                                        Notifications
-                                        {unread > 0 && (
-                                            <button onClick={() => markAllNotificationsRead(plugin.id)} className="text-xs text-muted-foreground hover:text-foreground">
-                                                Mark all read
-                                            </button>
-                                        )}
-                                    </DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    {notifications.length === 0 && (
-                                        <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-                                            <BellOff className="w-6 h-6 mx-auto mb-2 opacity-30" />
-                                            No notifications yet
-                                        </div>
-                                    )}
-                                    {notifications.slice(0, 20).map((n) => (
-                                        <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-0.5 py-2">
-                                            <span className={`text-xs font-medium ${n.read ? "text-muted-foreground" : ""}`}>{n.title}</span>
-                                            <span className="text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleString()}</span>
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            <Button variant="outline" size="sm" className="rounded-full relative" onClick={() => setNotifOpen(true)}>
+                                <Bell className="w-4 h-4" />
+                                {unread > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold bg-destructive text-white flex items-center justify-center">
+                                        {unread > 9 ? "9+" : unread}
+                                    </span>
+                                )}
+                            </Button>
+                            <PluginNotificationDrawer
+                                open={notifOpen}
+                                onClose={() => setNotifOpen(false)}
+                                notifications={notifications}
+                                onMarkRead={() => markAllNotificationsRead(plugin.id)}
+                                onMarkAllRead={() => markAllNotificationsRead(plugin.id)}
+                                reminders={reminders}
+                            />
 
                             <Button variant="outline" size="sm" className="rounded-full"
                                 onClick={() => { const l = buildShareLink(plugin.id); if (l) { navigator.clipboard.writeText(l); toast.success("Share link copied"); } }}>
@@ -229,41 +211,19 @@ export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
                 </motion.div>
 
                 {/* Due reminders section */}
-                {reminders.length > 0 && (
-                    <div className="border-b">
-                        <div className="px-5 pt-3 pb-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
-                            Reminders
-                        </div>
-                        {reminders.slice(0, 10).map((r) => (
-                            <button key={r.id}
-                                className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/50 transition text-left">
-                                <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                    style={{ background: `${r.accent}22` }}>{r.pluginIcon}</span>
-                                <div className="min-w-0 flex-1">
-                                    <div className="text-sm truncate">{r.label}</div>
-                                    <div className={`text-xs ${r.overdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                                        {r.overdue ? "Overdue — " : "Due "}{new Date(r.due).toLocaleDateString()}
-                                    </div>
-                                </div>
-                                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-                            </button>
-                        ))}
-                        {/* Due reminders strip (only when there are overdue items) */}
-                        {overdueReminders.length > 0 && (
-                            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                                className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-destructive/30 bg-destructive/5 text-sm">
-                                <Clock className="w-4 h-4 text-destructive shrink-0" />
-                                <span className="flex-1">
-                                    <strong>{overdueReminders.length} overdue reminder{overdueReminders.length !== 1 ? "s" : ""}</strong>
-                                    {" — "}{overdueReminders.slice(0, 2).map((r) => r.label).join(", ")}
-                                    {overdueReminders.length > 2 && ` +${overdueReminders.length - 2} more`}
-                                </span>
-                                <Button size="sm" variant="outline" className="rounded-full h-7 text-xs shrink-0">
-                                    View all
-                                </Button>
-                            </motion.div>
-                        )}
-                    </div>
+                {overdueReminders.length > 0 && (
+                    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-destructive/30 bg-destructive/5 text-sm">
+                        <Clock className="w-4 h-4 text-destructive shrink-0" />
+                        <span className="flex-1 break-all">
+                            <strong>{overdueReminders.length} overdue reminder{overdueReminders.length !== 1 ? "s" : ""}</strong>
+                            {" — "}{overdueReminders.slice(0, 2).map((r) => r.label).join(", ")}
+                            {overdueReminders.length > 2 && ` +${overdueReminders.length - 2} more`}
+                        </span>
+                        <Button size="sm" variant="outline" className="rounded-full h-7 text-xs shrink-0" onClick={() => setNotifOpen(true)}>
+                            View all
+                        </Button>
+                    </motion.div>
                 )}
 
 

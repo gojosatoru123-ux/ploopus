@@ -14,6 +14,7 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import PluginBuilder from "@/components/plugins/PluginBuilder";
+import PluginNotificationDrawer from "@/components/plugins/PluginNotificationDrawer";
 import { BUILTIN_PLUGINS } from "@/lib/plugins/builtins";
 import { toast } from "sonner";
 import type { PluginManifest } from "@/lib/plugins/types";
@@ -116,71 +117,17 @@ export default function PlatformPage() {
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ""; }} />
 
             {/* Notification drawer */}
-            <AnimatePresence>
-                {notifOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/30 backdrop-blur-[2px] flex items-start justify-end"
-                        onClick={() => setNotifOpen(false)}>
-                        <motion.div
-                            initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
-                            transition={{ type: "spring", damping: 28, stiffness: 300 }}
-                            className="fixed top-3 right-0.5 sm:right-3 bottom-3 z-50 w-full max-w-100 flex flex-col overflow-hidden"
-                            style={{
-                                background: "#FFFFFF",
-                                borderRadius: "20px",
-                                border: "0.5px solid #E2DDD8",
-                                boxShadow: "0 12px 48px -8px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.05)",
-                            }}
-                            onClick={(e) => e.stopPropagation()}>
-                            <div className="px-5 py-4 border-b flex items-center justify-between sticky top-0 bg-card z-10">
-                                <div className="flex items-center gap-2 font-semibold">
-                                    <Bell className="w-4 h-4" /> Notifications
-                                    {unreadCount > 0 && <Badge className="text-[10px] px-1.5">{unreadCount}</Badge>}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    {unreadCount > 0 && (
-                                        <button onClick={() => markAllNotificationsRead()} className="text-xs text-muted-foreground hover:text-foreground">
-                                            Mark all read
-                                        </button>
-                                    )}
-                                    {notifications.length > 0 && (
-                                        <button onClick={() => clearNotifications()} className="text-xs text-muted-foreground hover:text-destructive">
-                                            Clear all
-                                        </button>
-                                    )}
-                                    <button onClick={() => setNotifOpen(false)} className="text-muted-foreground hover:text-foreground">
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
+            <PluginNotificationDrawer
+                open={notifOpen}
+                onClose={() => setNotifOpen(false)}
+                notifications={notifications}
+                onMarkRead={markNotificationRead}
+                onMarkAllRead={markAllNotificationsRead}
+                onClearAll={clearNotifications}
+                onPluginRoute={handlePluginRoute}
+            />
 
-                            {/* Workflow notifications */}
-                            {notifications.length === 0 && (
-                                <div className="py-16 text-center">
-                                    <BellOff className="w-8 h-8 mx-auto text-muted-foreground/30 mb-3" />
-                                    <p className="text-sm text-muted-foreground">All caught up!</p>
-                                </div>
-                            )}
-                            {notifications.slice(0, 50).map((n) => (
-                                <button key={n.id}
-                                    onClick={() => { markNotificationRead(n.id); if (n.pluginId) handlePluginRoute(n.pluginId); setNotifOpen(false); }}
-                                    className={`w-full flex items-start gap-3 px-5 py-3 hover:bg-muted/50 transition text-left ${n.read ? "opacity-50" : ""}`}>
-                                    {!n.read && <span className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />}
-                                    {n.read && <span className="w-1.5 h-1.5 shrink-0" />}
-                                    <div className="min-w-0 flex-1">
-                                        <div className="text-sm">{n.title}</div>
-                                        {n.body && <div className="text-xs text-muted-foreground mt-0.5">{n.body}</div>}
-                                        <div className="text-[10px] text-muted-foreground mt-0.5">
-                                            {new Date(n.createdAt).toLocaleString()}
-                                        </div>
-                                    </div>
-                                </button>
-                            ))}
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
             {/* Uninstall confirmation dialog */}
             <Dialog open={!!uninstallTarget} onOpenChange={(o) => { if (!o) setUninstallTarget(null); }}>
