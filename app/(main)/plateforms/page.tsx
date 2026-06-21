@@ -39,11 +39,9 @@ export default function PlatformPage() {
         markNotificationRead,
         markAllNotificationsRead,
         clearNotifications,
-        getDueReminders,
         isInitialized,
     } = usePluginContext();
 
-    const reminders = getDueReminders();
     const router = useRouter();
     const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("all");
     const [marketSearch, setMarketSearch] = useState("");
@@ -111,7 +109,6 @@ export default function PlatformPage() {
     };
 
     const unreadCount = notifications.filter((n) => !n.read).length;
-    const overdueReminders = reminders.filter((r) => r.overdue);
 
     return (
         <div className="flex-1 overflow-y-auto bg-background">
@@ -158,31 +155,8 @@ export default function PlatformPage() {
                                 </div>
                             </div>
 
-                            {/* Due reminders section */}
-                            {reminders.length > 0 && (
-                                <div className="border-b">
-                                    <div className="px-5 pt-3 pb-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
-                                        Reminders
-                                    </div>
-                                    {reminders.slice(0, 10).map((r) => (
-                                        <button key={r.id} onClick={() => { handlePluginRoute(r.pluginId); setNotifOpen(false); }}
-                                            className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/50 transition text-left">
-                                            <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                                style={{ background: `${r.accent}22` }}>{r.pluginIcon}</span>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="text-sm truncate">{r.label}</div>
-                                                <div className={`text-xs ${r.overdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                                                    {r.overdue ? "Overdue — " : "Due "}{new Date(r.due).toLocaleDateString()}
-                                                </div>
-                                            </div>
-                                            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-
                             {/* Workflow notifications */}
-                            {notifications.length === 0 && reminders.length === 0 && (
+                            {notifications.length === 0 && (
                                 <div className="py-16 text-center">
                                     <BellOff className="w-8 h-8 mx-auto text-muted-foreground/30 mb-3" />
                                     <p className="text-sm text-muted-foreground">All caught up!</p>
@@ -297,9 +271,9 @@ export default function PlatformPage() {
                         {/* Notifications bell */}
                         <Button variant="outline" size="icon" className="rounded-full relative" onClick={() => setNotifOpen(true)}>
                             <Bell className="w-4 h-4" />
-                            {(unreadCount > 0 || overdueReminders.length > 0) && (
+                            {(unreadCount > 0) && (
                                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[9px] font-bold bg-destructive text-white flex items-center justify-center">
-                                    {Math.min(99, unreadCount + overdueReminders.length)}
+                                    {Math.min(99, unreadCount)}
                                 </span>
                             )}
                         </Button>
@@ -317,23 +291,6 @@ export default function PlatformPage() {
                         <PluginBuilder onCreated={(m) => handlePluginRoute(m.id)} />
                     </div>
                 </motion.div>
-
-                {/* Due reminders strip (only when there are overdue items) */}
-                {overdueReminders.length > 0 && (
-                    <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-destructive/30 bg-destructive/5 text-sm">
-                        <Clock className="w-4 h-4 text-destructive shrink-0" />
-                        <span className="flex-1">
-                            <strong>{overdueReminders.length} overdue reminder{overdueReminders.length !== 1 ? "s" : ""}</strong>
-                            {" — "}{overdueReminders.slice(0, 2).map((r) => r.label).join(", ")}
-                            {overdueReminders.length > 2 && ` +${overdueReminders.length - 2} more`}
-                        </span>
-                        <Button size="sm" variant="outline" className="rounded-full h-7 text-xs shrink-0"
-                            onClick={() => setNotifOpen(true)}>
-                            View all
-                        </Button>
-                    </motion.div>
-                )}
 
                 <Tabs defaultValue="installed">
                     <TabsList className="rounded-full p-1 h-auto bg-muted/60">

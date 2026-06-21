@@ -7,7 +7,8 @@ import {
 } from "recharts";
 import {
     ArrowUpDown, Bell, BellOff, Check, CheckSquare, ChevronDown,
-    ChevronUp, Copy, Download, Filter, Pencil, Plus, RotateCcw,
+    ChevronRight,
+    ChevronUp, Clock, Copy, Download, Filter, Pencil, Plus, RotateCcw,
     Search, Share2, SlidersHorizontal, Square, Trash, Trash2, TrendingDown,
     TrendingUp, Workflow, X,
 } from "lucide-react";
@@ -111,13 +112,17 @@ export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
         exportPlugin,
         buildShareLink,
         uninstallPlugin,
-        loadPluginRecords
+        loadPluginRecords,
+        getDueReminders
     } = usePluginContext();
 
     // Load this plugin's records when it mounts
     useEffect(() => {
         loadPluginRecords(plugin.id);
     }, [plugin.id]);
+
+    const reminders = getDueReminders();
+    const overdueReminders = reminders.filter((r) => r.overdue);
 
     const firstEntity = plugin.entities[0];
     const [tab, setTab] = useState<string>(
@@ -222,6 +227,46 @@ export default function PluginRunner({ plugin }: { plugin: PluginManifest }) {
                         </div>
                     </div>
                 </motion.div>
+
+                {/* Due reminders section */}
+                {reminders.length > 0 && (
+                    <div className="border-b">
+                        <div className="px-5 pt-3 pb-1 text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+                            Reminders
+                        </div>
+                        {reminders.slice(0, 10).map((r) => (
+                            <button key={r.id}
+                                className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/50 transition text-left">
+                                <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                    style={{ background: `${r.accent}22` }}>{r.pluginIcon}</span>
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-sm truncate">{r.label}</div>
+                                    <div className={`text-xs ${r.overdue ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                                        {r.overdue ? "Overdue — " : "Due "}{new Date(r.due).toLocaleDateString()}
+                                    </div>
+                                </div>
+                                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                            </button>
+                        ))}
+                        {/* Due reminders strip (only when there are overdue items) */}
+                        {overdueReminders.length > 0 && (
+                            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                                className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-destructive/30 bg-destructive/5 text-sm">
+                                <Clock className="w-4 h-4 text-destructive shrink-0" />
+                                <span className="flex-1">
+                                    <strong>{overdueReminders.length} overdue reminder{overdueReminders.length !== 1 ? "s" : ""}</strong>
+                                    {" — "}{overdueReminders.slice(0, 2).map((r) => r.label).join(", ")}
+                                    {overdueReminders.length > 2 && ` +${overdueReminders.length - 2} more`}
+                                </span>
+                                <Button size="sm" variant="outline" className="rounded-full h-7 text-xs shrink-0">
+                                    View all
+                                </Button>
+                            </motion.div>
+                        )}
+                    </div>
+                )}
+
+
 
                 <Tabs value={tab} onValueChange={setTab} className="space-y-6">
                     <TabsList className="flex flex-nowrap justify-start items-center w-full h-auto rounded-full bg-muted/60 p-1 gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden content-box">                        <span className="w-1 shrink-0" />

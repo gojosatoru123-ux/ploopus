@@ -1,6 +1,6 @@
 'use client';
 import { useState } from "react";
-import { ChevronDown, ChevronUp, GitBranch, Plus, Sparkles, Trash2, Wand2, Workflow, Database, Palette, X } from "lucide-react";
+import { ChevronDown, ChevronUp, GitBranch, Plus, Sparkles, Trash2, Wand2, Workflow, Database, Palette, X, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type {
     BranchCondition, EntityDef, FieldDef, FieldType, FilterOp,
-    PluginManifest, ViewDef, WidgetDef, WorkflowDef, WorkflowAction,
+    PluginManifest, ViewDef, WidgetDef, WorkflowDef, WorkflowAction, ReminderDef,
 } from "@/lib/plugins/types";
 import { toast } from "sonner";
 import { usePluginContext } from "@/contexts/PluginsContext";
@@ -113,11 +113,12 @@ export default function PluginBuilder({ onCreated }: Props) {
     const [category, setCategory] = useState<PluginManifest["category"]>("productivity");
     const [entities, setEntities] = useState<EntityDef[]>([blankEntity()]);
     const [workflows, setWorkflows] = useState<WorkflowDef[]>([]);
+    const [reminders, setReminders] = useState<ReminderDef[]>([]);
     const [activeTemplate, setActiveTemplate] = useState("blank");
 
     function reset() {
         setName(""); setDescription(""); setIcon("✨"); setCustomEmoji(""); setAccent("#8b5cf6");
-        setCategory("productivity"); setEntities([blankEntity()]); setWorkflows([]);
+        setCategory("productivity"); setEntities([blankEntity()]); setWorkflows([]); setReminders([]);
         setActiveTemplate("blank"); setTab("identity");
     }
 
@@ -132,6 +133,9 @@ export default function PluginBuilder({ onCreated }: Props) {
         if (!name.trim()) { toast.error("Give your plugin a name"); setTab("identity"); return; }
         if (entities.some((e) => !e.name.trim() || e.fields.length === 0)) {
             toast.error("Each object needs a name and at least one field"); setTab("data"); return;
+        }
+        if (reminders.some((r) => !r.dateField)) {
+            toast.error("Each reminder needs a date field selected"); setTab("reminders"); return;
         }
 
         const autoViews = entities.flatMap<ViewDef>((e) => {
@@ -193,6 +197,7 @@ export default function PluginBuilder({ onCreated }: Props) {
             views: autoViews,
             dashboards: [{ id: crypto.randomUUID(), name: "Overview", widgets: autoWidgets }],
             workflows,
+            reminders,
         };
         installPlugin(manifest);
         toast.success(`${manifest.name} installed`);
@@ -236,6 +241,10 @@ export default function PluginBuilder({ onCreated }: Props) {
                             <TabsTrigger value="workflows" className="rounded-full sm:px-4 py-1.5 text-xs sm:gap-1.5">
                                 <Workflow className="w-3.5 h-3.5" /> Workflow
                                 {workflows.length > 0 && <Badge variant="secondary" className="sm:ml-1 text-[10px]">{workflows.length}</Badge>}
+                            </TabsTrigger>
+                            <TabsTrigger value="reminders" className="rounded-full sm:px-4 py-1.5 text-xs sm:gap-1.5">
+                                <Bell className="w-3.5 h-3.5" /> Reminders
+                                {reminders.length > 0 && <Badge variant="secondary" className="sm:ml-1 text-[10px]">{reminders.length}</Badge>}
                             </TabsTrigger>
                         </TabsList>
 
@@ -354,12 +363,56 @@ export default function PluginBuilder({ onCreated }: Props) {
                                 <Plus className="w-4 h-4" /> Add workflow
                             </Button>
                         </TabsContent>
+
+                        {/* ---- Reminders ---- */}
+                        <TabsContent value="reminders" className="space-y-3 mt-0">
+                            <p className="text-xs text-muted-foreground">
+                                Surface a record as due/overdue based on one of its date fields — shown in the notification bell.
+                            </p>
+                            {entities.every((e) => !e.fields.some((f) => f.type === "date")) && (
+                                <Card className="border-dashed bg-amber-500/5 border-amber-500/30">
+                                    <CardContent className="py-4 text-xs text-muted-foreground">
+                                        None of your objects have a Date field yet — add one in the Data tab first, then come back here.
+                                    </CardContent>
+                                </Card>
+                            )}
+                            {reminders.length === 0 && (
+                                <Card className="border-dashed bg-muted/20">
+                                    <CardContent className="py-8 text-center space-y-2">
+                                        <Bell className="w-6 h-6 mx-auto text-muted-foreground/50" />
+                                        <p className="text-sm text-muted-foreground">No reminders yet — totally optional.</p>
+                                    </CardContent>
+                                </Card>
+                            )}
+                            {reminders.map((rem, i) => (
+                                <ReminderEditor key={rem.id} reminder={rem} entities={entities}
+                                    onChange={(next) => setReminders((a) => a.map((x, j) => j === i ? next : x))}
+                                    onRemove={() => setReminders((a) => a.filter((_, j) => j !== i))}
+                                />
+                            ))}
+                            <Button variant="outline" size="sm" className="rounded-full"
+                                disabled={entities.every((e) => !e.fields.some((f) => f.type === "date"))}
+                                onClick={() => {
+                                    const firstEntityWithDate = entities.find((e) => e.fields.some((f) => f.type === "date"));
+                                    if (!firstEntityWithDate) return;
+                                    const dateF = firstEntityWithDate.fields.find((f) => f.type === "date")!;
+                                    setReminders([...reminders, {
+                                        id: crypto.randomUUID(),
+                                        entityId: firstEntityWithDate.id,
+                                        dateField: dateF.key,
+                                        label: `{{${firstEntityWithDate.titleField}}} is due`,
+                                        leadDays: 0,
+                                    }]);
+                                }}>
+                                <Plus className="w-4 h-4" /> Add reminder
+                            </Button>
+                        </TabsContent>
                     </Tabs>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-t bg-muted/20">
                     <div className="text-xs text-muted-foreground">
-                        {entities.length} object{entities.length !== 1 ? "s" : ""} · {totalFields} field{totalFields !== 1 ? "s" : ""} · {workflows.length} workflow{workflows.length !== 1 ? "s" : ""}
+                        {entities.length} object{entities.length !== 1 ? "s" : ""} · {totalFields} field{totalFields !== 1 ? "s" : ""} · {workflows.length} workflow{workflows.length !== 1 ? "s" : ""}{reminders.length > 0 && <> · {reminders.length} reminder{reminders.length !== 1 ? "s" : ""}</>}
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto justify-end">
                         <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
@@ -384,14 +437,7 @@ function EntityEditor({ entity, onChange, onRemove, accent, allEntities }: {
 
     const addField = () => {
         const id = crypto.randomUUID();
-        const existingKeys = new Set(entity.fields.map((f) => f.key));
-        let n = entity.fields.length + 1;
-        let key = `field_${n}`;
-        while (existingKeys.has(key)) {
-            n++;
-            key = `field_${n}`;
-        }
-        set("fields", [...entity.fields, { id, key, label: "New field", type: "text" }]);
+        set("fields", [...entity.fields, { id, key: `field_${entity.fields.length + 1}`, label: "New field", type: "text" }]);
     };
 
     const updateField = (id: string, patch: Partial<FieldDef>) => {
@@ -537,7 +583,8 @@ function FieldRow({ field, index, total, allEntities, onChange, onRemove, onMove
                 <Input
                     value={field.label}
                     onChange={(e) => onChange({
-                        label: e.target.value
+                        label: e.target.value,
+                        key: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "_") || field.key,
                     })}
                     placeholder="Field label"
                     className="rounded-lg flex-1 min-w-28 h-8 text-sm"
@@ -621,8 +668,81 @@ function FieldRow({ field, index, total, allEntities, onChange, onRemove, onMove
     );
 }
 
-/* ---------- Workflow editor ---------- */
+/* ---------- Reminder editor ---------- */
 
+function ReminderEditor({ reminder, entities, onChange, onRemove }: {
+    reminder: ReminderDef; entities: EntityDef[];
+    onChange: (next: ReminderDef) => void; onRemove: () => void;
+}) {
+    const entity = entities.find((e) => e.id === reminder.entityId) ?? entities[0];
+    const dateFields = entity?.fields.filter((f) => f.type === "date") ?? [];
+    const set = <K extends keyof ReminderDef>(k: K, v: ReminderDef[K]) => onChange({ ...reminder, [k]: v });
+
+    // Switching entity: snap dateField to the first date field on the new
+    // entity (or clear it) so we never carry over a key that doesn't exist there.
+    function setEntity(entityId: string) {
+        const next = entities.find((e) => e.id === entityId);
+        const nextDateField = next?.fields.find((f) => f.type === "date")?.key ?? "";
+        onChange({ ...reminder, entityId, dateField: nextDateField });
+    }
+
+    return (
+        <Card className="overflow-hidden border-border/60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                    <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+                    {entity ? `Remind about ${entity.plural}` : "Reminder"}
+                </div>
+                <button onClick={onRemove} className="text-xs text-muted-foreground hover:text-destructive">Remove</button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                    <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Object</Label>
+                        <Select value={reminder.entityId} onValueChange={setEntity}>
+                            <SelectTrigger className="rounded-lg h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>{entities.map((e) => <SelectItem key={e.id} value={e.id}>{e.plural}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                    <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Date field</Label>
+                        <Select value={reminder.dateField} onValueChange={(v) => set("dateField", v)}>
+                            <SelectTrigger className="rounded-lg h-8 text-xs"><SelectValue placeholder="Pick a date field" /></SelectTrigger>
+                            <SelectContent>
+                                {dateFields.map((f) => <SelectItem key={f.id} value={f.key}>{f.label}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        {dateFields.length === 0 && (
+                            <p className="text-[10px] text-amber-600">This object has no Date field yet.</p>
+                        )}
+                    </div>
+                    <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">Lead time</Label>
+                        <div className="flex items-center gap-1.5">
+                            <Input type="number" min={0} value={reminder.leadDays ?? 0}
+                                onChange={(e) => set("leadDays", Math.max(0, Number(e.target.value) || 0))}
+                                className="rounded-lg h-8 text-xs w-16" />
+                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">day(s) before</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Reminder label</Label>
+                    <Input value={reminder.label} onChange={(e) => set("label", e.target.value)}
+                        placeholder={`e.g. "{{${entity?.titleField ?? "title"}}} is due"`}
+                        className="rounded-lg h-8 text-xs" />
+                    <p className="text-[10px] text-muted-foreground">
+                        Use <code className="px-1 rounded bg-muted">{"{{field_key}}"}</code> to pull in a record's values.
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+
+/* ---------- Workflow editor ---------- */
 function WorkflowEditor({ workflow, entities, onChange, onRemove }: {
     workflow: WorkflowDef; entities: EntityDef[];
     onChange: (next: WorkflowDef) => void; onRemove: () => void;
