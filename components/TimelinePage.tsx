@@ -10,6 +10,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNotesContext } from "@/contexts/NotesContext";
+import { authClient } from "@/lib/auth-client";
 
 import {
   computeMilestones, computeClusters, computeGrowth,
@@ -21,12 +22,13 @@ import KnowledgeClusters from "@/components/timeline/KnowledgeClusters";
 import MemoryAnchors from "@/components/timeline/MemoryAnchors";
 import JourneyOverlays from "@/components/timeline/JourneyOverlays";
 import TimelineDrawer, { type DrawerPayload } from "@/components/timeline/TimelineDrawer";
+import Link from "next/link";
 
 type Zoom = "day" | "week" | "month";
 
 interface ColorTheme {
   bg: string;
-  border: string; // Tailored high-contrast dark border accent matching the core theme
+  border: string;
   text: string;
   icon: LucideIcon;
 }
@@ -57,7 +59,6 @@ const daysBetween = (a: Date, b: Date) =>
 const WEEKDAY = ["S", "M", "T", "W", "T", "F", "S"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-// Upgraded themes with specific deep high-contrast structural border rules
 const COLOR_THEMES: ColorTheme[] = [
   { bg: "bg-[#FFB067]", border: "border-[#E6954D]", text: "text-[#8C5A2D]", icon: Cake },
   { bg: "bg-[#38B6FF]", border: "border-[#219FE8]", text: "text-[#145D8A]", icon: Search },
@@ -94,9 +95,6 @@ const clusterMilestonesByDay = (milestoneList: (Milestone & { day: number })[]) 
   });
 };
 
-/**
- * Premium Circular Satin Glass Medal Bead
- */
 const AppleCircularBadge = ({ iconType }: { iconType: string }) => {
   const Icon =
     iconType === "folder" ? FolderIcon
@@ -121,6 +119,7 @@ const AppleCircularBadge = ({ iconType }: { iconType: string }) => {
 const TimelinePage = () => {
   const router = useRouter();
   const { noteIndexes: notes, folders } = useNotesContext();
+  const { data: session, isPending } = authClient.useSession();
   const [zoom, setZoom] = useState<Zoom>("week");
 
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -134,6 +133,12 @@ const TimelinePage = () => {
 
   const today = useMemo(() => startOfDay(new Date()), []);
   const [insightsOpen, setInsightsOpen] = useState(false);
+
+  // Subscription gate: true for pro or creator plans
+  const isPaidPlan =
+    !isPending &&
+    (session?.subscription?.planName === "pro" ||
+      session?.subscription?.planName === "creator");
 
   const { rangeStart, totalDays } = useMemo(() => {
     if (notes.length === 0) {
@@ -256,6 +261,9 @@ const TimelinePage = () => {
     return arr;
   }, [bars, totalLanesCount]);
 
+  // Total gated insight count (for display in the toggle button)
+  const gatedInsightCount = clusters.length + anchors.length + journeys.length + evolutions.length;
+
   return (
     <div className="flex-1 h-full flex flex-col bg-linear-to-b from-background via-background to-muted/30 subpixel-antialiased overflow-y-auto">
 
@@ -318,7 +326,7 @@ const TimelinePage = () => {
               </Popover>
             </div>
 
-            <div className="flex items-center  gap-1 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-3">
               <div className="inline-flex rounded-full border border-border p-1 bg-card/80 shadow-sm">
                 {(["day", "week", "month"] as Zoom[]).map((z) => (
                   <button
@@ -385,28 +393,75 @@ const TimelinePage = () => {
                   <Layers3 className="w-3.5 h-3.5" />
                   Insights & Memories
                   <span className="text-foreground/50 normal-case tracking-normal">
-                    ({clusters.length + anchors.length + journeys.length + evolutions.length})
+                    ({gatedInsightCount})
                   </span>
+                  {!isPaidPlan && !isPending && (
+                    <span className="inline-flex items-center gap-1 text-[10px] normal-case tracking-normal font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40">
+                      Pro
+                    </span>
+                  )}
                   <ChevronUp className={`w-3.5 h-3.5 transition-transform ${insightsOpen ? "" : "rotate-180"}`} />
                 </button>
               </div>
+
               {insightsOpen && (
-                <div className="pb-2">
-                  <KnowledgeClusters
-                    clusters={clusters}
-                    onSelect={(c) => setDrawer({ kind: "cluster", cluster: c })}
-                  />
-                  <MemoryAnchors
-                    anchors={anchors}
-                    onSelect={(a) => setDrawer({ kind: "anchor", anchor: a })}
-                  />
-                  <JourneyOverlays
-                    journeys={journeys}
-                    evolutions={evolutions}
-                    onOpenJourney={(j) => setDrawer({ kind: "journey", journey: j })}
-                    onOpenEvolution={(e) => setDrawer({ kind: "evolution", evolution: e })}
-                  />
-                </div>
+                isPaidPlan ? (
+                  /* ── PAID: render all insight panels ── */
+                  <div className="pb-2">
+                    <KnowledgeClusters
+                      clusters={clusters}
+                      onSelect={(c) => setDrawer({ kind: "cluster", cluster: c })}
+                    />
+                    <MemoryAnchors
+                      anchors={anchors}
+                      onSelect={(a) => setDrawer({ kind: "anchor", anchor: a })}
+                    />
+                    <JourneyOverlays
+                      journeys={journeys}
+                      evolutions={evolutions}
+                      onOpenJourney={(j) => setDrawer({ kind: "journey", journey: j })}
+                      onOpenEvolution={(e) => setDrawer({ kind: "evolution", evolution: e })}
+                    />
+                  </div>
+                ) : (
+                  /* ── FREE: blurred gate ── */
+                  <div className="mx-8 mb-4 rounded-2xl border border-border/60 overflow-hidden bg-background">
+                    {/* Blurred skeleton rows */}
+                    <div className="pointer-events-none select-none blur-sm opacity-40 px-5 pt-4 pb-2 flex flex-col gap-2.5">
+                      {[
+                        ["flex-1", "flex-[2]", "flex-1", "flex-[1.5]"],
+                        ["flex-[2]", "flex-1", "flex-[3]"],
+                        ["flex-[1.5]", "flex-1", "flex-[2]", "flex-1"],
+                      ].map((row, ri) => (
+                        <div key={ri} className="flex gap-2">
+                          {row.map((w, ci) => (
+                            <div key={ci} className={`${w} h-7 rounded-xl bg-muted`} />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Upgrade CTA */}
+                    <div className="flex flex-col items-center gap-2.5 px-6 pb-6 pt-3 text-center">
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                        <Sparkles className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                      <p className="text-[14px] font-semibold text-foreground">
+                        Unlock knowledge insights
+                      </p>
+                      <p className="text-[12px] text-muted-foreground max-w-xs leading-relaxed">
+                        Knowledge clusters, memory anchors, and journey overlays are available on the Pro and Creator plans.
+                      </p>
+                      <Link
+                        href="/billings"
+                        className="mt-1 inline-flex items-center gap-1.5 text-[12px] font-medium px-4 py-1.5 rounded-full border border-border hover:bg-muted transition-colors text-foreground"
+                      >
+                        Upgrade to Pro
+                        <ChevronRight className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
+                )
               )}
             </div>
 
@@ -526,7 +581,7 @@ const TimelinePage = () => {
                     </div>
                   </div>
 
-                  {/* SHADCN-TOOLTIP POWERED SIDE-BY-SIDE MILESTONE SHELF */}
+                  {/* MILESTONE SHELF */}
                   <div className="relative border-b border-neutral-100 dark:border-neutral-800/30 bg-neutral-50/10 dark:bg-neutral-900/5 flex items-center" style={{ height: MILESTONE_TRACK_H }}>
                     {clusteredMilestones.map((m) => {
                       const segmentWidth = DAY_W / (m.totalInDay + 1);
@@ -575,7 +630,6 @@ const TimelinePage = () => {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.2, ease: "easeOut" }}
                           onClick={() => router.push(`/note/ideas/${bar.note.id}`)}
-                          // Added explicit high-contrast theme border rule styles down below
                           className={`absolute ${bar.theme.bg} ${bar.theme.border} rounded-2xl flex items-center px-4 transition-all active:scale-[0.99] text-left border-2 shadow-[0_3px_10px_rgba(0,0,0,0.03)] group`}
                           style={{
                             left: Math.max(4, left),

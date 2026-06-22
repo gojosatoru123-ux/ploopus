@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-    ArrowLeft, Bell, BellOff, Boxes, Check, ChevronRight, Clock,
-    Download, Link as LinkIcon, Loader2, Package, Search, Share2, Sparkles, Store, Upload, X,
+    ArrowLeft, BarChart2, Bell, BellOff, Boxes, Check, ChevronRight, Clock,
+    Crown, Download, GitBranch, LayoutGrid, Link as LinkIcon, Loader2, Lock, Package, Search, Share2, Sparkles, Store, TableIcon, Upload, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,8 +21,30 @@ import type { PluginManifest } from "@/lib/plugins/types";
 import { usePluginContext } from "@/contexts/PluginsContext";
 import { useRouter } from "next/navigation";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { authClient } from "@/lib/auth-client";
 
 const CATEGORIES = ["all", "work", "personal", "fitness", "finance", "research", "creative", "productivity",] as const;
+
+/* ---------- Plan limits ---------- */
+
+type Plan = "free" | "pro" | "creator";
+
+function getPlan(session: any): Plan {
+    const name = (session?.subscription?.planName ?? "free").toLowerCase();
+    if (name === "creator") return "creator";
+    if (name === "pro") return "pro";
+    return "free";
+}
+
+const MARKETPLACE_LIMIT: Record<Plan, number> = { free: 3, pro: 10, creator: Infinity };
+const INSTALLED_LIMIT: Record<Plan, number> = { free: 3, pro: 10, creator: Infinity };
+
+const PLAN_LABEL: Record<Plan, string> = { free: "Free", pro: "Pro", creator: "Creator" };
+const UPGRADE_LABEL: Record<Plan, string> = {
+    free: "Upgrade to Pro for 10 plugins, or Creator for unlimited.",
+    pro: "Upgrade to Creator for unlimited plugins.",
+    creator: "",
+};
 
 export default function PlatformPage() {
     const {
@@ -42,6 +64,7 @@ export default function PlatformPage() {
         clearNotifications,
         isInitialized,
     } = usePluginContext();
+    const { data: session } = authClient.useSession();
 
     const router = useRouter();
     const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("all");
@@ -53,37 +76,57 @@ export default function PlatformPage() {
     const [urlInstalling, setUrlInstalling] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
 
+    /* ---- plan / limits ---- */
+    const plan = getPlan(session);
+    const mktLimit = MARKETPLACE_LIMIT[plan];   // how many marketplace plugins are accessible
+    const instLimit = INSTALLED_LIMIT[plan];     // max installed plugins
+    const atInstLimit = installed.length >= instLimit;
+
     const handlePluginRoute = (id: string) => {
         router.push(`/plateforms/${id}`)
     }
 
-    // Surface storage quota errors as toasts
-    // useEffect(() => onStorageError((msg) => toast.error(msg)), []);
-
-    // Auto-install from #plugin= hash — must wait until storage has finished
-    // loading (isInitialized), otherwise the install can race the initial
-    // OPFS load: if storage finishes loading *after* the hash-install runs,
-    // its plain setPluginIndexes(indexes) overwrite would silently wipe out
-    // the just-installed plugin. Gating on isInitialized guarantees the
-    // install always happens last.
     const hashInstallRan = useRef(false);
     useEffect(() => {
         if (!isInitialized || hashInstallRan.current) return;
         hashInstallRan.current = true;
+        // Gate hash-based share-link installs against the plan limit.
+        // atInstLimit can't be used here (stale closure on first render),
+        // so read installed.length directly against instLimit.
+        if (installed.length >= instLimit) {
+            toast.error(`You've reached the ${PLAN_LABEL[plan]} plan limit of ${instLimit} installed plugins. ${UPGRADE_LABEL[plan]}`);
+            // Clear the hash so the user isn't stuck with an unresolvable link
+            window.history.replaceState(null, "", window.location.pathname + window.location.search);
+            return;
+        }
         const m = tryInstallFromHash();
         if (m) { toast.success(`Installed "${m.name}" from share link`); handlePluginRoute(m.id); }
     }, [isInitialized, tryInstallFromHash]);
 
-    const filteredMarketplace = useMemo(() => {
-        return BUILTIN_PLUGINS.filter((p) => {
+    /* Split accessible vs locked BEFORE filtering so category/search
+       can never promote a locked plugin into the accessible tier.        */
+    const { accessibleMarket, lockedMarket } = useMemo(() => {
+        const filterFn = (p: PluginManifest) => {
             if (category !== "all" && p.category !== category) return false;
             if (marketSearch && !`${p.name} ${p.description} ${(p.tags ?? []).join(" ")}`
                 .toLowerCase().includes(marketSearch.toLowerCase())) return false;
             return true;
-        });
-    }, [category, marketSearch]);
+        };
+
+        const accessiblePool = mktLimit === Infinity ? BUILTIN_PLUGINS : BUILTIN_PLUGINS.slice(0, mktLimit);
+        const lockedPool = mktLimit === Infinity ? [] : BUILTIN_PLUGINS.slice(mktLimit);
+
+        return {
+            accessibleMarket: accessiblePool.filter(filterFn),
+            lockedMarket: lockedPool.filter(filterFn),
+        };
+    }, [category, marketSearch, mktLimit]);
 
     const handleImport = async (file: File) => {
+        if (atInstLimit) {
+            toast.error(`You've reached the ${PLAN_LABEL[plan]} plan limit of ${instLimit} installed plugins. ${UPGRADE_LABEL[plan]}`);
+            return;
+        }
         try {
             const text = await file.text();
             const payload = JSON.parse(text);
@@ -97,6 +140,10 @@ export default function PlatformPage() {
     const handleInstallFromUrl = async () => {
         const url = urlInput.trim();
         if (!url) return;
+        if (atInstLimit) {
+            toast.error(`You've reached the ${PLAN_LABEL[plan]} plan limit of ${instLimit} installed plugins. ${UPGRADE_LABEL[plan]}`);
+            return;
+        }
         setUrlInstalling(true);
         const m = await installFromUrl(url);
         setUrlInstalling(false);
@@ -106,7 +153,6 @@ export default function PlatformPage() {
             setUrlInput("");
             handlePluginRoute(m.id);
         }
-        // On failure, installError is set by the hook and rendered in the dialog below.
     };
 
     const unreadCount = notifications.filter((n) => !n.read).length;
@@ -116,7 +162,6 @@ export default function PlatformPage() {
             <input ref={fileRef} type="file" accept="application/json" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); e.target.value = ""; }} />
 
-            {/* Notification drawer */}
             <PluginNotificationDrawer
                 open={notifOpen}
                 onClose={() => setNotifOpen(false)}
@@ -126,8 +171,6 @@ export default function PlatformPage() {
                 onClearAll={clearNotifications}
                 onPluginRoute={handlePluginRoute}
             />
-
-
 
             {/* Uninstall confirmation dialog */}
             <Dialog open={!!uninstallTarget} onOpenChange={(o) => { if (!o) setUninstallTarget(null); }}>
@@ -180,18 +223,20 @@ export default function PlatformPage() {
                     {installError && (
                         <p className="text-xs text-destructive">{installError}</p>
                     )}
+                    {atInstLimit && (
+                        <p className="text-xs text-amber-600 flex items-center gap-1">
+                            <Crown className="w-3 h-3 shrink-0" />
+                            {PLAN_LABEL[plan]} limit reached — {UPGRADE_LABEL[plan]}
+                        </p>
+                    )}
                     <div className="flex gap-2 justify-end">
                         <Button variant="ghost" onClick={() => setUrlDialogOpen(false)} disabled={urlInstalling}>
                             Cancel
                         </Button>
-                        <Button onClick={handleInstallFromUrl} disabled={urlInstalling || !urlInput.trim()}>
+                        <Button onClick={handleInstallFromUrl} disabled={urlInstalling || !urlInput.trim() || atInstLimit}>
                             {urlInstalling ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" /> Installing…
-                                </>
-                            ) : (
-                                "Install"
-                            )}
+                                <><Loader2 className="w-4 h-4 animate-spin" /> Installing…</>
+                            ) : "Install"}
                         </Button>
                     </div>
                 </DialogContent>
@@ -212,30 +257,60 @@ export default function PlatformPage() {
                             </p>
                         </div>
                     </div>
-                    {/* Top-right actions */}
                     <div className="flex items-center gap-2 flex-wrap">
-
-                        {/* Notifications bell */}
                         <Button variant="outline" size="icon" className="rounded-full relative" onClick={() => setNotifOpen(true)}>
                             <Bell className="w-4 h-4" />
-                            {(unreadCount > 0) && (
+                            {unreadCount > 0 && (
                                 <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full text-[9px] font-bold bg-destructive text-white flex items-center justify-center">
                                     {Math.min(99, unreadCount)}
                                 </span>
                             )}
                         </Button>
-
-                        <Button variant="outline" className="rounded-full" onClick={() => fileRef.current?.click()}>
+                        <Button
+                            variant="outline"
+                            className="rounded-full"
+                            onClick={() => {
+                                if (atInstLimit) {
+                                    toast.error(`You've reached the ${PLAN_LABEL[plan]} plan limit of ${instLimit} installed plugins. ${UPGRADE_LABEL[plan]}`);
+                                    return;
+                                }
+                                fileRef.current?.click();
+                            }}
+                        >
                             <Upload className="w-4 h-4" /> Import
                         </Button>
                         <Button
                             variant="outline"
                             className="rounded-full"
-                            onClick={() => { clearInstallError(); setUrlInput(""); setUrlDialogOpen(true); }}
+                            onClick={() => {
+                                if (atInstLimit) {
+                                    toast.error(`You've reached the ${PLAN_LABEL[plan]} plan limit of ${instLimit} installed plugins. ${UPGRADE_LABEL[plan]}`);
+                                    return;
+                                }
+                                clearInstallError();
+                                setUrlInput("");
+                                setUrlDialogOpen(true);
+                            }}
                         >
                             <LinkIcon className="w-4 h-4" /> Install from URL
                         </Button>
-                        <PluginBuilder onCreated={(m) => handlePluginRoute(m.id)} />
+                        <div className="relative">
+                            <PluginBuilder onCreated={(m) => handlePluginRoute(m.id)} />
+                            {atInstLimit && (
+                                <div
+                                    className="absolute inset-0 rounded-md cursor-not-allowed group"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toast.error(`You've reached the ${PLAN_LABEL[plan]} limit of ${instLimit} installed plugins. ${UPGRADE_LABEL[plan]}`);
+                                    }}
+                                >
+                                    <span className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap bg-popover text-popover-foreground border text-[11px] px-2.5 py-1.5 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                        <Crown className="w-3 h-3 inline mr-1 text-amber-500" />
+                                        {PLAN_LABEL[plan]} limit reached — upgrade
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </motion.div>
 
@@ -253,6 +328,25 @@ export default function PlatformPage() {
 
                     {/* ---- Installed ---- */}
                     <TabsContent value="installed" className="mt-6">
+                        {/* Plan usage banner */}
+                        {instLimit !== Infinity && (
+                            <div className={`flex items-center gap-3 mb-5 px-4 py-3 rounded-2xl border text-sm ${atInstLimit
+                                ? "border-destructive/30 bg-destructive/5 text-destructive"
+                                : "border-border bg-muted/40 text-muted-foreground"
+                                }`}>
+                                <Crown className={`w-4 h-4 shrink-0 ${atInstLimit ? "text-destructive" : "text-amber-500"}`} />
+                                <span className="flex-1">
+                                    <strong>{installed.length} / {instLimit}</strong> plugins used on the {PLAN_LABEL[plan]} plan.
+                                    {atInstLimit && <> {UPGRADE_LABEL[plan]}</>}
+                                </span>
+                                {atInstLimit && (
+                                    <Badge className="shrink-0 bg-amber-400/20 text-amber-600 border border-amber-400/30 gap-1">
+                                        <Sparkles className="w-3 h-3" /> Upgrade
+                                    </Badge>
+                                )}
+                            </div>
+                        )}
+
                         {installed.length === 0 ? (
                             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                                 <Card className="border-dashed">
@@ -326,25 +420,44 @@ export default function PlatformPage() {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {filteredMarketplace.map((p, i) => {
+                            {/* Accessible plugins */}
+                            {accessibleMarket.map((p, i) => {
                                 const isInstalled = installed.some((x) => x.id === p.id);
+                                const installBlocked = !isInstalled && atInstLimit;
                                 return (
                                     <motion.div key={p.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                                         <PluginCard
                                             plugin={p}
-                                            actionLabel={isInstalled ? "Installed" : "Install"}
-                                            actionDisabled={isInstalled}
-                                            actionIcon={isInstalled ? <Check className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                                            actionLabel={isInstalled ? "Installed" : installBlocked ? "Limit reached" : "Install"}
+                                            actionDisabled={isInstalled || installBlocked}
+                                            actionIcon={isInstalled ? <Check className="w-4 h-4" /> : installBlocked ? <Lock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                                             onAction={() => {
-                                                if (isInstalled) return;
+                                                if (isInstalled || installBlocked) return;
                                                 installPlugin(p);
                                                 toast.success(`"${p.name}" installed — open it from your library`);
                                             }}
+                                            installLimitHint={installBlocked ? UPGRADE_LABEL[plan] : undefined}
                                         />
                                     </motion.div>
                                 );
                             })}
-                            {filteredMarketplace.length === 0 && (
+
+                            {/* Locked plugins (beyond plan's marketplace limit) */}
+                            {lockedMarket.map((p, i) => (
+                                <motion.div key={p.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: (accessibleMarket.length + i) * 0.03 }}>
+                                    <PluginCard
+                                        plugin={p}
+                                        locked
+                                        lockedPlan={plan}
+                                        actionLabel="Upgrade to unlock"
+                                        actionDisabled
+                                        actionIcon={<Crown className="w-4 h-4 text-amber-400" />}
+                                        onAction={() => { }}
+                                    />
+                                </motion.div>
+                            ))}
+
+                            {accessibleMarket.length === 0 && lockedMarket.length === 0 && (
                                 <Card className="col-span-full border-dashed">
                                     <CardContent className="py-12 text-center text-sm text-muted-foreground">
                                         No plugins match your search.
@@ -352,6 +465,23 @@ export default function PlatformPage() {
                                 </Card>
                             )}
                         </div>
+
+                        {/* Upgrade nudge banner when locked plugins exist */}
+                        {lockedMarket.length > 0 && (
+                            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                                className="flex items-center gap-3 px-5 py-4 rounded-2xl border border-amber-400/30 bg-amber-400/5">
+                                <Crown className="w-5 h-5 text-amber-500 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium">
+                                        {lockedMarket.length} more plugin{lockedMarket.length !== 1 ? "s" : ""} available on a higher plan
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{UPGRADE_LABEL[plan]}</p>
+                                </div>
+                                <Badge className="shrink-0 bg-amber-400/20 text-amber-600 border border-amber-400/30 gap-1 cursor-pointer hover:bg-amber-400/30 transition">
+                                    <Sparkles className="w-3 h-3" /> Upgrade
+                                </Badge>
+                            </motion.div>
+                        )}
                     </TabsContent>
                 </Tabs>
             </div>
@@ -364,6 +494,7 @@ export default function PlatformPage() {
 function PluginCard({
     plugin, actionLabel, onAction, actionDisabled, actionIcon,
     onExport, onShare, onUninstall,
+    locked, lockedPlan, installLimitHint,
 }: {
     plugin: PluginManifest;
     actionLabel: string;
@@ -373,60 +504,133 @@ function PluginCard({
     onExport?: () => void;
     onShare?: () => void;
     onUninstall?: () => void;
+    locked?: boolean;
+    lockedPlan?: Plan;
+    installLimitHint?: string;
 }) {
+    const upgradeNeeded = lockedPlan === "free" ? "Pro or Creator" : "Creator";
+
+    // Derive a pastel bg from the accent color or fall back to a default
+    const cardBg = locked ? "#E5E7EB" : `${plugin.accent}33`;
+
     return (
         <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.15 }} className="h-full">
-            <Card className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow">
-                <div className="h-1" style={{ background: plugin.accent }} />
-                <CardHeader className="pb-2">
-                    <div className="flex items-start gap-3">
-                        <div
-                            className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0"
-                            style={{ background: `${plugin.accent}22`, color: plugin.accent }}>
-                            {plugin.icon}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <CardTitle className="text-sm truncate">{plugin.name}</CardTitle>
-                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                                <Badge variant="outline" className="text-[10px]">v{plugin.version}</Badge>
-                                {plugin.builtin && <Badge variant="secondary" className="text-[10px]">Official</Badge>}
-                                {plugin.category && <Badge variant="outline" className="text-[10px] capitalize">{plugin.category}</Badge>}
-                            </div>
-                        </div>
+            <div
+                className="relative h-full flex flex-col gap-3 rounded-[20px] p-5 overflow-hidden"
+                style={{ background: cardBg }}
+            >
+                {/* Top row: badge + lock */}
+                <div className="flex items-start justify-between">
+                    <div className="flex gap-1.5 flex-wrap">
+                        {plugin.builtin && (
+                            <span className="text-[11px] font-medium bg-white/60 text-neutral-600 rounded-full px-2.5 py-0.5">
+                                Official
+                            </span>
+                        )}
+                        {plugin.category && (
+                            <span className="text-[11px] font-medium bg-white/60 text-neutral-600 rounded-full px-2.5 py-0.5 capitalize">
+                                {plugin.category}
+                            </span>
+                        )}
+                        <span className="text-[11px] font-medium bg-white/60 text-neutral-600 rounded-full px-2.5 py-0.5">
+                            v{plugin.version}
+                        </span>
                     </div>
-                    <CardDescription className="line-clamp-2 text-xs mt-2">{plugin.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="mt-auto space-y-3">
-                    <div className="flex flex-wrap gap-1 text-xs text-muted-foreground">
-                        <Badge variant="outline" className="text-[10px]">{plugin.entities.length} table{plugin.entities.length !== 1 ? "s" : ""}</Badge>
-                        <Badge variant="outline" className="text-[10px]">{plugin.views.length} views</Badge>
-                        <Badge variant="outline" className="text-[10px]">{plugin.dashboards[0]?.widgets.length ?? 0} widgets</Badge>
-                        {plugin.workflows?.length ? <Badge variant="outline" className="text-[10px]">{plugin.workflows.length} workflows</Badge> : null}
-                    </div>
-                    <div className="flex gap-2">
-                        <Button className="flex-1 rounded-full h-8 text-xs gap-1.5" disabled={actionDisabled} onClick={onAction}
-                            style={!actionDisabled && actionLabel !== "Installed" ? { background: plugin.accent, color: "white" } : undefined}>
+                    {locked && (
+                        <span className="flex items-center gap-1 bg-amber-400/20 text-amber-700 border border-amber-400/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                            <Crown className="w-3 h-3" />
+                            {upgradeNeeded}
+                        </span>
+                    )}
+                </div>
+
+                {/* Large icon floating top-right */}
+                <div
+                    className="absolute top-10 right-4 text-5xl leading-none pointer-events-none select-none"
+                    aria-hidden="true"
+                >
+                    {locked ? "🔒" : plugin.icon}
+                </div>
+
+                {/* Title + description */}
+                <div className="pr-16">
+                    <p className="text-[20px] font-semibold text-neutral-900 leading-snug">{plugin.name}</p>
+                    <p className="text-xs text-neutral-500 mt-1 leading-relaxed line-clamp-2">{plugin.description}</p>
+                </div>
+
+                {/* Stats row */}
+                <div className="flex items-center gap-2 text-xs text-neutral-500 flex-wrap">
+                    <span className="flex items-center gap-1">
+                        <TableIcon className="w-3.5 h-3.5" />
+                        {plugin.entities.length} table{plugin.entities.length !== 1 ? "s" : ""}
+                    </span>
+                    <span className="w-1 h-1 rounded-full bg-neutral-400" />
+                    <span className="flex items-center gap-1">
+                        <LayoutGrid className="w-3.5 h-3.5" />
+                        {plugin.views.length} views
+                    </span>
+                    {plugin.dashboards[0]?.widgets.length ? (
+                        <>
+                            <span className="w-1 h-1 rounded-full bg-neutral-400" />
+                            <span className="flex items-center gap-1">
+                                <BarChart2 className="w-3.5 h-3.5" />
+                                {plugin.dashboards[0].widgets.length} widgets
+                            </span>
+                        </>
+                    ) : null}
+                    {plugin.workflows?.length ? (
+                        <>
+                            <span className="w-1 h-1 rounded-full bg-neutral-400" />
+                            <span className="flex items-center gap-1">
+                                <GitBranch className="w-3.5 h-3.5" />
+                                {plugin.workflows.length} workflows
+                            </span>
+                        </>
+                    ) : null}
+                </div>
+
+                {/* Install limit hint */}
+                {installLimitHint && (
+                    <p className="text-[10px] text-amber-700 flex items-center gap-1">
+                        <Crown className="w-3 h-3 shrink-0" /> {installLimitHint}
+                    </p>
+                )}
+
+                {/* Bottom row: meta + actions */}
+                <div className="flex items-center justify-between mt-auto pt-1">
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={onAction}
+                            disabled={actionDisabled}
+                            className={`rounded-full flex items-center gap-2 px-4 py-1.5 text-xs font-medium transition-colors
+                                ${actionDisabled
+                                    ? "bg-black/10 text-black/40 cursor-not-allowed"
+                                    : "bg-neutral-900 text-white hover:bg-neutral-700"
+                                }`}
+                        >
                             {actionIcon}{actionLabel}
-                        </Button>
+                        </button>
                         {onShare && (
-                            <Button variant="outline" size="icon" className="rounded-full h-8 w-8" onClick={onShare} title="Copy share link">
+                            <button onClick={onShare} title="Share"
+                                className="w-8 h-8 rounded-full border border-black/15 bg-white/50 flex items-center justify-center hover:bg-white/80 text-neutral-500">
                                 <Share2 className="w-3.5 h-3.5" />
-                            </Button>
+                            </button>
                         )}
                         {onExport && (
-                            <Button variant="outline" size="icon" className="rounded-full h-8 w-8" onClick={onExport} title="Export">
+                            <button onClick={onExport} title="Export"
+                                className="w-8 h-8 rounded-full border border-black/15 bg-white/50 flex items-center justify-center hover:bg-white/80 text-neutral-500">
                                 <Download className="w-3.5 h-3.5" />
-                            </Button>
+                            </button>
                         )}
                         {onUninstall && (
-                            <Button variant="outline" size="icon" className="rounded-full h-8 w-8 text-muted-foreground hover:text-destructive hover:border-destructive/50"
-                                onClick={onUninstall} title="Uninstall">
+                            <button onClick={onUninstall} title="Uninstall"
+                                className="w-8 h-8 rounded-full border border-black/15 bg-white/50 flex items-center justify-center hover:text-red-500 text-neutral-500">
                                 <X className="w-3.5 h-3.5" />
-                            </Button>
+                            </button>
                         )}
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         </motion.div>
     );
 }

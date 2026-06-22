@@ -557,7 +557,7 @@ const PublishSiteModal = ({ isOpen, onClose, note }: PublishSiteModalProps) => {
       {isOpen && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-background/60 backdrop-blur-md" onClick={onClose} />
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={onClose} />
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}

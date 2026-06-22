@@ -6,6 +6,7 @@ import { createOrder } from "@/server/createOrder";
 import Script from "next/script";
 import { verifyOrder } from "@/server/verifyOrder";
 import { authClient } from "@/lib/auth-client";
+import { TIERS } from "@/lib/constants";
 
 const SpiralSVG = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 200 200" fill="none">
@@ -14,60 +15,6 @@ const SpiralSVG = ({ className }: { className?: string }) => (
         <circle cx="100" cy="100" r="40" stroke="currentColor" strokeWidth="1" strokeDasharray="4 6" opacity="0.12" />
     </svg>
 );
-
-const tiers = [
-    {
-        name: "Free", price: "$0", period: "forever", plan: 'free',
-        description: "For personal use — capture ideas offline with zero friction.",
-        features: [
-            "Unlimited notes & pages",
-            "Offline-first editing",
-            "Rich text & markdown",
-            "Basic mind maps",
-            "3 Google Drive backups/day",
-            "Single device sync"
-        ],
-        cta: "Get Started Free", highlighted: false,
-        cardBg: "bg-[hsl(var(--green-light))] border-[hsl(var(--green-badge))]/15",
-        btnBg: "bg-[hsl(var(--green-badge))] text-white",
-        checkColor: "text-[hsl(var(--green-badge))]",
-    },
-    {
-        name: "Pro", price: "$8", period: "/month", plan: 'pro',
-        description: "For power users — unlock full formatting, unlimited sync, and team features.",
-        features: [
-            "Everything in Free",
-            "Unlimited Google Drive sync",
-            "Advanced mind maps & kanban",
-            "Databases & tables",
-            "Multi-device real-time sync",
-            "Version history (30 days)",
-            "Priority support",
-            "Custom templates"
-        ],
-        cta: "Start 14-Day Trial", highlighted: true,
-        cardBg: "bg-gradient-to-br from-[hsl(var(--green-badge))] to-[hsl(var(--green-badge))]/80 border-[hsl(var(--green-badge))]",
-        btnBg: "bg-[hsl(var(--yellow-light))] text-accent-foreground",
-        checkColor: "text-[hsl(var(--yellow-tag))]",
-    },
-    {
-        name: "Team", price: "$16", period: "/user/month", plan: 'team',
-        description: "For teams — collaborate with shared workspaces and admin controls.",
-        features: [
-            "Everything in Pro",
-            "Shared workspaces",
-            "Admin & permission controls",
-            "Team templates library",
-            "Unlimited version history",
-            "SSO & SAML",
-            "Dedicated support"
-        ],
-        cta: "Contact Sales", highlighted: false,
-        cardBg: "bg-[hsl(var(--yellow-light))] border-accent/20",
-        btnBg: "bg-accent text-accent-foreground",
-        checkColor: "text-accent-foreground",
-    },
-];
 
 const BillingsPage = () => {
     const ref = useRef<HTMLElement>(null);
@@ -137,7 +84,7 @@ const BillingsPage = () => {
                 </motion.div>
 
                 <div className="mt-10 grid gap-6 sm:mt-14 md:grid-cols-3">
-                    {tiers.map((tier, index) => (
+                    {TIERS.map((tier, index) => (
                         <motion.div
                             key={tier.name}
                             initial={{ opacity: 0, y: 60, rotateX: 10, filter: "blur(5px)" }}
@@ -165,7 +112,7 @@ const BillingsPage = () => {
                             </h3>
                             <div className="mt-4 flex items-baseline gap-1">
                                 <span className={`text-4xl font-bold sm:text-5xl ${tier.highlighted ? "text-white" : "text-foreground"}`}>
-                                    {tier.price}
+                                    ${tier.plan.price}
                                 </span>
                                 <span className={`text-sm ${tier.highlighted ? "text-white/60" : "text-muted-foreground"}`}>
                                     {tier.period}
@@ -175,14 +122,26 @@ const BillingsPage = () => {
                                 {tier.description}
                             </p>
 
-                            <motion.button
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                className={`mt-6 w-full rounded-full py-2.5 text-sm font-medium shadow-sm sm:py-3 ${tier.btnBg}`}
-                                onClick={() => handleCreateOrder(tier.plan)}
-                            >
-                                {tier.cta}
-                            </motion.button>
+                            {tier.plan.planName !== "free" ?
+                                <>
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        className={`mt-6 w-full rounded-full py-2.5 text-sm font-medium shadow-sm sm:py-3 ${tier.btnBg}`}
+                                        onClick={() => handleCreateOrder(tier.plan.planName)}
+                                        disabled={session?.subscription.planName===tier.plan.planName}
+                                    >
+                                        {session?.subscription.planName===tier.plan.planName ? "Currently Subscribed To This Pack":tier.cta}
+                                    </motion.button>
+                                </> :
+                                <>
+                                    <motion.button
+                                        className={`mt-6 w-full rounded-full py-2.5 text-sm font-medium shadow-sm sm:py-3 ${tier.btnBg}`}
+                                        disabled
+                                    >
+                                        Always Free And Included All Time
+                                    </motion.button>
+                                </>}
 
                             <ul className="mt-6 space-y-2.5 sm:mt-8 sm:space-y-3">
                                 {tier.features.map((feature, fi) => (

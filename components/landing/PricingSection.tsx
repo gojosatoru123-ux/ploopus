@@ -2,6 +2,7 @@
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { Check } from "lucide-react";
+import { PLANS, TIERS } from "@/lib/constants";
 
 const SpiralSVG = ({ className }: { className?: string }) => (
     <svg className={className} viewBox="0 0 200 200" fill="none">
@@ -10,96 +11,6 @@ const SpiralSVG = ({ className }: { className?: string }) => (
         <circle cx="100" cy="100" r="40" stroke="currentColor" strokeWidth="1" strokeDasharray="4 6" opacity="0.12" />
     </svg>
 );
-
-const tiers = [
-    {
-        name: "Free",
-        price: "$0",
-        period: "forever",
-        description:
-            "Everything you need for personal knowledge management. Free forever.",
-
-        features: [
-            "Unlimited notes",
-            "Unlimited folders",
-            "Unlimited mind maps",
-            "Unlimited flashcards",
-            "38+ editing blocks",
-            "PDF, HTML, MD & TXT exports",
-            "Knowledge graph",
-            "Single device"
-        ],
-
-        cta: "Start Free",
-        highlighted: false,
-
-        cardBg:
-            "bg-[hsl(var(--green-light))] border-[hsl(var(--green-badge))]/15",
-
-        btnBg:
-            "bg-[hsl(var(--green-badge))] text-white",
-
-        checkColor:
-            "text-[hsl(var(--green-badge))]",
-    },
-
-    {
-        name: "Pro",
-        price: "$3",
-        period: "/month",
-
-        description:
-            "For people who want automatic backup, sync, and a seamless experience across devices.",
-
-        features: [
-            "Everything in Free",
-            "Premium templates",
-            "Semantic Search in knowledge graph",
-            "AI power functionalities using your own AI or open source models",
-        ],
-
-        cta: "Try Free For 60 Days",
-
-        highlighted: true,
-
-        cardBg:
-            "bg-gradient-to-br from-[hsl(var(--green-badge))] to-[hsl(var(--green-badge))]/80 border-[hsl(var(--green-badge))]",
-
-        btnBg:
-            "bg-[hsl(var(--yellow-light))] text-accent-foreground",
-
-        checkColor:
-            "text-[hsl(var(--yellow-tag))]",
-    },
-
-    {
-        name: "placeholder",
-
-        price: "$5",
-
-        period: "/month",
-
-        description:
-            "",
-
-        features: [
-            
-        ],
-
-        cta: "Contact Sales",
-
-        highlighted: false,
-
-        cardBg:
-            "bg-[hsl(var(--yellow-light))] border-accent/20",
-
-        btnBg:
-            "bg-accent text-accent-foreground",
-
-        checkColor:
-            "text-accent-foreground",
-    },
-];
 
 const PricingSection = () => {
     const ref = useRef<HTMLElement>(null);
@@ -135,7 +46,7 @@ const PricingSection = () => {
                 </motion.div>
 
                 <div className="mt-10 grid gap-6 sm:mt-14 md:grid-cols-3">
-                    {tiers.map((tier, index) => (
+                    {TIERS.map((tier, index) => (
                         <motion.div
                             key={tier.name}
                             initial={{ opacity: 0, y: 60, rotateX: 10, filter: "blur(5px)" }}
@@ -163,7 +74,7 @@ const PricingSection = () => {
                             </h3>
                             <div className="mt-4 flex items-baseline gap-1">
                                 <span className={`text-4xl font-bold sm:text-5xl ${tier.highlighted ? "text-white" : "text-foreground"}`}>
-                                    {tier.price}
+                                    ${tier.plan.price}
                                 </span>
                                 <span className={`text-sm ${tier.highlighted ? "text-white/60" : "text-muted-foreground"}`}>
                                     {tier.period}

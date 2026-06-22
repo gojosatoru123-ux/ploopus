@@ -7,9 +7,11 @@ import {
   Layers, Calendar, FolderOpen, Play, Pause,
   Sparkles, Zap, Brain, FileSearch, AlertCircle,
   ChevronDown, Tag, File, Code2, Table2, Presentation,
-  Music, Video, Image as ImageIcon, BookOpen, Hash
+  Music, Video, Image as ImageIcon, BookOpen, Hash,
+  Lock
 } from "lucide-react";
 import { NoteIndex, Folder, CalendarEvent, FlashcardDeck } from "@/lib/types";
+import { authClient } from "@/lib/auth-client";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -798,6 +800,7 @@ function SemanticSearchPanel({ isOpen, onClose, onHighlightNodes, rawNotes, onSe
   const [filterType, setFilterType] = useState<"all" | "note" | "media" | "deck">("all");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { data: session } = authClient.useSession();
 
   // Boot worker — CORE LOGIC UNCHANGED
   useEffect(() => {
@@ -929,14 +932,38 @@ function SemanticSearchPanel({ isOpen, onClose, onHighlightNodes, rawNotes, onSe
 
               {/* ── Index idle ── */}
               {indexState === "idle" && (
-                <button
-                  onClick={handleBuildIndex}
-                  className="w-full h-12 rounded-2xl font-semibold text-sm text-white flex items-center justify-center gap-2.5 transition-all active:scale-[0.98]"
-                  style={{ background: "linear-gradient(135deg,#7C3AED 0%,#4F46E5 100%)", boxShadow: "0 6px 24px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.12)" }}
-                >
-                  <Zap className="w-4 h-4" />
-                  Build Search Index
-                </button>
+                session?.subscription ? (
+                  // Active Premium State
+                  <button
+                    onClick={handleBuildIndex}
+                    className="w-full h-12 rounded-2xl font-semibold text-sm text-white flex items-center justify-center gap-2.5 transition-all active:scale-[0.98]"
+                    style={{
+                      background: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)",
+                      boxShadow: "0 6px 24px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12)"
+                    }}
+                  >
+                    <Zap className="w-4 h-4" />
+                    Build Search Index
+                  </button>
+                ) : (
+                  // Disabled Non-Premium State
+                  <button
+                    disabled
+                    className="w-full h-12 rounded-2xl font-semibold text-sm text-white/40 flex items-center justify-center gap-2.5 cursor-not-allowed border border-white/5 relative overflow-hidden"
+                    style={{
+                      background: "rgba(255, 255, 255, 0.03)",
+                      backdropFilter: "blur(12px)"
+                    }}
+                  >
+                    <Lock className="w-4 h-4 text-purple-400/60" />
+                    <span className="flex items-center gap-2">
+                      Build Search Index
+                      <span className="text-[10px] tracking-wide uppercase px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-400 font-bold border border-purple-500/20">
+                        Premium
+                      </span>
+                    </span>
+                  </button>
+                )
               )}
 
               {/* ── Index building ── */}
