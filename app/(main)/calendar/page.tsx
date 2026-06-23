@@ -187,7 +187,7 @@ const CalendarPage = () => {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="sticky top-0 z-20 backdrop-blur-md bg-background/70 border-b border-border pb-4 pt-2 mb-8"
+          className="border-b border-border pb-4 pt-2 mb-8"
         >
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between flex-wrap gap-4">

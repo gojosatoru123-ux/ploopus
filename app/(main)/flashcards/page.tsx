@@ -151,7 +151,7 @@ const FlashcardsPage = () => {
     <div className="flex-1 flex flex-col bg-background overflow-y-auto scrollbar-thin">
       <ScrollArea className="flex-1">
         <div className="max-w-7xl mx-auto p-2 sm:p-8 space-y-8">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6 border-b border-border pb-4 pt-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <SidebarTrigger />

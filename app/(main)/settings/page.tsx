@@ -522,7 +522,7 @@ const Settings = () => {
                 {/* Welcome Header */}
                 <motion.div
                     variants={itemVariants}
-                    className="flex items-center justify-between mb-10 sticky top-0 z-20 backdrop-blur-md bg-background/70 border-b border-border pb-4 pt-2"
+                    className="flex items-center justify-between mb-10 border-b border-border pb-4 pt-2"
                 >
                     <header className="flex flex-col gap-1">
                         <div className="flex items-center gap-4">

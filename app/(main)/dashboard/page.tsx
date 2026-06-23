@@ -64,7 +64,7 @@ const Dashboard = () => {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-10 sticky top-0 z-20 backdrop-blur-md bg-background/70 border-b border-border pb-4 pt-2"
+          className="flex items-center justify-between mb-10 border-b border-border pb-4 pt-2"
         >
           <div className="flex items-center gap-4">
             <SidebarTrigger />
