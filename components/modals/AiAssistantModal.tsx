@@ -65,7 +65,7 @@ const SYSTEM_PROMPTS: Record<Task, string> = {
     'You are a precise study assistant. Read the provided note (in Markdown) and produce 6-12 quiz questions in FAQ form. Respond ONLY with a JSON array of objects of the form {"question": string, "answer": string}. No prose, no markdown fences.',
 };
 
-const DEFAULT_USER_PROMPT = "Be accurate, concise, and helpful.";
+const DEFAULT_USER_PROMPT = "You are an expert assistant. Read the following content carefully. Acknowledge that you have read and understood it by saying: 'I have read the content and am ready for your questions.' Once I begin asking questions, answer them accurately based only on the provided text. If the answer cannot be found in the text, state that clearly rather than making assumptions.";
 
 const providerMeta: Record<AiProviderId, { icon: React.ReactNode; color: string; activeColor: string }> = {
   openai: { icon: <span className="text-emerald-500 text-lg">✦</span>, color: "border-emerald-500/20 hover:border-emerald-500/40", activeColor: "border-emerald-500 bg-emerald-500/5" },
