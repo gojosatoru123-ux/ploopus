@@ -22,9 +22,11 @@ import {
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { NoteIndex, Folder, FlashcardItem, CalendarEvent, FlashcardDeck } from "@/lib/types";
-import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, SLIDEDECK_FILE } from "@/lib/constants";
+import { CALENDAR_FILE, FOLDERS_FILE, INDEXES_FILE, MANIFEST_FILE, PLUGINS_INDEXES_FILE, SLIDEDECK_FILE } from "@/lib/constants";
 import { authClient } from "@/lib/auth-client";
 import Link from "next/link";
+import { PluginManifest, PluginNotification } from "@/lib/plugins/types";
+import { usePluginContext } from "@/contexts/PluginsContext";
 
 type SyncStatus = 'added' | 'updated' | 'skipped';
 interface SyncLogEntry { id: string; title: string; status: SyncStatus; }
@@ -56,6 +58,7 @@ const itemVariants: Variants = {
 
 const Settings = () => {
     const { noteIndexes, folders } = useNotesContext();
+    const { pluginIndexes } = usePluginContext();
     const [showClearDialog, setShowClearDialog] = useState(false);
     const [confirmText, setConfirmText] = useState("");
     const [isRestoring, setIsRestoring] = useState(false);
@@ -149,6 +152,7 @@ const Settings = () => {
             const foldersFile = zip.file(FOLDERS_FILE);
             const flashcardsFile = zip.file(SLIDEDECK_FILE);
             const calendarFile = zip.file(CALENDAR_FILE);
+            const pluginIndexesFile = zip.file(PLUGINS_INDEXES_FILE);
 
             if (!manifestFile || !indexFile || !foldersFile) {
                 toast.error("Invalid backup: Missing system files", { id: tid, position: "top-right" });
@@ -166,12 +170,17 @@ const Settings = () => {
             const backupCalender: CalendarEvent[] = calendarFile
                 ? JSON.parse(await calendarFile.async("string"))
                 : [];
+            
+            const backupPluginIndexes: PluginManifest[] = pluginIndexesFile
+                ? JSON.parse(await pluginIndexesFile.async("string"))
+                : [];
 
             // 2. Load Current Local Manifest
             const root = await navigator.storage.getDirectory();
             // Ensures directories exist so StorageEngine doesn't crash on an empty OPFS.
             await root.getDirectoryHandle("notes", { create: true });
             await root.getDirectoryHandle("media", { create: true });
+            await root.getDirectoryHandle("plugins", { create: true });
             let currentManifest: Record<string, { id: string; dirty: boolean; ts: number }> = {};
             try {
                 const mHandle = await root.getFileHandle(MANIFEST_FILE);
@@ -213,7 +222,7 @@ const Settings = () => {
                         const content = JSON.parse(await contentFile.async("string"));
 
                         // Write actual note data to OPFS
-                        await StorageEngine._saveToLocal(bNote.id, content, true);
+                        await StorageEngine._saveToLocal(bNote.id, content, true, false);
 
                         // MANIFEST MERGE: 
                         // We pull the Drive ID from backupManifest if local doesn't have it.
@@ -243,6 +252,47 @@ const Settings = () => {
 
                             await yieldToBrowser();
                             lastYieldTime = performance.now();
+                        }
+                    }
+                }
+            }
+
+            // LAYER 2.1 PLUGINS AND CONTENT MERGE
+            const currentPluginMap = new Map((pluginIndexes || []).map(n=>[n.id,n]));
+            let lastYieldTimePlugin = performance.now();
+            const yieldToBrowserPlugin = () => new Promise(resolve => requestAnimationFrame(resolve));
+            let pluginProcessed = 0;
+
+            for (const bPlugin of backupPluginIndexes) {
+                const fileNamePlugin = `${bPlugin.id}.json`;
+                const existing = currentPluginMap.get(bPlugin.id);
+                if(!existing){
+                    const contentFilePlugin = zip.file(`plugins/${fileNamePlugin}`);
+                    if (contentFilePlugin){
+                        const contentPlugin = JSON.parse(await contentFilePlugin.async("string"));
+                        await StorageEngine._saveToLocal(bPlugin.id,contentPlugin, false, true);
+
+                        const localMeta = currentManifest[bPlugin.id];
+                        const backupMeta = backupManifest[bPlugin.id] || { id: "", ts: Date.now(), dirty: true };
+
+                        currentManifest[bPlugin.id] = {
+                            id: localMeta?.id || backupMeta.id || "",
+                            ts: Math.max(localMeta?.ts || 0, backupMeta.ts || 0),
+                            dirty: true
+                        }
+
+                        pluginProcessed++;
+                        currentPluginMap.set(bPlugin.id, bPlugin);
+
+                        if (performance.now()-lastYieldTimePlugin > 50) {
+                            const status = 'added' as SyncStatus;
+                            setSyncLogs(prev => [
+                                { id: bPlugin.id, title: bPlugin.name || "Unnamed Plugin", status },
+                                ...prev
+                            ].slice(0, 15));
+
+                            await yieldToBrowserPlugin();
+                            lastYieldTimePlugin = performance.now();
                         }
                     }
                 }
@@ -332,7 +382,7 @@ const Settings = () => {
             // --- LAYER 5: STRUCTURAL FILES (INDEX & FOLDERS) ---
             // Preserve Drive IDs for the main collection files to avoid duplicate files on Drive
 
-            const structuralFiles = [INDEXES_FILE, FOLDERS_FILE, SLIDEDECK_FILE, CALENDAR_FILE];
+            const structuralFiles = [INDEXES_FILE, FOLDERS_FILE, SLIDEDECK_FILE, CALENDAR_FILE, PLUGINS_INDEXES_FILE];
 
             structuralFiles.forEach(file => {
                 const localMeta = currentManifest[file];
@@ -347,11 +397,12 @@ const Settings = () => {
 
             // --- FINAL PERSISTENCE ---
             // 1. Save data files
-            await StorageEngine._saveToLocal(INDEXES_FILE, Array.from(currentMap.values()), false);
-            await StorageEngine._saveToLocal(FOLDERS_FILE, mergedFolders, false);
-            await StorageEngine._saveToLocal(SLIDEDECK_FILE, mergedDecks, false);
-            await StorageEngine._saveToLocal(CALENDAR_FILE, mergedEvents, false);
-            await StorageEngine._saveToLocal(MANIFEST_FILE, currentManifest, false);
+            await StorageEngine._saveToLocal(INDEXES_FILE, Array.from(currentMap.values()), false, false);
+            await StorageEngine._saveToLocal(FOLDERS_FILE, mergedFolders, false, false);
+            await StorageEngine._saveToLocal(SLIDEDECK_FILE, mergedDecks, false, false);
+            await StorageEngine._saveToLocal(CALENDAR_FILE, mergedEvents, false, false);
+            await StorageEngine._saveToLocal(MANIFEST_FILE, currentManifest, false, false);
+            await StorageEngine._saveToLocal(PLUGINS_INDEXES_FILE, Array.from(currentPluginMap.values()), false, false);
 
             toast.success("Restore complete! Reloading to sync data...", { id: tid });
 

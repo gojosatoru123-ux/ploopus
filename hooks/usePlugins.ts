@@ -213,15 +213,7 @@ export const usePlugin = () => {
                 StorageEngine.loadPluginIndexes(),
                 StorageEngine.loadPluginNotificationsFile(),
             ]);
-            // Merge rather than overwrite: if a plugin was installed in-memory
-            // before this load resolved (e.g. a #plugin= hash install racing
-            // the initial fetch), keep it instead of silently dropping it.
-            setPluginIndexes((prev) => {
-                if (prev.length === 0) return indexes;
-                const byId = new Map(indexes.map((p) => [p.id, p]));
-                const extras = prev.filter((p) => !byId.has(p.id));
-                return [...indexes, ...extras];
-            });
+            setPluginIndexes(indexes);
             setNotifications(notifs);
             setIsInitialized(true);
         } catch (err) {
