@@ -37,12 +37,26 @@ const tagColors = [
 const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }: NoteEditorFullProps) => {
   const [newTagInput, setNewTagInput] = useState("");
   const [showTagInput, setShowTagInput] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [showMoreModal, setShowMoreModal] = useState(false);
   const [showIndex, setShowIndex] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showAi, setShowAi] = useState(false);
+  const menuContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (menuContainerRef.current && !menuContainerRef.current.contains(event.target as Node)) {
+        setShowMoreModal(false);
+        setShowExportMenu(false);
+        setShowIndex(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
 
   const activeBlockIndexRef = useRef<number>(-1);
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -263,7 +277,7 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
               <SyncStatusIndicator />
             </div>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" ref={menuContainerRef}>
             {/* Undo/Redo Buttons */}
             <TooltipProvider delayDuration={200}>
               <div className="hidden sm:flex items-center gap-0.5 mr-2 border-r border-border pr-2">
@@ -310,42 +324,6 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
             </TooltipProvider>
 
             <TooltipProvider delayDuration={200}>
-
-              {/* Templates Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <motion.button
-                    onClick={() => setShowTemplates(true)}
-                    className="hidden sm:block p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                  </motion.button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>Use a template</p>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* AI Feature */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="relative">
-                    <motion.button
-                      onClick={() => setShowAi(true)}
-                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <WandSparkles className="w-4 h-4" />
-                    </motion.button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>AI Features</p>
-                </TooltipContent>
-              </Tooltip>
 
               {/* Focus Mode Toggle */}
               <Tooltip>
@@ -396,86 +374,25 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
                 </TooltipContent>
               </Tooltip>
 
-              {/* Export Button */}
+              {/* More */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="relative">
                     <motion.button
-                      onClick={() => setShowExportMenu(!showExportMenu)}
+                      onClick={() => setShowMoreModal(!showMoreModal)}
                       className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                     >
-                      <Download className="w-4 h-4" />
+                      <MoreHorizontal className="w-4 h-4" />
                     </motion.button>
                   </div>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  <p>Export note</p>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Import Button */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="relative">
-                    <input
-                      ref={importInputRef}
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={handleImport}
-                    />
-                    <motion.button
-                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => importInputRef.current?.click()}
-                    >
-                      <Upload className="w-4 h-4" />
-                    </motion.button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>Import blocks from JSON</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="relative">
-                    <motion.button
-                      onClick={() => setShowPublishModal(!showPublishModal)}
-                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      <CloudFog className="w-4 h-4" />
-                    </motion.button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  <p>Publish Site</p>
+                  <p>More</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-
-            {/* <motion.button
-              onClick={() => setIsFavorite(!isFavorite)}
-              className={`p-2 rounded-lg transition-colors ${isFavorite ? 'text-yellow-500' : 'hover:bg-muted text-muted-foreground'}`}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Star className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-            </motion.button> */}
-
-            {/* <motion.button
-              className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <Share2 className="w-4 h-4" />
-            </motion.button> */}
           </div>
         </motion.div>
 
@@ -611,6 +528,132 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
               >
                 <File className="w-4 h-4" /> PDF
               </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* More Menu */}
+        <AnimatePresence>
+          {showMoreModal && (
+            <motion.div
+              initial={{ opacity: 0, y: -5, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -5, scale: 0.95 }}
+              className="fixed gap-2 right-6 top-16 p-2 z-50 max-h-96 bg-card border border-border rounded-lg shadow-lg overflow-hidden flex flex-row"
+            >
+              <TooltipProvider delayDuration={200}>
+
+                {/* AI Feature */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="relative">
+                      <motion.button
+                        onClick={() => setShowAi(true)}
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <motion.span
+                          className="absolute top-0 right-0 w-2 h-2 text-[10px] font-bold bg-amber-400 rounded-full shadow-[0_0_8px_#f59e0b]"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: [1, 1.15, 1] }}
+                          transition={{
+                            scale: { duration: 0.2 }, // Initial pop-in
+                            default: { repeat: Infinity, duration: 2, ease: "easeInOut" } // Subtle pulse
+                          }}
+                        />
+                        <WandSparkles className="w-4 h-4" />
+                      </motion.button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>AI Features</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Templates Button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <motion.button
+                      onClick={() => setShowTemplates(true)}
+                      className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                    >
+                      <Sparkles className="w-4 h-4" />
+                    </motion.button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Use a template</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Export Button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="relative">
+                      <motion.button
+                        onClick={() => setShowExportMenu(!showExportMenu)}
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <Download className="w-4 h-4" />
+                      </motion.button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Export note</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Import Button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="relative">
+                      <input
+                        ref={importInputRef}
+                        type="file"
+                        accept=".json"
+                        className="hidden"
+                        onChange={handleImport}
+                      />
+                      <motion.button
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => importInputRef.current?.click()}
+                      >
+                        <Upload className="w-4 h-4" />
+                      </motion.button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Import blocks from JSON</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* Publish Button */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="relative">
+                      <motion.button
+                        onClick={() => setShowPublishModal(!showPublishModal)}
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <CloudFog className="w-4 h-4" />
+                      </motion.button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Publish Site</p>
+                  </TooltipContent>
+                </Tooltip>
+
+              </TooltipProvider>
+
             </motion.div>
           )}
         </AnimatePresence>
