@@ -7,6 +7,7 @@ import AppSidebar from "@/components/app-sidebar";
 import { StorageEngine } from "@/lib/storage-engine";
 import AuthGuard from "@/components/utility/AuthGuard";
 import { PluginProvider } from "@/contexts/PluginsContext";
+import CommandPalette from "@/components/modals/CommandPalette";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -22,6 +23,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <AppSidebar />
               <SidebarInset className="flex flex-1 flex-col overflow-hidden">
                 {children}
+                <CommandPalette/>
               </SidebarInset>
             </div>
           </SidebarProvider>
