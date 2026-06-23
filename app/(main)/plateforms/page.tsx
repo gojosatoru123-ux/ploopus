@@ -47,6 +47,8 @@ const UPGRADE_LABEL: Record<Plan, string> = {
 };
 
 export default function PlatformPage() {
+    const { data: session } = authClient.useSession();
+    if (!session) return null;
     const {
         pluginIndexes: installed,
         notifications,
@@ -64,7 +66,6 @@ export default function PlatformPage() {
         clearNotifications,
         isInitialized,
     } = usePluginContext();
-    const { data: session } = authClient.useSession();
 
     const router = useRouter();
     const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("all");
@@ -88,20 +89,25 @@ export default function PlatformPage() {
 
     const hashInstallRan = useRef(false);
     useEffect(() => {
-        if (!isInitialized || hashInstallRan.current) return;
+        // FIX: If there's no session, freeze execution immediately. 
+        // Let AuthGuard push the user out cleanly without router interference.
+        if (!session || !isInitialized || hashInstallRan.current) return;
+        
         hashInstallRan.current = true;
-        // Gate hash-based share-link installs against the plan limit.
-        // atInstLimit can't be used here (stale closure on first render),
-        // so read installed.length directly against instLimit.
+    
         if (installed.length >= instLimit) {
             toast.error(`You've reached the ${PLAN_LABEL[plan]} plan limit of ${instLimit} installed plugins. ${UPGRADE_LABEL[plan]}`);
-            // Clear the hash so the user isn't stuck with an unresolvable link
             window.history.replaceState(null, "", window.location.pathname + window.location.search);
             return;
         }
+    
         const m = tryInstallFromHash();
-        if (m) { toast.success(`Installed "${m.name}" from share link`); handlePluginRoute(m.id); }
-    }, [isInitialized, tryInstallFromHash]);
+        if (m) { 
+            toast.success(`Installed "${m.name}" from share link`); 
+            handlePluginRoute(m.id); 
+        }
+    }, [isInitialized, tryInstallFromHash, session, installed.length, instLimit, plan]); 
+    // Added session to dependency array
 
     /* Split accessible vs locked BEFORE filtering so category/search
        can never promote a locked plugin into the accessible tier.        */
