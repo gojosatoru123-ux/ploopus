@@ -27,6 +27,7 @@ import { authClient } from "@/lib/auth-client";
 import Link from "next/link";
 import { PluginManifest, PluginNotification } from "@/lib/plugins/types";
 import { usePluginContext } from "@/contexts/PluginsContext";
+import PWAInstallButton from "@/components/utility/PWAInstallButton";
 
 type SyncStatus = 'added' | 'updated' | 'skipped';
 interface SyncLogEntry { id: string; title: string; status: SyncStatus; }
@@ -71,7 +72,7 @@ const Settings = () => {
         isPending, //loading state
         error, //error object
         refetch //refetch the session
-      } = authClient.useSession()
+    } = authClient.useSession()
 
     const updateStorageEstimate = useCallback(async () => {
         try {
@@ -170,7 +171,7 @@ const Settings = () => {
             const backupCalender: CalendarEvent[] = calendarFile
                 ? JSON.parse(await calendarFile.async("string"))
                 : [];
-            
+
             const backupPluginIndexes: PluginManifest[] = pluginIndexesFile
                 ? JSON.parse(await pluginIndexesFile.async("string"))
                 : [];
@@ -258,7 +259,7 @@ const Settings = () => {
             }
 
             // LAYER 2.1 PLUGINS AND CONTENT MERGE
-            const currentPluginMap = new Map((pluginIndexes || []).map(n=>[n.id,n]));
+            const currentPluginMap = new Map((pluginIndexes || []).map(n => [n.id, n]));
             let lastYieldTimePlugin = performance.now();
             const yieldToBrowserPlugin = () => new Promise(resolve => requestAnimationFrame(resolve));
             let pluginProcessed = 0;
@@ -266,11 +267,11 @@ const Settings = () => {
             for (const bPlugin of backupPluginIndexes) {
                 const fileNamePlugin = `${bPlugin.id}.json`;
                 const existing = currentPluginMap.get(bPlugin.id);
-                if(!existing){
+                if (!existing) {
                     const contentFilePlugin = zip.file(`plugins/${fileNamePlugin}`);
-                    if (contentFilePlugin){
+                    if (contentFilePlugin) {
                         const contentPlugin = JSON.parse(await contentFilePlugin.async("string"));
-                        await StorageEngine._saveToLocal(bPlugin.id,contentPlugin, false, true);
+                        await StorageEngine._saveToLocal(bPlugin.id, contentPlugin, false, true);
 
                         const localMeta = currentManifest[bPlugin.id];
                         const backupMeta = backupManifest[bPlugin.id] || { id: "", ts: Date.now(), dirty: true };
@@ -284,7 +285,7 @@ const Settings = () => {
                         pluginProcessed++;
                         currentPluginMap.set(bPlugin.id, bPlugin);
 
-                        if (performance.now()-lastYieldTimePlugin > 50) {
+                        if (performance.now() - lastYieldTimePlugin > 50) {
                             const status = 'added' as SyncStatus;
                             setSyncLogs(prev => [
                                 { id: bPlugin.id, title: bPlugin.name || "Unnamed Plugin", status },
@@ -451,14 +452,14 @@ const Settings = () => {
     ];
 
     const plan = session?.subscription?.planName?.toLowerCase() || "free";
-    const expiresDate = session?.subscription?.expiresAt 
+    const expiresDate = session?.subscription?.expiresAt
         ? new Date(session?.subscription.expiresAt).toLocaleDateString('en-GB', {
             day: 'numeric',
             month: 'short',
             year: 'numeric'
-          })
+        })
         : "N/A";
-        
+
     const joinYear = session?.subscription?.createdAt
         ? new Date(session?.subscription.createdAt).getFullYear()
         : new Date().getFullYear();
@@ -514,195 +515,230 @@ const Settings = () => {
                 )}
             </AnimatePresence>
             <div className="max-w-7xl mx-auto p-2 sm:p-8">
-            <motion.div
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-            >
-                {/* Welcome Header */}
                 <motion.div
-                    variants={itemVariants}
-                    className="flex items-center justify-between mb-10 border-b border-border pb-4 pt-2"
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
                 >
-                    <header className="flex flex-col gap-1">
-                        <div className="flex items-center gap-4">
-                            <SidebarTrigger className="h-8 w-8 text-[#4a4d4a]" />
-                            <div>
-                                <h1 className="text-3xl font-bold text-foreground tracking-tight">
-                                    Settings 👋
-                                </h1>
-                                <p className="text-muted-foreground text-sm font-medium">
-                                    Manage your settings and system backups.
-                                </p>
-                            </div>
-                        </div>
-                    </header>
-                </motion.div>
-
-                {/* Stats & Premium Row */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-                    {stats.map((stat) => (
-                        <motion.div
-                            key={stat.label}
-                            variants={itemVariants}
-                            whileHover={{ y: -4 }}
-                            className="bg-card rounded-2xl p-6 border border-border shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
-                        >
-                            <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3 bg-primary/10 border border-primary/5">
-                                <stat.icon className="w-5 h-5 text-primary" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-foreground">
-                                    {stat.value}
-                                </p>
-                                <p className="text-sm font-semibold text-muted-foreground">
-                                    {stat.label}
-                                </p>
-                            </div>
-                        </motion.div>
-                    ))}
-
-                    {/* Premium Member Card */}
+                    {/* Welcome Header */}
                     <motion.div
                         variants={itemVariants}
-                        whileHover={{ y: -4 }}
-                        className="col-span-2 bg-[#1a1c1a] text-white rounded-2xl p-6 border border-[#2e312e] flex flex-col justify-between relative overflow-hidden group shadow-lg"
+                        className="flex items-center justify-between mb-10 border-b border-border pb-4 pt-2"
                     >
-                        {/* Background Decorative Icon */}
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-                            <BackgroundIcon className="w-20 h-20" />
-                        </div>
-
-                        {/* Top Badges */}
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${currentConfig.badgeStyles}`}>
-                                {currentConfig.badgeText}
-                            </div>
-                            <p className="text-sm font-bold opacity-80">Member since {joinYear}</p>
-                        </div>
-
-                        {/* Bottom Content Area */}
-                        <div className="flex items-end justify-between relative z-10 mt-4">
-                            <div>
-                                <h3 className="text-lg font-bold">{currentConfig.title}</h3>
-                                
-                                {currentConfig.showExpiry ? (
-                                    <p className="text-xs opacity-60 flex items-center gap-1 mt-1">
-                                        <Calendar className="w-3 h-3" /> Expires: {expiresDate}
+                        <header className="flex flex-col gap-1">
+                            <div className="flex items-center gap-4">
+                                <SidebarTrigger className="h-8 w-8 text-[#4a4d4a]" />
+                                <div>
+                                    <h1 className="text-3xl font-bold text-foreground tracking-tight">
+                                        Settings 👋
+                                    </h1>
+                                    <p className="text-muted-foreground text-sm font-medium">
+                                        Manage your settings and system backups.
                                     </p>
-                                ) : (
-                                    <p className="text-xs opacity-60 flex items-center gap-1 mt-1">
-                                        Upgrade for premium features
-                                    </p>
-                                )}
+                                </div>
                             </div>
-                            
-                            <Link href='/billings' className="flex justify-center items-center text-white hover:bg-white/10 rounded-full h-10 w-10 p-0">
-                                <ArrowRight className="w-5 h-5" />
-                            </Link>
+                        </header>
+                    </motion.div>
+
+                    {/* Stats & Premium Row */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+                        {stats.map((stat) => (
+                            <motion.div
+                                key={stat.label}
+                                variants={itemVariants}
+                                whileHover={{ y: -4 }}
+                                className="bg-card rounded-2xl p-6 border border-border shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                            >
+                                <div className="w-11 h-11 rounded-xl flex items-center justify-center mb-3 bg-primary/10 border border-primary/5">
+                                    <stat.icon className="w-5 h-5 text-primary" />
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold text-foreground">
+                                        {stat.value}
+                                    </p>
+                                    <p className="text-sm font-semibold text-muted-foreground">
+                                        {stat.label}
+                                    </p>
+                                </div>
+                            </motion.div>
+                        ))}
+
+                        {/* Premium Member Card */}
+                        <motion.div
+                            variants={itemVariants}
+                            whileHover={{ y: -4 }}
+                            className="col-span-2 bg-[#1a1c1a] text-white rounded-2xl p-6 border border-[#2e312e] flex flex-col justify-between relative overflow-hidden group shadow-lg"
+                        >
+                            {/* Background Decorative Icon */}
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
+                                <BackgroundIcon className="w-20 h-20" />
+                            </div>
+
+                            {/* Top Badges */}
+                            <div className="flex items-center gap-2 mb-2">
+                                <div className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest ${currentConfig.badgeStyles}`}>
+                                    {currentConfig.badgeText}
+                                </div>
+                                <p className="text-sm font-bold opacity-80">Member since {joinYear}</p>
+                            </div>
+
+                            {/* Bottom Content Area */}
+                            <div className="flex items-end justify-between relative z-10 mt-4">
+                                <div>
+                                    <h3 className="text-lg font-bold">{currentConfig.title}</h3>
+
+                                    {currentConfig.showExpiry ? (
+                                        <p className="text-xs opacity-60 flex items-center gap-1 mt-1">
+                                            <Calendar className="w-3 h-3" /> Expires: {expiresDate}
+                                        </p>
+                                    ) : (
+                                        <p className="text-xs opacity-60 flex items-center gap-1 mt-1">
+                                            Upgrade for premium features
+                                        </p>
+                                    )}
+                                </div>
+
+                                <Link href='/billings' className="flex justify-center items-center text-white hover:bg-white/10 rounded-full h-10 w-10 p-0">
+                                    <ArrowRight className="w-5 h-5" />
+                                </Link>
+                            </div>
+                        </motion.div>
+                    </div>
+
+                    {/* System Sections */}
+                    <motion.div variants={itemVariants} className="space-y-6 mb-10">
+                        <h2 className="text-lg font-bold flex items-center gap-2 px-1">
+                            <LayoutGrid className="w-5 h-5" /> Maintenance
+                        </h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <motion.div whileHover={{ scale: 1.01 }} className="bg-white border border-[#e2e4e2] rounded-[1.5rem] p-8 flex flex-col gap-6 shadow-sm">
+                                <div className="space-y-2">
+                                    <h3 className="font-bold text-xl tracking-tight">Export Library</h3>
+                                    <p className="text-sm text-[#7a7d7a] leading-relaxed font-medium">
+                                        Create a portable backup of your notes and storage manifest.
+                                    </p>
+                                </div>
+                                <Button onClick={handleExportZip} disabled={isExporting} className="w-full bg-primary hover:bg-primary/80 text-white rounded-xl h-12 font-bold transition-all shadow-sm">
+                                    {isExporting ? <Loader2 className="animate-spin" /> : "Export Backup (.zip)"}
+                                </Button>
+                            </motion.div>
+
+                            <motion.div whileHover={{ scale: 1.01 }} className="bg-white border border-[#e2e4e2] rounded-[1.5rem] p-8 flex flex-col gap-6 shadow-sm">
+                                <div className="space-y-2">
+                                    <h3 className="font-bold text-xl tracking-tight">Restore Backup</h3>
+                                    <p className="text-sm text-[#7a7d7a] leading-relaxed font-medium">
+                                        Upload a previous archive to merge with your existing notes.
+                                    </p>
+                                </div>
+                                <input type="file" id="restore" className="hidden" accept=".zip" onChange={handleRestore} />
+                                <label htmlFor="restore" className="w-full">
+                                    <Button asChild className="w-full bg-white border border-[#e2e4e2] hover:bg-[#f9faf9] text-[#1a1c1a] rounded-xl h-12 font-bold cursor-pointer transition-all shadow-sm">
+                                        <span>Restore Archive</span>
+                                    </Button>
+                                </label>
+                            </motion.div>
                         </div>
                     </motion.div>
-                </div>
 
-                {/* System Sections */}
-                <motion.div variants={itemVariants} className="space-y-6 mb-10">
-                    <h2 className="text-lg font-bold flex items-center gap-2 px-1">
-                        <LayoutGrid className="w-5 h-5" /> Maintenance
-                    </h2>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <motion.div whileHover={{ scale: 1.01 }} className="bg-white border border-[#e2e4e2] rounded-[1.5rem] p-8 flex flex-col gap-6 shadow-sm">
-                            <div className="space-y-2">
-                                <h3 className="font-bold text-xl tracking-tight">Export Library</h3>
-                                <p className="text-sm text-[#7a7d7a] leading-relaxed font-medium">
-                                    Create a portable backup of your notes and storage manifest.
-                                </p>
+                    {/* Info & Danger */}
+                    <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start mb-10">
+                        <div className="bg-[#f0f2f0] p-6 rounded-[1.25rem] space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-bold text-[#4a4d4a]">
+                                <HardDrive className="w-4 h-4" /> LOCAL_ENGINE_STATUS
                             </div>
-                            <Button onClick={handleExportZip} disabled={isExporting} className="w-full bg-primary hover:bg-primary/80 text-white rounded-xl h-12 font-bold transition-all shadow-sm">
-                                {isExporting ? <Loader2 className="animate-spin" /> : "Export Backup (.zip)"}
+                            <div className="flex justify-between text-xs font-semibold text-[#7a7d7a]">
+                                <span>OPFS Volume Usage</span>
+                                <span className="text-[#1a1c1a]">{opfsSize}</span>
+                            </div>
+                            <div className="w-full bg-white rounded-full h-1.5 overflow-hidden">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: "10%" }}
+                                    transition={{ delay: 1, duration: 1.5 }}
+                                    className="bg-green-500 h-full"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="bg-red-50/50 border border-red-100 p-6 rounded-[1.25rem] flex items-center justify-between group hover:bg-red-50 transition-colors">
+                            <div className="space-y-1">
+                                <p className="text-sm font-bold text-red-900">Delete all data</p>
+                                <p className="text-xs text-red-700 opacity-80 font-medium">Clear entire local storage.</p>
+                            </div>
+                            <Button variant="ghost" onClick={() => setShowClearDialog(true)} className="text-red-600 hover:bg-red-100 hover:text-red-700 rounded-lg font-bold border border-red-200">
+                                Reset Engine
                             </Button>
-                        </motion.div>
-
-                        <motion.div whileHover={{ scale: 1.01 }} className="bg-white border border-[#e2e4e2] rounded-[1.5rem] p-8 flex flex-col gap-6 shadow-sm">
-                            <div className="space-y-2">
-                                <h3 className="font-bold text-xl tracking-tight">Restore Backup</h3>
-                                <p className="text-sm text-[#7a7d7a] leading-relaxed font-medium">
-                                    Upload a previous archive to merge with your existing notes.
-                                </p>
-                            </div>
-                            <input type="file" id="restore" className="hidden" accept=".zip" onChange={handleRestore} />
-                            <label htmlFor="restore" className="w-full">
-                                <Button asChild className="w-full bg-white border border-[#e2e4e2] hover:bg-[#f9faf9] text-[#1a1c1a] rounded-xl h-12 font-bold cursor-pointer transition-all shadow-sm">
-                                    <span>Restore Archive</span>
-                                </Button>
-                            </label>
-                        </motion.div>
-                    </div>
-                </motion.div>
-
-                {/* Info & Danger */}
-                <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                    <div className="bg-[#f0f2f0] p-6 rounded-[1.25rem] space-y-3">
-                        <div className="flex items-center gap-2 text-sm font-bold text-[#4a4d4a]">
-                            <HardDrive className="w-4 h-4" /> LOCAL_ENGINE_STATUS
                         </div>
-                        <div className="flex justify-between text-xs font-semibold text-[#7a7d7a]">
-                            <span>OPFS Volume Usage</span>
-                            <span className="text-[#1a1c1a]">{opfsSize}</span>
-                        </div>
-                        <div className="w-full bg-white rounded-full h-1.5 overflow-hidden">
-                            <motion.div
-                                initial={{ width: 0 }}
-                                animate={{ width: "10%" }}
-                                transition={{ delay: 1, duration: 1.5 }}
-                                className="bg-green-500 h-full"
-                            />
-                        </div>
-                    </div>
+                    </motion.div>
 
-                    <div className="bg-red-50/50 border border-red-100 p-6 rounded-[1.25rem] flex items-center justify-between group hover:bg-red-50 transition-colors">
-                        <div className="space-y-1">
-                            <p className="text-sm font-bold text-red-900">Delete all data</p>
-                            <p className="text-xs text-red-700 opacity-80 font-medium">Clear entire local storage.</p>
-                        </div>
-                        <Button variant="ghost" onClick={() => setShowClearDialog(true)} className="text-red-600 hover:bg-red-100 hover:text-red-700 rounded-lg font-bold border border-red-200">
-                            Reset Engine
-                        </Button>
-                    </div>
-                </motion.div>
-
-                {/* <button onClick={requestGoogleDriveAccess}>
+                    {/* <button onClick={requestGoogleDriveAccess}>
                     Add Google Drive Permissions
                 </button> */}
-            </motion.div>
 
-            <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
-                <DialogContent className="bg-white border-[#e2e4e2] rounded-4xl p-10 max-w-md">
-                    <DialogHeader className="text-center">
-                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Trash2 className="text-red-600 w-8 h-8" />
+                    <motion.div variants={itemVariants} className="w-full bg-[#fcfcf9] border border-[#e6e6e0] rounded-2xl p-6 sm:p-8 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-6 transition-all duration-300">
+                        <div className="flex items-start gap-4">
+                            <div className="p-3 bg-[#e4ede8] text-[#52826d] rounded-xl shrink-0 hidden sm:block">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    strokeWidth={2}
+                                    stroke="currentColor"
+                                    className="w-6 h-6"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        pathLength="360"
+                                        d="M12 9.75v6.7m0 0l-3-3m3 3l3-3m-8.25 6a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"
+                                    />
+                                </svg>
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-xl font-bold text-[#2d312e] flex items-center gap-2">
+                                    Take Ploopus Everywhere 👋
+                                </h3>
+                                <p className="text-sm text-[#666c67] max-w-xl leading-relaxed">
+                                    Install the desktop or mobile app for smoother performance, and instant note-taking right from your home screen.
+                                </p>
+                            </div>
                         </div>
-                        <DialogTitle className="text-2xl font-bold tracking-tight">Confirm Reset</DialogTitle>
-                        <DialogDescription className="pt-2">
-                            To proceed, type <span className="font-bold text-[#1a1c1a]">DELETE EVERYTHING</span> below. This cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <Input
-                        value={confirmText}
-                        onChange={e => setConfirmText(e.target.value)}
-                        className="h-12 rounded-xl my-6 text-center border-[#e2e4e2] focus:ring-red-500 font-bold"
-                        placeholder="Verification phrase"
-                    />
-                    <DialogFooter className="gap-2 sm:flex-row flex-col">
-                        <Button variant="destructive" disabled={confirmText !== "DELETE EVERYTHING" || isPurging} onClick={handleHardReset} className="flex-1 h-12 rounded-xl font-bold bg-red-600 hover:bg-red-700">
-                            {isPurging ? <Loader2 className="animate-spin" /> : "Yes, clear data"}
-                        </Button>
-                        <Button variant="outline" onClick={() => setShowClearDialog(false)} className="flex-1 h-12 rounded-xl font-bold border-[#e2e4e2]">
-                            Cancel
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                        <div className="shrink-0 w-full md:w-auto">
+                            <div>
+                                <PWAInstallButton />
+                            </div>
+                        </div>
+                    </motion.div>
+                </motion.div>
+
+                <Dialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+                    <DialogContent className="bg-white border-[#e2e4e2] rounded-4xl p-10 max-w-md">
+                        <DialogHeader className="text-center">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Trash2 className="text-red-600 w-8 h-8" />
+                            </div>
+                            <DialogTitle className="text-2xl font-bold tracking-tight">Confirm Reset</DialogTitle>
+                            <DialogDescription className="pt-2">
+                                To proceed, type <span className="font-bold text-[#1a1c1a]">DELETE EVERYTHING</span> below. This cannot be undone.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <Input
+                            value={confirmText}
+                            onChange={e => setConfirmText(e.target.value)}
+                            className="h-12 rounded-xl my-6 text-center border-[#e2e4e2] focus:ring-red-500 font-bold"
+                            placeholder="Verification phrase"
+                        />
+                        <DialogFooter className="gap-2 sm:flex-row flex-col">
+                            <Button variant="destructive" disabled={confirmText !== "DELETE EVERYTHING" || isPurging} onClick={handleHardReset} className="flex-1 h-12 rounded-xl font-bold bg-red-600 hover:bg-red-700">
+                                {isPurging ? <Loader2 className="animate-spin" /> : "Yes, clear data"}
+                            </Button>
+                            <Button variant="outline" onClick={() => setShowClearDialog(false)} className="flex-1 h-12 rounded-xl font-bold border-[#e2e4e2]">
+                                Cancel
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );
