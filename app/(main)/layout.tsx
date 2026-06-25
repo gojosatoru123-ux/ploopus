@@ -15,7 +15,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthGuard>
+    // <AuthGuard>
       <PluginProvider>
         <NotesProvider>
           <SidebarProvider>
@@ -29,6 +29,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </SidebarProvider>
         </NotesProvider>
       </PluginProvider>
-    </AuthGuard>
+    // </AuthGuard>
   );
 }

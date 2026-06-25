@@ -1,10 +1,10 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Peer, { DataConnection } from 'peerjs';
-import * as Y from 'yjs';
 import { NoteBlock } from '@/lib/types';
 
 export type CollabRole = 'host' | 'guest' | 'idle';
+
 export interface PendingGuest {
     peerId: string;
     displayName: string;
@@ -13,20 +13,26 @@ export interface PendingGuest {
 export interface ConnectedPeer {
     peerId: string;
     displayName: string;
-    conn: DataConnection;
+    isHost?: boolean;
 }
 
 // ─── Wire messages ────────────────────────────────────────────────────────────
 
 type Msg =
     | { type: 'ACCESS_REQUEST'; displayName: string }
-    | { type: 'ACCESS_GRANTED'; update: number[] }   // full Y.Doc state
+    | { type: 'ACCESS_GRANTED'; blocks: NoteBlock[]; roster: RosterEntry[] }
     | { type: 'ACCESS_DENIED' }
-    | { type: 'SYNC'; update: number[] };             // incremental Y.Doc update
+    | { type: 'SYNC'; blocks: NoteBlock[] }
+    | { type: 'ROSTER'; roster: RosterEntry[] };
+
+// Lightweight peer descriptor sent in roster broadcasts
+interface RosterEntry {
+    peerId: string;
+    displayName: string;
+    isHost?: boolean;
+}
 
 // ─── Peer ID derivation ───────────────────────────────────────────────────────
-// PeerJS public server requires IDs ≤ 50 chars, alphanumeric + hyphen only.
-// We hash the roomId to 8 hex chars and prefix with "nh" → always 10 chars.
 
 function djb2(str: string): number {
     let h = 5381;
@@ -40,7 +46,6 @@ function hostPeerIdForRoom(roomId: string): string {
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 interface UseCollaborationOptions {
-    /** Guests: pass '' until the user submits their name to gate PeerJS init. */
     roomId: string;
     initialBlocks: NoteBlock[];
     isHost: boolean;
@@ -56,7 +61,6 @@ interface UseCollaborationReturn {
     isReady: boolean;
     approveGuest: (peerId: string) => void;
     denyGuest: (peerId: string) => void;
-    /** Call with the full updated blocks array on every editor onChange */
     applyLocalChange: (blocks: NoteBlock[]) => void;
 }
 
@@ -68,142 +72,206 @@ export function useCollaboration({
 }: UseCollaborationOptions): UseCollaborationReturn {
     const role: CollabRole = isHost ? 'host' : roomId ? 'guest' : 'idle';
 
-    // ── Yjs ───────────────────────────────────────────────────────────────────
-    const ydocRef = useRef<Y.Doc>(new Y.Doc());
-    // blocks live at ydoc.getArray<NoteBlock>('blocks')
-
     // ── PeerJS ────────────────────────────────────────────────────────────────
-    const peerRef = useRef<Peer | null>(null);
+    const peerRef        = useRef<Peer | null>(null);
+    // For host: maps peerId → { conn, displayName } for approved peers
+    // For guest: just holds the single host connection
     const connectionsRef = useRef<Map<string, DataConnection>>(new Map());
-    const retryCountRef = useRef(0);
-    const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const retryCountRef  = useRef(0);
+    const retryTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // ── React state ───────────────────────────────────────────────────────────
+    // ── Stable ref mirrors ────────────────────────────────────────────────────
+    const isHostRef      = useRef(isHost);
+    const displayNameRef = useRef(displayName);
+    useEffect(() => { isHostRef.current      = isHost;      }, [isHost]);
+    useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
+
+    // ── Shared blocks ─────────────────────────────────────────────────────────
     const [sharedBlocks, setSharedBlocks] = useState<NoteBlock[]>(initialBlocks);
+    const sharedBlocksRef                 = useRef<NoteBlock[]>(initialBlocks);
+
+    const updateBlocks = useCallback((blocks: NoteBlock[]) => {
+        sharedBlocksRef.current = blocks;
+        setSharedBlocks(blocks);
+    }, []);
+
+    // ── Peers & guests ────────────────────────────────────────────────────────
     const [connectedPeers, setConnectedPeers] = useState<ConnectedPeer[]>([]);
-    const [pendingGuests, setPendingGuests] = useState<PendingGuest[]>([]);
-    const [accessStatus, setAccessStatus] = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
-    const [isReady, setIsReady] = useState(false);
+    const [pendingGuests,  setPendingGuests]  = useState<PendingGuest[]>([]);
+    const [accessStatus,   setAccessStatus]   = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
+    const [isReady,        setIsReady]        = useState(false);
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // Ref mirrors for synchronous reads inside stable callbacks
+    const pendingGuestsRef  = useRef<PendingGuest[]>([]);
+    const connectedPeersRef = useRef<ConnectedPeer[]>([]);
+    useEffect(() => { pendingGuestsRef.current  = pendingGuests;  }, [pendingGuests]);
+    useEffect(() => { connectedPeersRef.current = connectedPeers; }, [connectedPeers]);
 
-    /** Read current blocks out of the Y.Array and push to React state */
-    const flushBlocks = useCallback(() => {
-        const arr = ydocRef.current.getArray<NoteBlock>('blocks');
-        setSharedBlocks(arr.toArray());
-    }, []);
+    const isApplyingRemoteRef = useRef(false);
 
-    /** Encode the full Y.Doc state as a transferable number[] */
-    const encodeFullState = useCallback((): number[] => {
-        return Array.from(Y.encodeStateAsUpdate(ydocRef.current));
-    }, []);
+    // ── Roster helpers (host only) ────────────────────────────────────────────
+    // Builds a full roster including the host and broadcasts it to all approved
+    // peers so every guest knows who else is in the room.
 
-    /** Apply an incoming Y.Doc update (from any peer) */
-    const applyRemoteUpdate = useCallback(
-        (update: number[]) => {
-            Y.applyUpdate(ydocRef.current, new Uint8Array(update));
-            flushBlocks();
-        },
-        [flushBlocks]
+    const buildRoster = useCallback(
+        (peers: ConnectedPeer[]): RosterEntry[] => [
+            { peerId: hostPeerIdForRoom(roomId), displayName: displayNameRef.current, isHost: true },
+            ...peers.map((p) => ({ peerId: p.peerId, displayName: p.displayName })),
+        ],
+        [roomId]
     );
 
-    /** Broadcast a Y.Doc update to all currently connected peers */
-    const broadcastUpdate = useCallback((update: Uint8Array) => {
-        const msg: Msg = { type: 'SYNC', update: Array.from(update) };
-        connectionsRef.current.forEach((conn) => {
-            if (conn.open) conn.send(msg);
+    const broadcastRoster = useCallback(
+        (peers: ConnectedPeer[]) => {
+            if (!isHostRef.current) return;
+            const msg: Msg = { type: 'ROSTER', roster: buildRoster(peers) };
+            connectionsRef.current.forEach((conn) => {
+                if (conn.open) conn.send(msg);
+            });
+        },
+        [buildRoster]
+    );
+
+    const broadcastRosterRef = useRef(broadcastRoster);
+    useEffect(() => { broadcastRosterRef.current = broadcastRoster; }, [broadcastRoster]);
+
+    // Wrapper: update connectedPeers state and immediately broadcast the new roster
+    const setConnectedPeersAndBroadcast = useCallback(
+        (updater: (prev: ConnectedPeer[]) => ConnectedPeer[]) => {
+            setConnectedPeers((prev) => {
+                const next = updater(prev);
+                // Schedule broadcast after state is committed
+                setTimeout(() => broadcastRosterRef.current(next), 0);
+                return next;
+            });
+        },
+        []
+    );
+
+    // ── Broadcast helpers ─────────────────────────────────────────────────────
+
+    const broadcastBlocks = useCallback((blocks: NoteBlock[], excludePeerId?: string) => {
+        const msg: Msg = { type: 'SYNC', blocks };
+        connectionsRef.current.forEach((conn, peerId) => {
+            if (peerId !== excludePeerId && conn.open) conn.send(msg);
         });
     }, []);
 
+    const broadcastBlocksRef = useRef(broadcastBlocks);
+    useEffect(() => { broadcastBlocksRef.current = broadcastBlocks; }, [broadcastBlocks]);
+
     // ── Wire a DataConnection ─────────────────────────────────────────────────
 
-    const wireConnection = useCallback(
-        (conn: DataConnection) => {
-            conn.on('data', (raw) => {
-                const msg = raw as Msg;
+    const wireConnection = useCallback((conn: DataConnection) => {
+        conn.on('data', (raw) => {
+            const msg = raw as Msg;
 
-                if (msg.type === 'ACCESS_REQUEST' && isHost) {
-                    connectionsRef.current.set(conn.peer, conn);
-                    setPendingGuests((prev) => [
-                        ...prev.filter((g) => g.peerId !== conn.peer),
-                        { peerId: conn.peer, displayName: msg.displayName, requestedAt: Date.now() },
-                    ]);
+            if (msg.type === 'ACCESS_REQUEST' && isHostRef.current) {
+                connectionsRef.current.set(conn.peer, conn);
+                setPendingGuests((prev) => [
+                    ...prev.filter((g) => g.peerId !== conn.peer),
+                    { peerId: conn.peer, displayName: msg.displayName, requestedAt: Date.now() },
+                ]);
+            }
+
+            if (msg.type === 'ACCESS_GRANTED') {
+                setAccessStatus('granted');
+                isApplyingRemoteRef.current = true;
+                updateBlocks(msg.blocks);
+                // Hydrate the guest's peer list from the host's roster snapshot
+                setConnectedPeers(msg.roster.map((r) => ({
+                    peerId: r.peerId,
+                    displayName: r.displayName,
+                    isHost: r.isHost,
+                })));
+                Promise.resolve().then(() => { isApplyingRemoteRef.current = false; });
+            }
+
+            if (msg.type === 'ACCESS_DENIED') {
+                setAccessStatus('denied');
+                conn.close();
+            }
+
+            if (msg.type === 'SYNC') {
+                isApplyingRemoteRef.current = true;
+                updateBlocks(msg.blocks);
+                // Host fans SYNC out to all other approved peers
+                if (isHostRef.current) {
+                    connectionsRef.current.forEach((otherConn, otherPeerId) => {
+                        if (otherPeerId !== conn.peer && otherConn.open) {
+                            otherConn.send({ type: 'SYNC', blocks: msg.blocks } as Msg);
+                        }
+                    });
                 }
+                Promise.resolve().then(() => { isApplyingRemoteRef.current = false; });
+            }
 
-                if (msg.type === 'ACCESS_GRANTED') {
-                    setAccessStatus('granted');
-                    applyRemoteUpdate(msg.update); // hydrate Y.Doc from host snapshot
-                }
+            // Guest receives roster update from host
+            if (msg.type === 'ROSTER') {
+                setConnectedPeers(msg.roster.map((r) => ({
+                    peerId: r.peerId,
+                    displayName: r.displayName,
+                    isHost: r.isHost,
+                })));
+            }
+        });
 
-                if (msg.type === 'ACCESS_DENIED') {
-                    setAccessStatus('denied');
-                    conn.close();
-                }
-
-                if (msg.type === 'SYNC') {
-                    applyRemoteUpdate(msg.update);
-                    // Host fans the update out to all other peers
-                    if (isHost) {
-                        const raw = new Uint8Array(msg.update);
-                        connectionsRef.current.forEach((otherConn, otherPeerId) => {
-                            if (otherPeerId !== conn.peer && otherConn.open)
-                                otherConn.send({ type: 'SYNC', update: msg.update } as Msg);
-                        });
-                    }
-                }
-            });
-
-            conn.on('close', () => {
-                connectionsRef.current.delete(conn.peer);
+        conn.on('close', () => {
+            connectionsRef.current.delete(conn.peer);
+            setPendingGuests((prev) => prev.filter((g) => g.peerId !== conn.peer));
+            if (isHostRef.current) {
+                // Remove from connectedPeers and broadcast the updated roster
+                setConnectedPeersAndBroadcast((prev) =>
+                    prev.filter((p) => p.peerId !== conn.peer)
+                );
+            } else {
+                // Guest: mark the peer as gone in local list
                 setConnectedPeers((prev) => prev.filter((p) => p.peerId !== conn.peer));
-                setPendingGuests((prev) => prev.filter((g) => g.peerId !== conn.peer));
-            });
+            }
+        });
 
-            conn.on('error', (err) => console.error('[collab] conn error', err));
-        },
-        [isHost, applyRemoteUpdate]
-    );
+        conn.on('error', (err) => console.error('[collab] conn error', err));
+    }, [updateBlocks, setConnectedPeersAndBroadcast]);
 
-    // ── Guest: connect to host (with retry) ──────────────────────────────────
+    // ── Guest: connect to host ────────────────────────────────────────────────
 
-    const connectToHost = useCallback(
-        (peer: Peer, hostPeerId: string) => {
-            const conn = peer.connect(hostPeerId, { reliable: true });
+    const connectToHost = useCallback((peer: Peer, hostPeerId: string) => {
+        const conn = peer.connect(hostPeerId, { reliable: true });
 
-            conn.on('open', () => {
-                retryCountRef.current = 0;
-                connectionsRef.current.set(hostPeerId, conn);
-                wireConnection(conn);
-                conn.send({ type: 'ACCESS_REQUEST', displayName } as Msg);
-                setAccessStatus('pending');
-            });
+        wireConnection(conn);
 
-            conn.on('error', () => {
-                if (retryCountRef.current < 5) {
-                    retryCountRef.current += 1;
-                    retryTimerRef.current = setTimeout(() => connectToHost(peer, hostPeerId), 1000);
-                } else {
-                    console.error('[collab] host unreachable after retries');
-                    setAccessStatus('denied');
-                }
-            });
-        },
-        [displayName, wireConnection]
-    );
+        conn.on('open', () => {
+            retryCountRef.current = 0;
+            connectionsRef.current.set(hostPeerId, conn);
+            conn.send({ type: 'ACCESS_REQUEST', displayName: displayNameRef.current } as Msg);
+            setAccessStatus('pending');
+        });
+
+        conn.on('error', () => {
+            if (retryCountRef.current < 5) {
+                retryCountRef.current += 1;
+                retryTimerRef.current = setTimeout(() => connectToHost(peer, hostPeerId), 1000);
+            } else {
+                console.error('[collab] host unreachable after retries');
+                setAccessStatus('denied');
+            }
+        });
+    }, [wireConnection]);
 
     // ── PeerJS lifecycle ──────────────────────────────────────────────────────
 
     useEffect(() => {
-        if (!roomId) return; // guests: wait until name submitted
+        if (!roomId) return;
 
         if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
         retryCountRef.current = 0;
 
-        const myPeerId = isHost ? hostPeerIdForRoom(roomId) : undefined;
-        const peer = new Peer(myPeerId as string, { debug: 1 });
+        const peer = isHost
+            ? new Peer(hostPeerIdForRoom(roomId), { debug: 1 })
+            : new Peer({ debug: 1 });
+
         peerRef.current = peer;
 
-        // Register BEFORE open so no connections are missed
         if (isHost) {
             peer.on('connection', (conn) => wireConnection(conn));
         }
@@ -233,59 +301,44 @@ export function useCollaboration({
             if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
             peer.destroy();
             peerRef.current = null;
+            connectionsRef.current.clear();
             setIsReady(false);
         };
     }, [roomId, isHost, connectToHost, wireConnection]);
 
-    // ── Seed Y.Doc from OPFS blocks (host only, once) ────────────────────────
+    // ── Seed shared blocks from OPFS (host only, once) ───────────────────────
 
     const seeded = useRef(false);
     useEffect(() => {
         if (!isHost || seeded.current || !initialBlocks.length) return;
         seeded.current = true;
-        const arr = ydocRef.current.getArray<NoteBlock>('blocks');
-        ydocRef.current.transact(() => {
-            arr.delete(0, arr.length);
-            arr.insert(0, initialBlocks);
-        });
-        setSharedBlocks(initialBlocks);
-    }, [isHost, initialBlocks]);
-
-    // ── Subscribe to local Y.Doc changes so we can broadcast them ────────────
-
-    useEffect(() => {
-        const ydoc = ydocRef.current;
-        const handler = (update: Uint8Array, origin: unknown) => {
-            // origin === null means the change came from our own transact() call
-            if (origin === null) broadcastUpdate(update);
-        };
-        ydoc.on('update', handler);
-        return () => ydoc.off('update', handler);
-    }, [broadcastUpdate]);
+        updateBlocks(initialBlocks);
+    }, [isHost, initialBlocks, updateBlocks]);
 
     // ── Host: approve ─────────────────────────────────────────────────────────
 
-    const approveGuest = useCallback(
-        (peerId: string) => {
-            const conn = connectionsRef.current.get(peerId);
-            if (!conn) return;
+    const approveGuest = useCallback((peerId: string) => {
+        const conn = connectionsRef.current.get(peerId);
+        if (!conn) return;
 
-            // Send full Y.Doc state so the guest starts in sync
-            conn.send({ type: 'ACCESS_GRANTED', update: encodeFullState() } as Msg);
+        const guest = pendingGuestsRef.current.find((g) => g.peerId === peerId);
 
-            setPendingGuests((prev) => {
-                const guest = prev.find((g) => g.peerId === peerId);
-                if (guest) {
-                    setConnectedPeers((cp) => [
-                        ...cp.filter((p) => p.peerId !== peerId),
-                        { peerId, displayName: guest.displayName, conn },
-                    ]);
-                }
-                return prev.filter((g) => g.peerId !== peerId);
-            });
-        },
-        [encodeFullState]
-    );
+        // Build next connectedPeers synchronously so we can include it in
+        // ACCESS_GRANTED's roster snapshot before the state update lands.
+        const nextPeers: ConnectedPeer[] = [
+            ...connectedPeersRef.current.filter((p) => p.peerId !== peerId),
+            ...(guest ? [{ peerId, displayName: guest.displayName }] : []),
+        ];
+
+        conn.send({
+            type: 'ACCESS_GRANTED',
+            blocks: sharedBlocksRef.current,
+            roster: buildRoster(nextPeers),
+        } as Msg);
+
+        setPendingGuests((prev) => prev.filter((g) => g.peerId !== peerId));
+        setConnectedPeersAndBroadcast(() => nextPeers);
+    }, [buildRoster, setConnectedPeersAndBroadcast]);
 
     // ── Host: deny ────────────────────────────────────────────────────────────
 
@@ -301,18 +354,12 @@ export function useCollaboration({
 
     // ── Apply local editor change ─────────────────────────────────────────────
 
-    const applyLocalChange = useCallback(
-        (blocks: NoteBlock[]) => {
-            const arr = ydocRef.current.getArray<NoteBlock>('blocks');
-            // transact with origin=null so the update handler knows to broadcast it
-            ydocRef.current.transact(() => {
-                arr.delete(0, arr.length);
-                arr.insert(0, blocks);
-            }, null);
-            setSharedBlocks(blocks);
-        },
-        []
-    );
+    const applyLocalChange = useCallback((blocks: NoteBlock[]) => {
+        if (isApplyingRemoteRef.current) return;
+        if (JSON.stringify(sharedBlocksRef.current) === JSON.stringify(blocks)) return;
+        updateBlocks(blocks);
+        broadcastBlocksRef.current(blocks);
+    }, [updateBlocks]);
 
     return {
         role,
