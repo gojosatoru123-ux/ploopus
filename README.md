@@ -1190,3 +1190,74 @@ export function GraphView({ onSelectNote }: { onSelectNote?: (id: string) => voi
 
 export default GraphView;
 ```
+
+
+
+
+
+
+
+
+```tsx
+'use client';
+import NotionEditor from "@/components/NotionEditor";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import FloatingToolbar from "@/components/utility/FloatingToolbar";
+import { useNotesContext } from "@/contexts/NotesContext";
+import { useActiveNote } from "@/hooks/useActiveNotes";
+import { NoteBlock } from "@/lib/types";
+import { motion } from "framer-motion";
+import { useParams, useSearchParams } from "next/navigation";
+import React, { useEffect, useState, useRef } from "react";
+
+const CollabPage = () => {
+    const params = useParams();
+    const roomId = params?.roomId;
+    const searchParams = useSearchParams();
+    const noteId = searchParams.get("noteid") || "";
+    const { isInitialized, noteIndexes, updateNoteIndex, deleteNote } = useNotesContext();
+    const { blocks, setBlocks, isLoading: isBlocksLoading } = useActiveNote(noteId);
+    
+
+    const [temp, setTemp] = useState<NoteBlock[]>([]);
+    // Keep a mutable reference to the latest temp blocks for the window event listener
+    const tempRef = useRef<NoteBlock[]>([]);
+    // Sync OPFS blocks to local temp state once they load initially
+    useEffect(() => {
+        if (!isBlocksLoading && blocks) {
+            setTemp(blocks);
+            tempRef.current = blocks;
+        }
+    }, [blocks, isBlocksLoading]);
+
+    const handleBlockChanges = (updates: NoteBlock[]) => {
+        if (updates) {
+            setTemp(updates);
+            tempRef.current = updates;
+        }
+    };
+
+    return (
+        <>
+            <motion.div
+                className="flex items-center justify-between px-6 py-3 border-b border-border transition-all duration-300 bg-card/50 backdrop-blur-sm"
+                initial={false}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                whileHover={{ opacity: 1 }}
+            >
+                <SidebarTrigger />
+                {roomId && <h1>Room ID: {roomId}</h1>}
+            </motion.div>
+
+            <div className="overflow-y-auto p-4 min-h-screen">
+                <FloatingToolbar />
+                {!isBlocksLoading && (
+                    <NotionEditor blocks={temp} onChange={handleBlockChanges} />
+                )}
+            </div>
+        </>
+    );
+};
+
+export default CollabPage;
+```
