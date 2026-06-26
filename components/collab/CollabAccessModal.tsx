@@ -1,22 +1,46 @@
 'use client';
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Loader2, ShieldX, Users } from 'lucide-react';
+import { Loader2, ShieldX, Users, DoorClosed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 interface Props {
-    status: 'idle' | 'pending' | 'granted' | 'denied';
+    status: 'idle' | 'pending' | 'granted' | 'denied' | 'room_full';
     /** Pre-filled from localStorage if the guest has visited this room before */
     savedName?: string;
     onRequestAccess: (displayName: string) => void;
 }
 
 export default function CollabAccessModal({ status, savedName = '', onRequestAccess }: Props) {
-    const visible = status === 'idle' || status === 'pending' || status === 'denied';
-
-    // Pre-fill with the saved name so returning guests just hit Enter / the button
+    const visible = status === 'idle' || status === 'pending' || status === 'denied' || status === 'room_full';
     const [name, setName] = useState(savedName);
+
+    const icon = () => {
+        if (status === 'denied')    return <ShieldX    className="h-8 w-8 text-destructive" />;
+        if (status === 'room_full') return <DoorClosed className="h-8 w-8 text-amber-500" />;
+        return <Users className="h-8 w-8 text-primary" />;
+    };
+
+    const iconBg = () => {
+        if (status === 'denied')    return 'bg-destructive/10';
+        if (status === 'room_full') return 'bg-amber-500/10';
+        return 'bg-primary/10';
+    };
+
+    const title = () => {
+        if (status === 'denied')    return 'Access denied';
+        if (status === 'room_full') return 'Room is full';
+        return 'Join collaboration';
+    };
+
+    const subtitle = () => {
+        if (status === 'denied')    return "The host didn't let you in. You can close this tab.";
+        if (status === 'room_full') return 'This room has reached the 10-member limit. Try again later or ask someone to leave.';
+        if (status === 'pending')   return 'Your request has been sent — waiting for the host to approve you.';
+        if (savedName)              return `Welcome back, ${savedName}! Confirm your name or change it below.`;
+        return "Enter your name so the host knows who's knocking.";
+    };
 
     return (
         <AnimatePresence>
@@ -36,28 +60,13 @@ export default function CollabAccessModal({ status, savedName = '', onRequestAcc
                         exit={{ scale: 0.92, opacity: 0, y: 16 }}
                         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
                     >
-                        {/* Icon */}
-                        <div className="rounded-full bg-primary/10 p-4">
-                            {status === 'denied' ? (
-                                <ShieldX className="h-8 w-8 text-destructive" />
-                            ) : (
-                                <Users className="h-8 w-8 text-primary" />
-                            )}
+                        <div className={`rounded-full p-4 ${iconBg()}`}>
+                            {icon()}
                         </div>
 
                         <div className="text-center space-y-1">
-                            <h2 className="text-xl font-semibold tracking-tight">
-                                {status === 'denied' ? 'Access denied' : 'Join collaboration'}
-                            </h2>
-                            <p className="text-sm text-muted-foreground">
-                                {status === 'denied'
-                                    ? "The host didn't let you in. You can close this tab."
-                                    : status === 'pending'
-                                        ? "Your request has been sent — waiting for the host to approve you."
-                                        : savedName
-                                            ? `Welcome back, ${savedName}! Confirm your name or change it below.`
-                                            : "Enter your name so the host knows who's knocking."}
-                            </p>
+                            <h2 className="text-xl font-semibold tracking-tight">{title()}</h2>
+                            <p className="text-sm text-muted-foreground">{subtitle()}</p>
                         </div>
 
                         {status === 'idle' && (

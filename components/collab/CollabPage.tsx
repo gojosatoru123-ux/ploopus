@@ -160,7 +160,9 @@ export default function CollabPage() {
             : '';
 
     const showEditor  = !isBlocksLoading && (isHost || accessStatus === 'granted');
-    const modalStatus = guestRoomId ? accessStatus : 'idle';
+    // room_full: show modal so guest sees the message. If they want to retry
+    // later, they can refresh — the modal's idle state will let them re-request.
+    const modalStatus = (guestRoomId || accessStatus === 'room_full') ? accessStatus : 'idle';
 
     return (
         <>

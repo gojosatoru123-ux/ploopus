@@ -60,11 +60,8 @@ export default function CollabPanel({
 
     const isHost             = role === 'host';
     const totalNotifications = pendingGuests.length;
-
-    // How many others are in the room (excluding the local user shown separately)
-    const othersCount = isHost
-        ? connectedPeers.length                          // host sees guests
-        : connectedPeers.filter((p) => !p.isHost).length; // guest sees other guests + host separately
+    const totalInRoom        = connectedPeers.length + 1; // +1 for local user
+    const MAX_ROOM_SIZE      = 10;
 
     const copyLink = async () => {
         await navigator.clipboard.writeText(roomUrl);
@@ -90,11 +87,20 @@ export default function CollabPanel({
                             {totalNotifications}
                         </Badge>
                     )}
+                    {isHost && totalInRoom >= MAX_ROOM_SIZE && (
+                        <Badge variant="secondary" className="h-5 px-1.5 text-xs text-amber-600 bg-amber-500/10">
+                            Full
+                        </Badge>
+                    )}
                 </div>
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                     {/* +1 to include the local user (shown as "You") who is
                         filtered out of connectedPeers to avoid duplication */}
-                    <span className="text-xs">{connectedPeers.length + 1} connected</span>
+                    <span className="text-xs">
+                        {isHost
+                            ? `${totalInRoom} / ${MAX_ROOM_SIZE}`
+                            : `${totalInRoom} connected`}
+                    </span>
                     {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
                 </div>
             </button>

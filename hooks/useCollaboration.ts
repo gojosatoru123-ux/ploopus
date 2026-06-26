@@ -18,10 +18,15 @@ export interface ConnectedPeer {
 
 // ─── Wire messages ────────────────────────────────────────────────────────────
 
+// ─── Room limit ───────────────────────────────────────────────────────────────
+// 1 host + 9 guests = 10 total. The host counts as one slot.
+const MAX_ROOM_SIZE = 10;
+
 type Msg =
     | { type: 'ACCESS_REQUEST'; displayName: string }
     | { type: 'ACCESS_GRANTED'; blocks: NoteBlock[]; roster: RosterEntry[] }
     | { type: 'ACCESS_DENIED' }
+    | { type: 'ROOM_FULL' }
     | { type: 'SYNC'; blocks: NoteBlock[] }
     | { type: 'ROSTER'; roster: RosterEntry[] };
 
@@ -99,7 +104,7 @@ interface UseCollaborationReturn {
     sharedBlocks: NoteBlock[];
     connectedPeers: ConnectedPeer[];
     pendingGuests: PendingGuest[];
-    accessStatus: 'idle' | 'pending' | 'granted' | 'denied';
+    accessStatus: 'idle' | 'pending' | 'granted' | 'denied' | 'room_full';
     isReady: boolean;
     /** Saved display name recovered from localStorage (guests only) */
     savedDisplayName: string;
@@ -148,7 +153,7 @@ export function useCollaboration({
     // ── Peers & guests ────────────────────────────────────────────────────────
     const [connectedPeers, setConnectedPeers] = useState<ConnectedPeer[]>([]);
     const [pendingGuests,  setPendingGuests]  = useState<PendingGuest[]>([]);
-    const [accessStatus,   setAccessStatus]   = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
+    const [accessStatus,   setAccessStatus]   = useState<'idle' | 'pending' | 'granted' | 'denied' | 'room_full'>('idle');
     const [isReady,        setIsReady]        = useState(false);
 
     const pendingGuestsRef  = useRef<PendingGuest[]>([]);
@@ -215,12 +220,25 @@ export function useCollaboration({
                 connectionsRef.current.set(conn.peer, conn);
 
                 const approvedNames = loadApprovedNames(roomIdRef.current);
+                const isReturning   = approvedNames.has(msg.displayName);
 
-                if (approvedNames.has(msg.displayName)) {
+                // connectedPeers holds guests only; +1 for the host = total occupancy.
+                // Returning approved members already hold a logical slot (they are
+                // just reconnecting), so they bypass the limit check.
+                const currentOccupancy = connectedPeersRef.current.length + 1; // +1 for host
+                const wouldExceedLimit =
+                    !isReturning &&
+                    currentOccupancy >= MAX_ROOM_SIZE;
+
+                if (wouldExceedLimit) {
+                    conn.send({ type: 'ROOM_FULL' } as Msg);
+                    setTimeout(() => conn.close(), 300);
+                    connectionsRef.current.delete(conn.peer);
+                    return;
+                }
+
+                if (isReturning) {
                     // ── Auto-approve ──────────────────────────────────────────
-                    // Deduplicate by displayName (not peerId) so the same person
-                    // reconnecting from a refresh or a new tab replaces their old
-                    // entry rather than creating a second one.
                     const nextPeers: ConnectedPeer[] = [
                         ...connectedPeersRef.current.filter((p) => p.displayName !== msg.displayName),
                         { peerId: conn.peer, displayName: msg.displayName },
@@ -260,6 +278,11 @@ export function useCollaboration({
 
             if (msg.type === 'ACCESS_DENIED') {
                 setAccessStatus('denied');
+                conn.close();
+            }
+
+            if (msg.type === 'ROOM_FULL') {
+                setAccessStatus('room_full');
                 conn.close();
             }
 
@@ -418,6 +441,16 @@ export function useCollaboration({
         if (!conn) return;
 
         const guest = pendingGuestsRef.current.find((g) => g.peerId === peerId);
+
+        // Guard: room may have filled up while this guest was waiting in the queue
+        const currentOccupancy = connectedPeersRef.current.length + 1; // +1 for host
+        if (currentOccupancy >= MAX_ROOM_SIZE) {
+            conn.send({ type: 'ROOM_FULL' } as Msg);
+            setTimeout(() => conn.close(), 300);
+            connectionsRef.current.delete(peerId);
+            setPendingGuests((prev) => prev.filter((g) => g.peerId !== peerId));
+            return;
+        }
 
         // Deduplicate by displayName — if this person already has another
         // connection (e.g. they were approved from a different tab earlier),
