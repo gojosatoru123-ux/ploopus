@@ -156,7 +156,7 @@ export default function CollabPage() {
 
     const shareUrl =
         typeof window !== 'undefined'
-            ? `${window.location.origin}/collab/${roomId}?noteid=${noteId}`
+            ? `${window.location.origin}/collab/${roomId}?noteid=cursorbits`
             : '';
 
     const showEditor  = !isBlocksLoading && (isHost || accessStatus === 'granted');
