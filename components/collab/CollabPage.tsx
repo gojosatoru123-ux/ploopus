@@ -33,35 +33,40 @@ import CollabStatusBar from '@/components/collab/CollabStatusBar';
  * reliable way to gate on content equality across renders.
  */
 function useStableBlocks(blocks: NoteBlock[]): NoteBlock[] {
-    const stableRef = useRef<NoteBlock[]>(blocks);
+    const stableRef    = useRef<NoteBlock[]>(blocks);
     const serialiseRef = useRef<string>(JSON.stringify(blocks));
 
     const serialised = JSON.stringify(blocks);
     if (serialised !== serialiseRef.current) {
         serialiseRef.current = serialised;
-        stableRef.current = blocks;
+        stableRef.current    = blocks;
     }
 
     return stableRef.current;
 }
 
 export default function CollabPage() {
-    const params = useParams();
-    const roomId = (params?.roomId as string) ?? '';
+    const params       = useParams();
+    const roomId       = (params?.roomId as string) ?? '';
     const searchParams = useSearchParams();
-    const noteId = searchParams.get('noteid') ?? '';
-    const isHost = searchParams.get('host') === '1';
+    const noteId       = searchParams.get('noteid') ?? '';
+    const isHost       = searchParams.get('host') === '1';
 
     // ── OPFS note data ────────────────────────────────────────────────────────
     const { blocks, isLoading: isBlocksLoading } = useActiveNote(noteId);
 
     // ── Guest name gate ───────────────────────────────────────────────────────
-    const [guestDisplayName, setGuestDisplayName] = useState('');
+    // `savedDisplayName` comes from the hook (read from localStorage on mount).
+    // We initialise guestDisplayName from it so returning guests skip the modal.
     const [guestRoomId, setGuestRoomId] = useState('');
-    // Host display name — you can wire this to the user's profile if available
+    // Host display name — wire to your auth/profile if available
     const [hostDisplayName] = useState('Host');
 
-    const effectiveRoomId = isHost ? roomId : guestRoomId;
+    // Bootstrap the hook with roomId='', displayName='' until we have a name.
+    // We need savedDisplayName from the hook first, so we call the hook with
+    // a temporary empty state and then auto-submit if a saved name is found.
+    const [guestDisplayName, setGuestDisplayName] = useState('');
+    const effectiveRoomId  = isHost ? roomId : guestRoomId;
     const localDisplayName = isHost ? hostDisplayName : guestDisplayName;
 
     const {
@@ -71,30 +76,43 @@ export default function CollabPage() {
         pendingGuests,
         accessStatus,
         isReady,
+        savedDisplayName,
         approveGuest,
         denyGuest,
         applyLocalChange,
     } = useCollaboration({
-        roomId: effectiveRoomId,
+        roomId:        effectiveRoomId,
         initialBlocks: blocks ?? [],
         isHost,
-        displayName: localDisplayName || (isHost ? 'Host' : 'Guest'),
+        displayName:   localDisplayName || (isHost ? 'Host' : 'Guest'),
     });
+
+    // ── Auto-rejoin for guests with a saved name ──────────────────────────────
+    // If localStorage has a name for this room (from a previous visit), skip
+    // the modal entirely and connect straight away — same as if they'd typed
+    // their name and hit "Request access".
+    const autoJoinedRef = useRef(false);
+    useEffect(() => {
+        if (isHost || autoJoinedRef.current || !savedDisplayName || guestRoomId) return;
+        autoJoinedRef.current = true;
+        setGuestDisplayName(savedDisplayName);
+        setGuestRoomId(roomId);
+    }, [isHost, savedDisplayName, guestRoomId, roomId]);
 
     // ── Stable editor blocks ──────────────────────────────────────────────────
     // Prefer sharedBlocks (collab) over OPFS blocks; fall back to OPFS while
     // sharedBlocks is empty (i.e. before the Y.Doc is seeded / synced).
     // useStableBlocks ensures the reference is only replaced when content
     // actually changes, breaking the onChange → applyLocalChange → re-render loop.
-    const rawEditorBlocks = sharedBlocks.length > 0 ? sharedBlocks : (blocks ?? []);
-    const editorBlocks = useStableBlocks(rawEditorBlocks);
+    const rawEditorBlocks   = sharedBlocks.length > 0 ? sharedBlocks : (blocks ?? []);
+    const editorBlocks      = useStableBlocks(rawEditorBlocks);
 
     // ── Debounced applyLocalChange ────────────────────────────────────────────
     // Batches rapid keystrokes into a single Y.Doc transact + broadcast.
     // 120 ms is imperceptible to the typist but dramatically reduces the number
     // of updates sent to peers and Y.Doc writes per second.
-    const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pendingBlocks = useRef<NoteBlock[] | null>(null);
+    const debounceTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pendingBlocks   = useRef<NoteBlock[] | null>(null);
 
     const handleBlockChanges = useCallback(
         (updates: NoteBlock[]) => {
@@ -126,6 +144,8 @@ export default function CollabPage() {
 
     const handleRequestAccess = useCallback(
         (name: string) => {
+            // Persist so this guest is recognised on refresh / new tab
+            localStorage.setItem(`collab:${roomId}:guestName`, name);
             setGuestDisplayName(name);
             setGuestRoomId(roomId);
         },
@@ -139,13 +159,17 @@ export default function CollabPage() {
             ? `${window.location.origin}/collab/${roomId}?noteid=${noteId}`
             : '';
 
-    const showEditor = !isBlocksLoading && (isHost || accessStatus === 'granted');
+    const showEditor  = !isBlocksLoading && (isHost || accessStatus === 'granted');
     const modalStatus = guestRoomId ? accessStatus : 'idle';
 
     return (
         <>
             {!isHost && (
-                <CollabAccessModal status={modalStatus} onRequestAccess={handleRequestAccess} />
+                <CollabAccessModal
+                    status={modalStatus}
+                    savedName={savedDisplayName}
+                    onRequestAccess={handleRequestAccess}
+                />
             )}
 
             <motion.div

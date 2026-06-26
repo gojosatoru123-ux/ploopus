@@ -7,12 +7,16 @@ import { Input } from '@/components/ui/input';
 
 interface Props {
     status: 'idle' | 'pending' | 'granted' | 'denied';
+    /** Pre-filled from localStorage if the guest has visited this room before */
+    savedName?: string;
     onRequestAccess: (displayName: string) => void;
 }
 
-export default function CollabAccessModal({ status, onRequestAccess }: Props) {
+export default function CollabAccessModal({ status, savedName = '', onRequestAccess }: Props) {
     const visible = status === 'idle' || status === 'pending' || status === 'denied';
-    const [name, setName] = useState("");
+
+    // Pre-fill with the saved name so returning guests just hit Enter / the button
+    const [name, setName] = useState(savedName);
 
     return (
         <AnimatePresence>
@@ -40,6 +44,7 @@ export default function CollabAccessModal({ status, onRequestAccess }: Props) {
                                 <Users className="h-8 w-8 text-primary" />
                             )}
                         </div>
+
                         <div className="text-center space-y-1">
                             <h2 className="text-xl font-semibold tracking-tight">
                                 {status === 'denied' ? 'Access denied' : 'Join collaboration'}
@@ -49,9 +54,12 @@ export default function CollabAccessModal({ status, onRequestAccess }: Props) {
                                     ? "The host didn't let you in. You can close this tab."
                                     : status === 'pending'
                                         ? "Your request has been sent — waiting for the host to approve you."
-                                        : "Enter your name so the host knows who's knocking."}
+                                        : savedName
+                                            ? `Welcome back, ${savedName}! Confirm your name or change it below.`
+                                            : "Enter your name so the host knows who's knocking."}
                             </p>
                         </div>
+
                         {status === 'idle' && (
                             <div className="w-full flex flex-col gap-3">
                                 <Input
@@ -69,10 +77,11 @@ export default function CollabAccessModal({ status, onRequestAccess }: Props) {
                                     disabled={!name.trim()}
                                     onClick={() => onRequestAccess(name.trim())}
                                 >
-                                    Request access
+                                    {savedName ? 'Rejoin session' : 'Request access'}
                                 </Button>
                             </div>
                         )}
+
                         {status === 'pending' && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Loader2 className="h-4 w-4 animate-spin" />

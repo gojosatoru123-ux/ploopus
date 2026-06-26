@@ -55,10 +55,10 @@ export default function CollabPanel({
     onApprove,
     onDeny,
 }: Props) {
-    const [open, setOpen] = useState(true);
+    const [open,   setOpen]   = useState(true);
     const [copied, setCopied] = useState(false);
 
-    const isHost = role === 'host';
+    const isHost             = role === 'host';
     const totalNotifications = pendingGuests.length;
 
     // How many others are in the room (excluding the local user shown separately)
@@ -92,7 +92,9 @@ export default function CollabPanel({
                     )}
                 </div>
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <span className="text-xs">{connectedPeers.length} connected</span>
+                    {/* +1 to include the local user (shown as "You") who is
+                        filtered out of connectedPeers to avoid duplication */}
+                    <span className="text-xs">{connectedPeers.length + 1} connected</span>
                     {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
                 </div>
             </button>
