@@ -50,8 +50,8 @@ export default function CollabStatusBar({ role, isReady, accessStatus, connected
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                     className={`overflow-hidden ${isLive
-                            ? 'bg-emerald-500/10 border-b border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
-                            : 'bg-amber-500/10 border-b border-amber-500/20 text-amber-700 dark:text-amber-400'
+                        ? 'bg-emerald-500/10 border-b border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-amber-500/10 border-b border-amber-500/20 text-amber-700 dark:text-amber-400'
                         }`}
                 >
                     <div className="flex items-center justify-center gap-2 px-4 py-1.5 text-xs font-medium">

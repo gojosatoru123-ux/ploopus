@@ -55,10 +55,10 @@ export default function CollabPanel({
     onApprove,
     onDeny,
 }: Props) {
-    const [open,   setOpen]   = useState(true);
+    const [open, setOpen] = useState(true);
     const [copied, setCopied] = useState(false);
 
-    const isHost             = role === 'host';
+    const isHost = role === 'host';
     const totalNotifications = pendingGuests.length;
 
     // How many others are in the room (excluding the local user shown separately)

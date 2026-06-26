@@ -33,35 +33,35 @@ import CollabStatusBar from '@/components/collab/CollabStatusBar';
  * reliable way to gate on content equality across renders.
  */
 function useStableBlocks(blocks: NoteBlock[]): NoteBlock[] {
-    const stableRef    = useRef<NoteBlock[]>(blocks);
+    const stableRef = useRef<NoteBlock[]>(blocks);
     const serialiseRef = useRef<string>(JSON.stringify(blocks));
 
     const serialised = JSON.stringify(blocks);
     if (serialised !== serialiseRef.current) {
         serialiseRef.current = serialised;
-        stableRef.current    = blocks;
+        stableRef.current = blocks;
     }
 
     return stableRef.current;
 }
 
 export default function CollabPage() {
-    const params       = useParams();
-    const roomId       = (params?.roomId as string) ?? '';
+    const params = useParams();
+    const roomId = (params?.roomId as string) ?? '';
     const searchParams = useSearchParams();
-    const noteId       = searchParams.get('noteid') ?? '';
-    const isHost       = searchParams.get('host') === '1';
+    const noteId = searchParams.get('noteid') ?? '';
+    const isHost = searchParams.get('host') === '1';
 
     // ── OPFS note data ────────────────────────────────────────────────────────
     const { blocks, isLoading: isBlocksLoading } = useActiveNote(noteId);
 
     // ── Guest name gate ───────────────────────────────────────────────────────
     const [guestDisplayName, setGuestDisplayName] = useState('');
-    const [guestRoomId,      setGuestRoomId]      = useState('');
+    const [guestRoomId, setGuestRoomId] = useState('');
     // Host display name — you can wire this to the user's profile if available
-    const [hostDisplayName]                        = useState('Host');
+    const [hostDisplayName] = useState('Host');
 
-    const effectiveRoomId  = isHost ? roomId : guestRoomId;
+    const effectiveRoomId = isHost ? roomId : guestRoomId;
     const localDisplayName = isHost ? hostDisplayName : guestDisplayName;
 
     const {
@@ -75,10 +75,10 @@ export default function CollabPage() {
         denyGuest,
         applyLocalChange,
     } = useCollaboration({
-        roomId:        effectiveRoomId,
+        roomId: effectiveRoomId,
         initialBlocks: blocks ?? [],
         isHost,
-        displayName:   localDisplayName || (isHost ? 'Host' : 'Guest'),
+        displayName: localDisplayName || (isHost ? 'Host' : 'Guest'),
     });
 
     // ── Stable editor blocks ──────────────────────────────────────────────────
@@ -86,15 +86,15 @@ export default function CollabPage() {
     // sharedBlocks is empty (i.e. before the Y.Doc is seeded / synced).
     // useStableBlocks ensures the reference is only replaced when content
     // actually changes, breaking the onChange → applyLocalChange → re-render loop.
-    const rawEditorBlocks   = sharedBlocks.length > 0 ? sharedBlocks : (blocks ?? []);
-    const editorBlocks      = useStableBlocks(rawEditorBlocks);
+    const rawEditorBlocks = sharedBlocks.length > 0 ? sharedBlocks : (blocks ?? []);
+    const editorBlocks = useStableBlocks(rawEditorBlocks);
 
     // ── Debounced applyLocalChange ────────────────────────────────────────────
     // Batches rapid keystrokes into a single Y.Doc transact + broadcast.
     // 120 ms is imperceptible to the typist but dramatically reduces the number
     // of updates sent to peers and Y.Doc writes per second.
-    const debounceTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pendingBlocks   = useRef<NoteBlock[] | null>(null);
+    const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pendingBlocks = useRef<NoteBlock[] | null>(null);
 
     const handleBlockChanges = useCallback(
         (updates: NoteBlock[]) => {
@@ -139,7 +139,7 @@ export default function CollabPage() {
             ? `${window.location.origin}/collab/${roomId}?noteid=${noteId}`
             : '';
 
-    const showEditor  = !isBlocksLoading && (isHost || accessStatus === 'granted');
+    const showEditor = !isBlocksLoading && (isHost || accessStatus === 'granted');
     const modalStatus = guestRoomId ? accessStatus : 'idle';
 
     return (

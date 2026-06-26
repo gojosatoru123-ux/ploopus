@@ -73,22 +73,22 @@ export function useCollaboration({
     const role: CollabRole = isHost ? 'host' : roomId ? 'guest' : 'idle';
 
     // ── PeerJS ────────────────────────────────────────────────────────────────
-    const peerRef        = useRef<Peer | null>(null);
+    const peerRef = useRef<Peer | null>(null);
     // For host: maps peerId → { conn, displayName } for approved peers
     // For guest: just holds the single host connection
     const connectionsRef = useRef<Map<string, DataConnection>>(new Map());
-    const retryCountRef  = useRef(0);
-    const retryTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const retryCountRef = useRef(0);
+    const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ── Stable ref mirrors ────────────────────────────────────────────────────
-    const isHostRef      = useRef(isHost);
+    const isHostRef = useRef(isHost);
     const displayNameRef = useRef(displayName);
-    useEffect(() => { isHostRef.current      = isHost;      }, [isHost]);
+    useEffect(() => { isHostRef.current = isHost; }, [isHost]);
     useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
 
     // ── Shared blocks ─────────────────────────────────────────────────────────
     const [sharedBlocks, setSharedBlocks] = useState<NoteBlock[]>(initialBlocks);
-    const sharedBlocksRef                 = useRef<NoteBlock[]>(initialBlocks);
+    const sharedBlocksRef = useRef<NoteBlock[]>(initialBlocks);
 
     const updateBlocks = useCallback((blocks: NoteBlock[]) => {
         sharedBlocksRef.current = blocks;
@@ -97,14 +97,14 @@ export function useCollaboration({
 
     // ── Peers & guests ────────────────────────────────────────────────────────
     const [connectedPeers, setConnectedPeers] = useState<ConnectedPeer[]>([]);
-    const [pendingGuests,  setPendingGuests]  = useState<PendingGuest[]>([]);
-    const [accessStatus,   setAccessStatus]   = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
-    const [isReady,        setIsReady]        = useState(false);
+    const [pendingGuests, setPendingGuests] = useState<PendingGuest[]>([]);
+    const [accessStatus, setAccessStatus] = useState<'idle' | 'pending' | 'granted' | 'denied'>('idle');
+    const [isReady, setIsReady] = useState(false);
 
     // Ref mirrors for synchronous reads inside stable callbacks
-    const pendingGuestsRef  = useRef<PendingGuest[]>([]);
+    const pendingGuestsRef = useRef<PendingGuest[]>([]);
     const connectedPeersRef = useRef<ConnectedPeer[]>([]);
-    useEffect(() => { pendingGuestsRef.current  = pendingGuests;  }, [pendingGuests]);
+    useEffect(() => { pendingGuestsRef.current = pendingGuests; }, [pendingGuests]);
     useEffect(() => { connectedPeersRef.current = connectedPeers; }, [connectedPeers]);
 
     const isApplyingRemoteRef = useRef(false);
