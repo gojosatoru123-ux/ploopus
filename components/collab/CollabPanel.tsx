@@ -19,8 +19,8 @@ import { PendingGuest, ConnectedPeer, CollabRole } from '@/hooks/useCollaboratio
 
 interface Props {
     role: CollabRole;
-    /** The display name of the local user (host or guest) */
     localDisplayName: string;
+    localEmail: string;
     roomUrl: string;
     pendingGuests: PendingGuest[];
     connectedPeers: ConnectedPeer[];
@@ -28,8 +28,8 @@ interface Props {
     onDeny: (peerId: string) => void;
 }
 
-// Deterministic avatar colour from a string so every peer gets a consistent
-// colour across all clients without needing to negotiate it over the wire.
+// Avatar colour is keyed on email (unique) not display name,
+// so two people named "Alex" get different colours.
 const AVATAR_COLOURS = [
     'bg-violet-500/15 text-violet-600',
     'bg-blue-500/15 text-blue-600',
@@ -40,15 +40,16 @@ const AVATAR_COLOURS = [
     'bg-fuchsia-500/15 text-fuchsia-600',
     'bg-orange-500/15 text-orange-600',
 ];
-function avatarColour(name: string): string {
+function avatarColour(email: string): string {
     let h = 0;
-    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    for (let i = 0; i < email.length; i++) h = (h * 31 + email.charCodeAt(i)) >>> 0;
     return AVATAR_COLOURS[h % AVATAR_COLOURS.length];
 }
 
 export default function CollabPanel({
     role,
     localDisplayName,
+    localEmail,
     roomUrl,
     pendingGuests,
     connectedPeers,
@@ -160,13 +161,16 @@ export default function CollabPanel({
                                                     exit={{ opacity: 0, y: -6 }}
                                                     className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2"
                                                 >
-                                                    <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${avatarColour(guest.displayName)}`}>
+                                                    <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${avatarColour(guest.email)}`}>
                                                         <span className="text-xs font-semibold">
                                                             {guest.displayName[0]?.toUpperCase()}
                                                         </span>
                                                     </div>
-                                                    <span className="flex-1 text-sm font-medium truncate">{guest.displayName}</span>
-                                                    <div className="flex items-center gap-1">
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-medium truncate">{guest.displayName}</p>
+                                                        <p className="text-xs text-muted-foreground truncate">{guest.email}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0">
                                                         <Button
                                                             size="icon"
                                                             variant="ghost"
@@ -203,15 +207,18 @@ export default function CollabPanel({
                                     {/* Local user (always shown first) */}
                                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/5 border border-primary/10">
                                         <div className="relative">
-                                            <div className={`h-7 w-7 rounded-full flex items-center justify-center ${avatarColour(localDisplayName)}`}>
+                                            <div className={`h-7 w-7 rounded-full flex items-center justify-center ${avatarColour(localEmail)}`}>
                                                 <span className="text-xs font-semibold">
                                                     {localDisplayName[0]?.toUpperCase()}
                                                 </span>
                                             </div>
                                             <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-card" />
                                         </div>
-                                        <span className="flex-1 text-sm truncate font-medium">{localDisplayName}</span>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-medium truncate">{localDisplayName}</p>
+                                            <p className="text-xs text-muted-foreground truncate">{localEmail}</p>
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
                                             {isHost && (
                                                 <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
                                                     <Crown className="h-2.5 w-2.5" /> Host
@@ -233,16 +240,19 @@ export default function CollabPanel({
                                                 className="flex items-center gap-2 px-3 py-2 rounded-xl bg-muted/30"
                                             >
                                                 <div className="relative">
-                                                    <div className={`h-7 w-7 rounded-full flex items-center justify-center ${avatarColour(peer.displayName)}`}>
+                                                    <div className={`h-7 w-7 rounded-full flex items-center justify-center ${avatarColour(peer.email)}`}>
                                                         <span className="text-xs font-semibold">
                                                             {peer.displayName[0]?.toUpperCase()}
                                                         </span>
                                                     </div>
                                                     <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-card" />
                                                 </div>
-                                                <span className="flex-1 text-sm truncate">{peer.displayName}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm truncate">{peer.displayName}</p>
+                                                    <p className="text-xs text-muted-foreground truncate">{peer.email}</p>
+                                                </div>
                                                 {peer.isHost && (
-                                                    <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5">
+                                                    <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium flex items-center gap-0.5 shrink-0">
                                                         <Crown className="h-2.5 w-2.5" /> Host
                                                     </span>
                                                 )}

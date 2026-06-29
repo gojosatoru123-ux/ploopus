@@ -8,22 +8,24 @@ export type CollabRole = 'host' | 'guest' | 'idle';
 export interface PendingGuest {
     peerId: string;
     displayName: string;
+    email: string;
     requestedAt: number;
 }
 export interface ConnectedPeer {
     peerId: string;
     displayName: string;
+    email: string;
     isHost?: boolean;
 }
 
-// ─── Wire messages ────────────────────────────────────────────────────────────
-
 // ─── Room limit ───────────────────────────────────────────────────────────────
-// 1 host + 9 guests = 10 total. The host counts as one slot.
 const MAX_ROOM_SIZE = 10;
 
+// ─── Wire messages ────────────────────────────────────────────────────────────
+// email is the unique identity — displayName is for UI only.
+
 type Msg =
-    | { type: 'ACCESS_REQUEST'; displayName: string }
+    | { type: 'ACCESS_REQUEST'; displayName: string; email: string }
     | { type: 'ACCESS_GRANTED'; blocks: NoteBlock[]; roster: RosterEntry[] }
     | { type: 'ACCESS_DENIED' }
     | { type: 'ROOM_FULL' }
@@ -33,50 +35,37 @@ type Msg =
 interface RosterEntry {
     peerId: string;
     displayName: string;
+    email: string;
     isHost?: boolean;
 }
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
-//
-// Keys are scoped to roomId so sessions in different rooms don't interfere.
-//
-//  collab:<roomId>:guestPeerId   — guest's stable PeerJS peer ID
-//  collab:<roomId>:guestName     — guest's display name
-//  collab:<roomId>:approvedPeers — host's JSON set of approved peer IDs
+// collab:<roomId>:approvedEmails — host's approved email set
 
 function lsKey(roomId: string, suffix: string) {
     return `collab:${roomId}:${suffix}`;
 }
 
-/** Guest: persist display name so it survives refresh and new tabs */
-function saveGuestName(roomId: string, name: string) {
-    localStorage.setItem(lsKey(roomId, 'guestName'), name);
-}
-function loadGuestName(roomId: string): string {
-    return localStorage.getItem(lsKey(roomId, 'guestName')) ?? '';
-}
-
-/** Host: approved display-name set (keyed by name, not peerId) */
-function loadApprovedNames(roomId: string): Set<string> {
+function loadApprovedEmails(roomId: string): Set<string> {
     try {
-        const raw = localStorage.getItem(lsKey(roomId, 'approvedNames'));
+        const raw = localStorage.getItem(lsKey(roomId, 'approvedEmails'));
         return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
     } catch {
         return new Set();
     }
 }
-function saveApprovedNames(roomId: string, set: Set<string>) {
-    localStorage.setItem(lsKey(roomId, 'approvedNames'), JSON.stringify([...set]));
+function saveApprovedEmails(roomId: string, set: Set<string>) {
+    localStorage.setItem(lsKey(roomId, 'approvedEmails'), JSON.stringify([...set]));
 }
-function addApprovedName(roomId: string, displayName: string) {
-    const set = loadApprovedNames(roomId);
-    set.add(displayName);
-    saveApprovedNames(roomId, set);
+function addApprovedEmail(roomId: string, email: string) {
+    const set = loadApprovedEmails(roomId);
+    set.add(email);
+    saveApprovedEmails(roomId, set);
 }
-function removeApprovedName(roomId: string, displayName: string) {
-    const set = loadApprovedNames(roomId);
-    set.delete(displayName);
-    saveApprovedNames(roomId, set);
+function removeApprovedEmail(roomId: string, email: string) {
+    const set = loadApprovedEmails(roomId);
+    set.delete(email);
+    saveApprovedEmails(roomId, set);
 }
 
 // ─── Peer ID derivation (host) ────────────────────────────────────────────────
@@ -96,7 +85,8 @@ interface UseCollaborationOptions {
     roomId: string;
     initialBlocks: NoteBlock[];
     isHost: boolean;
-    displayName?: string;
+    displayName: string;
+    email: string;
 }
 
 interface UseCollaborationReturn {
@@ -106,8 +96,6 @@ interface UseCollaborationReturn {
     pendingGuests: PendingGuest[];
     accessStatus: 'idle' | 'pending' | 'granted' | 'denied' | 'room_full';
     isReady: boolean;
-    /** Saved display name recovered from localStorage (guests only) */
-    savedDisplayName: string;
     approveGuest: (peerId: string) => void;
     denyGuest: (peerId: string) => void;
     applyLocalChange: (blocks: NoteBlock[]) => void;
@@ -117,7 +105,8 @@ export function useCollaboration({
     roomId,
     initialBlocks,
     isHost,
-    displayName = 'Anonymous',
+    displayName,
+    email,
 }: UseCollaborationOptions): UseCollaborationReturn {
     const role: CollabRole = isHost ? 'host' : roomId ? 'guest' : 'idle';
 
@@ -130,16 +119,12 @@ export function useCollaboration({
     // ── Stable ref mirrors ────────────────────────────────────────────────────
     const isHostRef      = useRef(isHost);
     const displayNameRef = useRef(displayName);
+    const emailRef       = useRef(email);
     const roomIdRef      = useRef(roomId);
     useEffect(() => { isHostRef.current      = isHost;      }, [isHost]);
     useEffect(() => { displayNameRef.current = displayName; }, [displayName]);
+    useEffect(() => { emailRef.current       = email;       }, [email]);
     useEffect(() => { roomIdRef.current      = roomId;      }, [roomId]);
-
-    // ── Saved display name (guests) ───────────────────────────────────────────
-    // Loaded once so CollabPage can pre-fill the name input on refresh.
-    const [savedDisplayName] = useState<string>(() =>
-        !isHost && roomId ? loadGuestName(roomId) : ''
-    );
 
     // ── Shared blocks ─────────────────────────────────────────────────────────
     const [sharedBlocks, setSharedBlocks] = useState<NoteBlock[]>(initialBlocks);
@@ -167,25 +152,22 @@ export function useCollaboration({
 
     const buildRoster = useCallback(
         (peers: ConnectedPeer[]): RosterEntry[] => [
-            { peerId: hostPeerIdForRoom(roomId), displayName: displayNameRef.current, isHost: true },
-            ...peers.map((p) => ({ peerId: p.peerId, displayName: p.displayName })),
+            {
+                peerId:      hostPeerIdForRoom(roomId),
+                displayName: displayNameRef.current,
+                email:       emailRef.current,
+                isHost:      true,
+            },
+            ...peers.map((p) => ({
+                peerId:      p.peerId,
+                displayName: p.displayName,
+                email:       p.email,
+            })),
         ],
         [roomId]
     );
 
-    const broadcastRoster = useCallback(
-        (peers: ConnectedPeer[]) => {
-            if (!isHostRef.current) return;
-            const msg: Msg = { type: 'ROSTER', roster: buildRoster(peers) };
-            connectionsRef.current.forEach((conn) => {
-                if (conn.open) conn.send(msg);
-            });
-        },
-        [buildRoster]
-    );
-
-    const broadcastRosterRef = useRef(broadcastRoster);
-    useEffect(() => { broadcastRosterRef.current = broadcastRoster; }, [broadcastRoster]);
+    const broadcastRosterRef = useRef<(peers: ConnectedPeer[]) => void>(() => {});
 
     const setConnectedPeersAndBroadcast = useCallback(
         (updater: (prev: ConnectedPeer[]) => ConnectedPeer[]) => {
@@ -198,12 +180,24 @@ export function useCollaboration({
         []
     );
 
+    const broadcastRoster = useCallback(
+        (peers: ConnectedPeer[]) => {
+            if (!isHostRef.current) return;
+            const msg: Msg = { type: 'ROSTER', roster: buildRoster(peers) };
+            connectionsRef.current.forEach((conn) => {
+                if (conn.open) conn.send(msg);
+            });
+        },
+        [buildRoster]
+    );
+    useEffect(() => { broadcastRosterRef.current = broadcastRoster; }, [broadcastRoster]);
+
     // ── Broadcast blocks ──────────────────────────────────────────────────────
 
-    const broadcastBlocks = useCallback((blocks: NoteBlock[], excludePeerId?: string) => {
+    const broadcastBlocks = useCallback((blocks: NoteBlock[]) => {
         const msg: Msg = { type: 'SYNC', blocks };
-        connectionsRef.current.forEach((conn, peerId) => {
-            if (peerId !== excludePeerId && conn.open) conn.send(msg);
+        connectionsRef.current.forEach((conn) => {
+            if (conn.open) conn.send(msg);
         });
     }, []);
 
@@ -216,21 +210,16 @@ export function useCollaboration({
         conn.on('data', (raw) => {
             const msg = raw as Msg;
 
+            // ── ACCESS_REQUEST ────────────────────────────────────────────────
             if (msg.type === 'ACCESS_REQUEST' && isHostRef.current) {
                 connectionsRef.current.set(conn.peer, conn);
 
-                const approvedNames = loadApprovedNames(roomIdRef.current);
-                const isReturning   = approvedNames.has(msg.displayName);
-
-                // connectedPeers holds guests only; +1 for the host = total occupancy.
-                // Returning approved members already hold a logical slot (they are
-                // just reconnecting), so they bypass the limit check.
+                const approvedEmails   = loadApprovedEmails(roomIdRef.current);
+                const isReturning      = approvedEmails.has(msg.email);
                 const currentOccupancy = connectedPeersRef.current.length + 1; // +1 for host
-                const wouldExceedLimit =
-                    !isReturning &&
-                    currentOccupancy >= MAX_ROOM_SIZE;
 
-                if (wouldExceedLimit) {
+                // Room full — only block new guests, not returning approved ones
+                if (!isReturning && currentOccupancy >= MAX_ROOM_SIZE) {
                     conn.send({ type: 'ROOM_FULL' } as Msg);
                     setTimeout(() => conn.close(), 300);
                     connectionsRef.current.delete(conn.peer);
@@ -238,10 +227,10 @@ export function useCollaboration({
                 }
 
                 if (isReturning) {
-                    // ── Auto-approve ──────────────────────────────────────────
+                    // Auto-approve: deduplicate by email (unique identity)
                     const nextPeers: ConnectedPeer[] = [
-                        ...connectedPeersRef.current.filter((p) => p.displayName !== msg.displayName),
-                        { peerId: conn.peer, displayName: msg.displayName },
+                        ...connectedPeersRef.current.filter((p) => p.email !== msg.email),
+                        { peerId: conn.peer, displayName: msg.displayName, email: msg.email },
                     ];
                     conn.send({
                         type: 'ACCESS_GRANTED',
@@ -250,45 +239,55 @@ export function useCollaboration({
                     } as Msg);
                     setConnectedPeersAndBroadcast(() => nextPeers);
                 } else {
-                    // ── Normal flow: show knock notification to host ───────────
+                    // Normal flow: show knock to host
                     setPendingGuests((prev) => [
-                        ...prev.filter((g) => g.peerId !== conn.peer),
-                        { peerId: conn.peer, displayName: msg.displayName, requestedAt: Date.now() },
+                        ...prev.filter((g) => g.email !== msg.email),
+                        {
+                            peerId:      conn.peer,
+                            displayName: msg.displayName,
+                            email:       msg.email,
+                            requestedAt: Date.now(),
+                        },
                     ]);
                 }
             }
 
+            // ── ACCESS_GRANTED ────────────────────────────────────────────────
             if (msg.type === 'ACCESS_GRANTED') {
                 setAccessStatus('granted');
                 isApplyingRemoteRef.current = true;
                 updateBlocks(msg.blocks);
-                // Filter out the guest's own entry — they are rendered separately
-                // as "You" in CollabPanel, so including themselves in connectedPeers
-                // would show them twice and inflate the count by 1.
-                setConnectedPeers(msg.roster
-                    .filter((r) => r.displayName !== displayNameRef.current)
-                    .map((r) => ({
-                        peerId: r.peerId,
-                        displayName: r.displayName,
-                        isHost: r.isHost,
-                    }))
+                // Filter self out — guest is shown as "You" in CollabPanel
+                setConnectedPeers(
+                    msg.roster
+                        .filter((r) => r.email !== emailRef.current)
+                        .map((r) => ({
+                            peerId:      r.peerId,
+                            displayName: r.displayName,
+                            email:       r.email,
+                            isHost:      r.isHost,
+                        }))
                 );
                 Promise.resolve().then(() => { isApplyingRemoteRef.current = false; });
             }
 
+            // ── ACCESS_DENIED ─────────────────────────────────────────────────
             if (msg.type === 'ACCESS_DENIED') {
                 setAccessStatus('denied');
                 conn.close();
             }
 
+            // ── ROOM_FULL ─────────────────────────────────────────────────────
             if (msg.type === 'ROOM_FULL') {
                 setAccessStatus('room_full');
                 conn.close();
             }
 
+            // ── SYNC ──────────────────────────────────────────────────────────
             if (msg.type === 'SYNC') {
                 isApplyingRemoteRef.current = true;
                 updateBlocks(msg.blocks);
+                // Host fans out to all other approved peers
                 if (isHostRef.current) {
                     connectionsRef.current.forEach((otherConn, otherPeerId) => {
                         if (otherPeerId !== conn.peer && otherConn.open) {
@@ -299,16 +298,18 @@ export function useCollaboration({
                 Promise.resolve().then(() => { isApplyingRemoteRef.current = false; });
             }
 
+            // ── ROSTER ────────────────────────────────────────────────────────
             if (msg.type === 'ROSTER') {
-                // Same self-filter as ACCESS_GRANTED — don't include the local
-                // guest in their own connectedPeers list.
-                setConnectedPeers(msg.roster
-                    .filter((r) => r.displayName !== displayNameRef.current)
-                    .map((r) => ({
-                        peerId: r.peerId,
-                        displayName: r.displayName,
-                        isHost: r.isHost,
-                    }))
+                // Filter self out — same as ACCESS_GRANTED
+                setConnectedPeers(
+                    msg.roster
+                        .filter((r) => r.email !== emailRef.current)
+                        .map((r) => ({
+                            peerId:      r.peerId,
+                            displayName: r.displayName,
+                            email:       r.email,
+                            isHost:      r.isHost,
+                        }))
                 );
             }
         });
@@ -316,23 +317,22 @@ export function useCollaboration({
         conn.on('close', () => {
             connectionsRef.current.delete(conn.peer);
             setPendingGuests((prev) => prev.filter((g) => g.peerId !== conn.peer));
-            if (isHostRef.current) {
-                // Find the display name that's closing
-                const closingName = connectedPeersRef.current.find(
-                    (p) => p.peerId === conn.peer
-                )?.displayName;
 
-                // Only evict from the roster if no other open connection in
-                // connectionsRef belongs to the same display name. This handles
-                // the case where the same person has two tabs open — closing one
-                // should not remove them from the roster while the other is live.
-                const sameNameStillConnected = closingName
+            if (isHostRef.current) {
+                // Find the email of the closing peer
+                const closingEmail = connectedPeersRef.current.find(
+                    (p) => p.peerId === conn.peer
+                )?.email;
+
+                // Only evict if no other open connection for the same email exists
+                // (same person in two tabs — closing one shouldn't evict them)
+                const sameEmailStillConnected = closingEmail
                     ? connectedPeersRef.current
-                        .filter((p) => p.displayName === closingName && p.peerId !== conn.peer)
+                        .filter((p) => p.email === closingEmail && p.peerId !== conn.peer)
                         .some((p) => connectionsRef.current.get(p.peerId)?.open)
                     : false;
 
-                if (!sameNameStillConnected) {
+                if (!sameEmailStillConnected) {
                     setConnectedPeersAndBroadcast((prev) =>
                         prev.filter((p) => p.peerId !== conn.peer)
                     );
@@ -355,10 +355,10 @@ export function useCollaboration({
         conn.on('open', () => {
             retryCountRef.current = 0;
             connectionsRef.current.set(hostPeerId, conn);
-
             conn.send({
-                type: 'ACCESS_REQUEST',
+                type:        'ACCESS_REQUEST',
                 displayName: displayNameRef.current,
+                email:       emailRef.current,
             } as Msg);
             setAccessStatus('pending');
         });
@@ -382,12 +382,9 @@ export function useCollaboration({
         if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
         retryCountRef.current = 0;
 
-        let peer: Peer;
-        if (isHost) {
-            peer = new Peer(hostPeerIdForRoom(roomId), { debug: 1 });
-        } else {
-            peer = new Peer({ debug: 1 }); // random ID fine — identity is now the display name
-        }
+        const peer = isHost
+            ? new Peer(hostPeerIdForRoom(roomId), { debug: 1 })
+            : new Peer({ debug: 1 });
 
         peerRef.current = peer;
 
@@ -442,9 +439,8 @@ export function useCollaboration({
 
         const guest = pendingGuestsRef.current.find((g) => g.peerId === peerId);
 
-        // Guard: room may have filled up while this guest was waiting in the queue
-        const currentOccupancy = connectedPeersRef.current.length + 1; // +1 for host
-        if (currentOccupancy >= MAX_ROOM_SIZE) {
+        // Guard: room may have filled while guest was waiting in queue
+        if (connectedPeersRef.current.length + 1 >= MAX_ROOM_SIZE) {
             conn.send({ type: 'ROOM_FULL' } as Msg);
             setTimeout(() => conn.close(), 300);
             connectionsRef.current.delete(peerId);
@@ -452,24 +448,22 @@ export function useCollaboration({
             return;
         }
 
-        // Deduplicate by displayName — if this person already has another
-        // connection (e.g. they were approved from a different tab earlier),
-        // replace that entry rather than appending a second one.
+        // Deduplicate by email
         const nextPeers: ConnectedPeer[] = [
             ...connectedPeersRef.current.filter((p) =>
-                p.peerId !== peerId && p.displayName !== guest?.displayName
+                p.peerId !== peerId && p.email !== guest?.email
             ),
-            ...(guest ? [{ peerId, displayName: guest.displayName }] : []),
+            ...(guest ? [{ peerId, displayName: guest.displayName, email: guest.email }] : []),
         ];
 
         conn.send({
-            type: 'ACCESS_GRANTED',
+            type:   'ACCESS_GRANTED',
             blocks: sharedBlocksRef.current,
             roster: buildRoster(nextPeers),
         } as Msg);
 
-        // Persist approval by display name so any tab/refresh with this name auto-rejoins
-        addApprovedName(roomId, guest?.displayName ?? '');
+        // Persist by email so this person auto-rejoins on refresh / new tab
+        if (guest?.email) addApprovedEmail(roomId, guest.email);
 
         setPendingGuests((prev) => prev.filter((g) => g.peerId !== peerId));
         setConnectedPeersAndBroadcast(() => nextPeers);
@@ -484,9 +478,8 @@ export function useCollaboration({
             setTimeout(() => conn.close(), 300);
             connectionsRef.current.delete(peerId);
         }
-        // Remove from approved names so this person must knock again
         const deniedGuest = pendingGuestsRef.current.find((g) => g.peerId === peerId);
-        if (deniedGuest) removeApprovedName(roomId, deniedGuest.displayName);
+        if (deniedGuest?.email) removeApprovedEmail(roomId, deniedGuest.email);
         setPendingGuests((prev) => prev.filter((g) => g.peerId !== peerId));
     }, [roomId]);
 
@@ -506,7 +499,6 @@ export function useCollaboration({
         pendingGuests,
         accessStatus,
         isReady,
-        savedDisplayName,
         approveGuest,
         denyGuest,
         applyLocalChange,

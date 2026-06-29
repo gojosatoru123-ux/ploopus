@@ -1,20 +1,26 @@
 'use client';
-import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Loader2, ShieldX, Users, DoorClosed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 interface Props {
     status: 'idle' | 'pending' | 'granted' | 'denied' | 'room_full';
-    /** Pre-filled from localStorage if the guest has visited this room before */
-    savedName?: string;
-    onRequestAccess: (displayName: string) => void;
+    displayName: string;
+    email: string;
+    onRequestAccess: () => void;
 }
 
-export default function CollabAccessModal({ status, savedName = '', onRequestAccess }: Props) {
-    const visible = status === 'idle' || status === 'pending' || status === 'denied' || status === 'room_full';
-    const [name, setName] = useState(savedName);
+export default function CollabAccessModal({
+    status,
+    displayName,
+    email,
+    onRequestAccess,
+}: Props) {
+    const visible =
+        status === 'idle' ||
+        status === 'pending' ||
+        status === 'denied' ||
+        status === 'room_full';
 
     const icon = () => {
         if (status === 'denied')    return <ShieldX    className="h-8 w-8 text-destructive" />;
@@ -38,8 +44,7 @@ export default function CollabAccessModal({ status, savedName = '', onRequestAcc
         if (status === 'denied')    return "The host didn't let you in. You can close this tab.";
         if (status === 'room_full') return 'This room has reached the 10-member limit. Try again later or ask someone to leave.';
         if (status === 'pending')   return 'Your request has been sent — waiting for the host to approve you.';
-        if (savedName)              return `Welcome back, ${savedName}! Confirm your name or change it below.`;
-        return "Enter your name so the host knows who's knocking.";
+        return 'You\'re joining as the account below. Click the button to request access.';
     };
 
     return (
@@ -69,26 +74,26 @@ export default function CollabAccessModal({ status, savedName = '', onRequestAcc
                             <p className="text-sm text-muted-foreground">{subtitle()}</p>
                         </div>
 
-                        {status === 'idle' && (
-                            <div className="w-full flex flex-col gap-3">
-                                <Input
-                                    placeholder="Your display name"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && name.trim()) onRequestAccess(name.trim());
-                                    }}
-                                    autoFocus
-                                    className="text-center"
-                                />
-                                <Button
-                                    className="w-full"
-                                    disabled={!name.trim()}
-                                    onClick={() => onRequestAccess(name.trim())}
-                                >
-                                    {savedName ? 'Rejoin session' : 'Request access'}
-                                </Button>
+                        {/* Identity card — shown in idle and pending states */}
+                        {(status === 'idle' || status === 'pending') && (
+                            <div className="w-full rounded-xl border border-border bg-muted/40 px-4 py-3 flex items-center gap-3">
+                                {/* Avatar initial */}
+                                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                    <span className="text-sm font-semibold text-primary">
+                                        {displayName?.[0]?.toUpperCase()}
+                                    </span>
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                    <span className="text-sm font-medium truncate">{displayName}</span>
+                                    <span className="text-xs text-muted-foreground truncate">{email}</span>
+                                </div>
                             </div>
+                        )}
+
+                        {status === 'idle' && (
+                            <Button className="w-full" onClick={onRequestAccess}>
+                                Request access
+                            </Button>
                         )}
 
                         {status === 'pending' && (
