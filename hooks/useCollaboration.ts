@@ -30,7 +30,8 @@ type Msg =
     | { type: 'ACCESS_DENIED' }
     | { type: 'ROOM_FULL' }
     | { type: 'SYNC'; blocks: NoteBlock[] }
-    | { type: 'ROSTER'; roster: RosterEntry[] };
+    | { type: 'ROSTER'; roster: RosterEntry[] }
+    | { type: 'HOST_LEAVING' };
 
 interface RosterEntry {
     peerId: string;
@@ -94,11 +95,13 @@ interface UseCollaborationReturn {
     sharedBlocks: NoteBlock[];
     connectedPeers: ConnectedPeer[];
     pendingGuests: PendingGuest[];
-    accessStatus: 'idle' | 'pending' | 'granted' | 'denied' | 'room_full';
+    accessStatus: 'idle' | 'pending' | 'granted' | 'denied' | 'room_full' | 'host_left';
     isReady: boolean;
     approveGuest: (peerId: string) => void;
     denyGuest: (peerId: string) => void;
     applyLocalChange: (blocks: NoteBlock[]) => void;
+    /** Host only: broadcast HOST_LEAVING to all guests then destroy peer */
+    endSession: () => void;
 }
 
 export function useCollaboration({
@@ -138,7 +141,7 @@ export function useCollaboration({
     // ── Peers & guests ────────────────────────────────────────────────────────
     const [connectedPeers, setConnectedPeers] = useState<ConnectedPeer[]>([]);
     const [pendingGuests,  setPendingGuests]  = useState<PendingGuest[]>([]);
-    const [accessStatus,   setAccessStatus]   = useState<'idle' | 'pending' | 'granted' | 'denied' | 'room_full'>('idle');
+    const [accessStatus,   setAccessStatus]   = useState<'idle' | 'pending' | 'granted' | 'denied' | 'room_full' | 'host_left'>('idle');
     const [isReady,        setIsReady]        = useState(false);
 
     const pendingGuestsRef  = useRef<PendingGuest[]>([]);
@@ -281,6 +284,14 @@ export function useCollaboration({
             if (msg.type === 'ROOM_FULL') {
                 setAccessStatus('room_full');
                 conn.close();
+            }
+
+            // ── HOST_LEAVING ──────────────────────────────────────────────────
+            // Host is shutting down gracefully. Surface to UI so guest can
+            // save a copy. Editor stays readable — don't close the connection
+            // here, it will drop naturally when the host destroys their peer.
+            if (msg.type === 'HOST_LEAVING') {
+                setAccessStatus('host_left');
             }
 
             // ── SYNC ──────────────────────────────────────────────────────────
@@ -492,6 +503,27 @@ export function useCollaboration({
         broadcastBlocksRef.current(blocks);
     }, [updateBlocks]);
 
+    // ── Host: end session ─────────────────────────────────────────────────────
+    // 1. Broadcast HOST_LEAVING synchronously — DataChannel send is fire-and-forget,
+    //    never blocks or hangs regardless of peer state.
+    // 2. Destroy peer after 300 ms so the message has time to flush through
+    //    the DataChannel before the underlying RTCPeerConnection closes.
+    // CollabPage calls this then navigates away after a further 100 ms gap.
+
+    const endSession = useCallback(() => {
+        if (!isHostRef.current) return;
+        const msg: Msg = { type: 'HOST_LEAVING' };
+        connectionsRef.current.forEach((conn) => {
+            try { if (conn.open) conn.send(msg); } catch { /* ignore closed conn */ }
+        });
+        setTimeout(() => {
+            peerRef.current?.destroy();
+            peerRef.current = null;
+            connectionsRef.current.clear();
+            setIsReady(false);
+        }, 300);
+    }, []);
+
     return {
         role,
         sharedBlocks,
@@ -502,5 +534,6 @@ export function useCollaboration({
         approveGuest,
         denyGuest,
         applyLocalChange,
+        endSession,
     };
 }

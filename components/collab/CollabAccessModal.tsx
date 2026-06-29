@@ -4,7 +4,7 @@ import { Loader2, ShieldX, Users, DoorClosed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Props {
-    status: 'idle' | 'pending' | 'granted' | 'denied' | 'room_full';
+    status: 'idle' | 'pending' | 'granted' | 'denied' | 'room_full' | 'host_left';
     displayName: string;
     email: string;
     onRequestAccess: () => void;
@@ -21,6 +21,7 @@ export default function CollabAccessModal({
         status === 'pending' ||
         status === 'denied' ||
         status === 'room_full';
+    // host_left is handled by CollabSessionEndedModal — not this modal
 
     const icon = () => {
         if (status === 'denied')    return <ShieldX    className="h-8 w-8 text-destructive" />;
