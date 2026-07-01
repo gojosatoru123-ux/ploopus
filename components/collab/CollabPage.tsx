@@ -80,43 +80,60 @@ export default function CollabPage() {
     });
 
     // ── Host: save state ──────────────────────────────────────────────────────
-    // We track save status here in CollabPage because saving is done via
-    // setBlocks (which lives here, not in the hook). The hook only broadcasts.
-    const [saveStatus,  setSaveStatus]  = useState<SaveStatus>('unsaved');
+    const [saveStatus, setSaveStatus] = useState<SaveStatus>('unsaved');
     const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
-    const saveTimerRef                  = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const versionRef = useRef(0);
 
-    // Trigger a save: call setBlocks so useActiveNote's debounced auto-save fires.
-    // Also touch updatedAt on the index so the note floats to top of recents.
-    // Never awaits anything — completely non-blocking.
+    useEffect(() => {
+        if (!isHost || !noteId) return;
+        versionRef.current += 1;
+        const thisVersion = versionRef.current;
+
+        // 1. Update data instantly in the background so the auto-save engine works
+        setBlocks([...sharedBlocks]);
+        updateNoteIndex(noteId, { updatedAt: new Date().toISOString() });
+
+        // 2. Clear any pending UI updates while the user is actively typing
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+        // 3. This block runs ONLY when the user pauses typing for 800ms
+        saveTimerRef.current = setTimeout(() => {
+            if (versionRef.current === thisVersion) {
+                // Step A: Show 'saving' exactly when StorageEngine's 800ms buffer hits
+                setSaveStatus('saving');
+
+                // Step B: Hold it for a brief moment while the write finishes, then mark as saved
+                setTimeout(() => {
+                    if (versionRef.current === thisVersion) {
+                        setLastSavedAt(Date.now());
+                        setSaveStatus('saved');
+                    }
+                }, 500); // 500ms visual confirmation window for the write operation
+            }
+        }, 800); // Matches your exact StorageEngine 800ms debounce threshold!
+
+    }, [sharedBlocks, isHost, noteId, setBlocks, updateNoteIndex]);
+
+    // Manual "Save now" button — identical logic, callable on demand.
     const triggerSave = useCallback(() => {
         if (!isHost || !noteId) return;
+        versionRef.current += 1;
+        const thisVersion = versionRef.current;
+
         setSaveStatus('saving');
-        setBlocks([...sharedBlocks]); // new ref triggers useActiveNote's effect
+        setBlocks([...sharedBlocks]);
         updateNoteIndex(noteId, { updatedAt: new Date().toISOString() });
-        // Show "saving" for 600 ms then flip to "saved" — matches the debounce
-        // window in StorageEngine so the indicator resolves after the write starts.
-        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = setTimeout(() => {
-            setLastSavedAt(Date.now());
-            setSaveStatus('saved');
+
+        setTimeout(() => {
+            if (versionRef.current === thisVersion) {
+                setLastSavedAt(Date.now());
+                setSaveStatus('saved');
+            }
         }, 600);
     }, [isHost, noteId, setBlocks, sharedBlocks, updateNoteIndex]);
 
-    // Mark unsaved whenever sharedBlocks change after the last save
-    useEffect(() => {
-        if (!isHost || !isReady) return;
-        setSaveStatus('unsaved');
-    }, [sharedBlocks, isHost, isReady]);
-
-    // Auto-save every 30 s while the host is live
-    useEffect(() => {
-        if (!isHost || !isReady) return;
-        const id = setInterval(triggerSave, 30_000);
-        return () => clearInterval(id);
-    }, [isHost, isReady, triggerSave]);
-
-    // Cleanup save timer on unmount
+    // Cleanup any in-flight timer only on actual unmount
     useEffect(() => () => {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     }, []);
@@ -268,13 +285,11 @@ export default function CollabPage() {
                     )}
                     {isHost && (
                         <>
-                            {/* Save status indicator — styled like SyncStatusIndicator */}
-                            {isReady && (
-                                <CollabSaveIndicator
-                                    status={saveStatus}
-                                    lastSavedAt={lastSavedAt}
-                                />
-                            )}
+                            {/* Save status indicator — now connection-independent */}
+                            <CollabSaveIndicator
+                                status={saveStatus}
+                                lastSavedAt={lastSavedAt}
+                            />
 
                             {/* Manual save */}
                             <button
