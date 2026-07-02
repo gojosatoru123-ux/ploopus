@@ -241,6 +241,89 @@ export default function CollabPage() {
         setGuestRoomId(roomId);
     }, [roomId]);
 
+    // ── Navigation guard ──────────────────────────────────────────────────────
+    // Catches accidental in-app link clicks and browser back/forward while the
+    // host is mid-session, and asks for confirmation before actually leaving.
+    // On confirm: ends the collab session, then performs the navigation.
+    const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+    const pendingNavRef = useRef<{ type: 'link' | 'popstate'; href?: string } | null>(null);
+
+    // Kept in a ref so the click/popstate listeners (registered once) always
+    // see the latest guard-active state without needing to re-subscribe.
+    // (Populated further down, once `showEditor` has been computed.)
+    const guardActiveRef = useRef(false);
+
+    // Intercept clicks on any in-app <a> link
+    useEffect(() => {
+        const handleClick = (e: MouseEvent) => {
+            if (!guardActiveRef.current) return;
+
+            const anchor = (e.target as HTMLElement)?.closest('a');
+            if (!anchor) return;
+
+            const href = anchor.getAttribute('href');
+            const isExternal =
+                anchor.target === '_blank' ||
+                (href && /^(https?:)?\/\//i.test(href) && !href.startsWith(window.location.origin));
+
+            if (!href || href.startsWith('#') || isExternal) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+            pendingNavRef.current = { type: 'link', href };
+            setShowLeaveConfirm(true);
+        };
+
+        // Capture phase so we intercept before Next.js's own Link handler runs
+        document.addEventListener('click', handleClick, true);
+        return () => document.removeEventListener('click', handleClick, true);
+    }, []);
+
+    // Intercept browser back/forward
+    useEffect(() => {
+        // Seed an extra history entry so the first back-press fires a popstate
+        // we can catch and cancel, rather than immediately leaving the page.
+        window.history.pushState({ collabGuard: true }, '');
+
+        const handlePopState = () => {
+            if (!guardActiveRef.current) return;
+
+            // Re-push immediately so the URL/history doesn't actually move yet —
+            // the modal decides whether the navigation really happens.
+            window.history.pushState({ collabGuard: true }, '');
+            pendingNavRef.current = { type: 'popstate' };
+            setShowLeaveConfirm(true);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
+
+    const handleConfirmLeave = useCallback(() => {
+        setShowLeaveConfirm(false);
+
+        // Save + broadcast HOST_LEAVING, same as the explicit "End session" button
+        triggerSave();
+        endSession();
+
+        const pending = pendingNavRef.current;
+        pendingNavRef.current = null;
+
+        setTimeout(() => {
+            if (pending?.type === 'link' && pending.href) {
+                router.push(pending.href);
+            } else {
+                // Back/forward press, or no target captured — leave to the note
+                router.push(`/note/ideas/${noteId}`);
+            }
+        }, 400);
+    }, [triggerSave, endSession, router, noteId]);
+
+    const handleCancelLeave = useCallback(() => {
+        setShowLeaveConfirm(false);
+        pendingNavRef.current = null;
+    }, []);
+
     // ── Derived ───────────────────────────────────────────────────────────────
 
     const shareUrl =
@@ -250,6 +333,11 @@ export default function CollabPage() {
 
     const showEditor  = !isBlocksLoading && (isHost || accessStatus === 'granted' || accessStatus === 'host_left');
     const modalStatus = (guestRoomId || accessStatus === 'room_full') ? accessStatus : 'idle';
+
+    // Keep the nav-guard ref in sync now that showEditor is available
+    useEffect(() => {
+        guardActiveRef.current = isHost && showEditor;
+    }, [isHost, showEditor]);
 
     return (
         <>
@@ -269,6 +357,38 @@ export default function CollabPage() {
                 onSaveCopy={handleGuestSaveCopy}
                 onDismiss={() => setSessionEndedVisible(false)}
             />
+
+            {/* ── Host: confirm-before-leaving modal ── */}
+            {showLeaveConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.15 }}
+                        className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-lg"
+                    >
+                        <h2 className="text-sm font-semibold text-foreground">Leave this session?</h2>
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                            Navigating away will end the collaboration session for everyone
+                            currently connected. Your changes will be saved first.
+                        </p>
+                        <div className="mt-4 flex justify-end gap-2">
+                            <button
+                                onClick={handleCancelLeave}
+                                className="text-xs bg-muted hover:bg-muted/80 px-3 py-1.5 rounded-md transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmLeave}
+                                className="text-xs bg-destructive/10 text-destructive hover:bg-destructive/20 px-3 py-1.5 rounded-md transition-colors font-medium"
+                            >
+                                Exit
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
 
             {/* ── Top bar ── */}
             <motion.div
