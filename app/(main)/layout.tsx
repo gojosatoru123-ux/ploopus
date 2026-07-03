@@ -23,7 +23,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               <AppSidebar />
               <SidebarInset className="flex flex-1 flex-col overflow-hidden">
                 {children}
-                <CommandPalette/>
+                <CommandPalette />
               </SidebarInset>
             </div>
           </SidebarProvider>
