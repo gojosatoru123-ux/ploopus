@@ -21,6 +21,7 @@ import CollabAccessModal       from '@/components/collab/CollabAccessModal';
 import CollabPanel             from '@/components/collab/CollabPanel';
 import CollabSaveIndicator, { SaveStatus } from '@/components/collab/CollabSaveIndicator';
 import CollabSessionEndedModal from '@/components/collab/CollabSessionEndedModal';
+import CollabHostLeavingConfirmModal from './CollabHostLeavingConfirmModal';
 
 /**
  * useStableBlocks
@@ -359,36 +360,11 @@ export default function CollabPage() {
             />
 
             {/* ── Host: confirm-before-leaving modal ── */}
-            {showLeaveConfirm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.96 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.15 }}
-                        className="w-full max-w-sm rounded-lg border border-border bg-card p-5 shadow-lg"
-                    >
-                        <h2 className="text-sm font-semibold text-foreground">Leave this session?</h2>
-                        <p className="mt-1.5 text-xs text-muted-foreground">
-                            Navigating away will end the collaboration session for everyone
-                            currently connected. Your changes will be saved first.
-                        </p>
-                        <div className="mt-4 flex justify-end gap-2">
-                            <button
-                                onClick={handleCancelLeave}
-                                className="text-xs bg-muted hover:bg-muted/80 px-3 py-1.5 rounded-md transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleConfirmLeave}
-                                className="text-xs bg-destructive/10 text-destructive hover:bg-destructive/20 px-3 py-1.5 rounded-md transition-colors font-medium"
-                            >
-                                Exit
-                            </button>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
+            <CollabHostLeavingConfirmModal
+                showLeaveConfirm={showLeaveConfirm}
+                handleCancelLeave={handleCancelLeave}
+                handleConfirmLeave={handleConfirmLeave}
+            />
 
             {/* ── Top bar ── */}
             <motion.div
