@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Folder, Plus, Trash2, FolderOpen, StickyNote, X, ArrowLeft, Check, Search, Menu } from "lucide-react";
+import { Folder, Plus, Trash2, FolderOpen, StickyNote, X, ArrowLeft, Check, Search, Menu, FolderInput } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useNotesContext } from "@/contexts/NotesContext";
@@ -34,9 +34,11 @@ const FolderPage = () => {
   const {
     isInitialized,
     folders,
+    noteIndexes,
     createFolder,
     deleteFolder,
     createNoteIndex,
+    updateNoteIndex,
     getNoteIndexesForFolder
   } = useNotesContext();
 
@@ -44,6 +46,8 @@ const FolderPage = () => {
   const [newFolderName, setNewFolderName] = useState("");
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState("");
 
   // Mobile Sidebar State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -256,16 +260,25 @@ const FolderPage = () => {
                       {folderNotes.length} notes found
                     </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      const noteId = createNoteIndex(selectedFolder.id);
-                      router.push(`/note/ideas/${noteId}`);
-                    }}
-                    className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium shadow-lg"
-                  >
-                    <Plus className="w-5 h-5" />
-                    New Note
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setAddOpen((v) => !v)}
+                      className="flex items-center justify-center gap-2 px-6 py-3 border-primary border rounded-xl font-medium shadow-lg"
+                    >
+                      <FolderInput className="w-5 h-5" />
+                      Add Existing
+                    </button>
+                    <button
+                      onClick={() => {
+                        const noteId = createNoteIndex(selectedFolder.id);
+                        router.push(`/note/ideas/${noteId}`);
+                      }}
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium shadow-lg"
+                    >
+                      <Plus className="w-5 h-5" />
+                      New Note
+                    </button>
+                  </div>
                 </div>
 
                 {folderNotes.length === 0 ? (
@@ -330,7 +343,7 @@ const FolderPage = () => {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="absolute inset-0 bg-background/40 backdrop-blur-md"
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                 onClick={() => setShowCreateModal(false)}
               />
               <motion.div
@@ -372,6 +385,90 @@ const FolderPage = () => {
           )
         }
       </AnimatePresence >
+
+      {/* ADD EXISTING MODAL */}
+      <AnimatePresence>
+        {addOpen &&
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm pointer-events-auto"
+              onClick={() => setAddOpen(!addOpen)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 320, damping: 28 }}
+              className="fixed inset-x-0 top-[21vh] mx-auto w-full max-w-xl bg-card border border-border rounded-xl shadow-2xl overflow-hidden z-51 flex flex-col max-h-[80vh] pointer-events-auto"
+            >
+              {/* Search Input */}
+              <div className="flex items-center px-4 border-b border-border/60 h-12 shrink-0 gap-3">
+                <Search className="w-3.5 h-3.5 text-muted-foreground" />
+                <input
+                  autoFocus
+                  value={addQuery}
+                  onChange={(e) => setAddQuery(e.target.value)}
+                  placeholder="Search notes to add..."
+                  className="flex-1 h-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+                {addQuery && (
+                  <button
+                    onClick={() => setAddQuery("")}
+                    className="p-1 hover:bg-muted rounded text-muted-foreground"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              {/* Results Area */}
+              <div className="max-h-72 overflow-y-auto scrollbar-thin py-1 px-2">
+                {(() => {
+                  const candidates = noteIndexes
+                    .filter((n) => n.folderId !== selectedFolderId)
+                    .filter((n) =>
+                      addQuery
+                        ? (n.title || "Untitled")
+                          .toLowerCase()
+                          .includes(addQuery.toLowerCase())
+                        : true
+                    );
+                  if (candidates.length === 0) {
+                    return (
+                      <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                        No notes available
+                      </p>
+                    );
+                  }
+                  return candidates.map((n) => {
+                    const currentFolder = folders.find((f) => f.id === n.folderId);
+                    return (
+                      <button
+                        key={n.id}
+                        onClick={() => {
+                          updateNoteIndex(n.id, { folderId: selectedFolderId });
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg cursor-pointer hover:bg-accent transition-colors text-left"
+                      >
+                        <StickyNote className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm truncate">{n.title || "Untitled"}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            {currentFolder ? `in ${currentFolder.name}` : ""}
+                          </p>
+                        </div>
+                        <Check className="w-4 h-4 text-primary opacity-0" />
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            </motion.div>
+          </>
+        }
+      </AnimatePresence>
     </div >
   );
 };

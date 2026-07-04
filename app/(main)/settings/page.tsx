@@ -9,7 +9,8 @@ import {
     ArrowRight,
     Sparkles,
     Calendar,
-    Users
+    Users,
+    Crown
 } from "lucide-react";
 import JSZip from "jszip";
 import { useNotesContext } from "@/contexts/NotesContext";
@@ -479,11 +480,11 @@ const Settings = () => {
             icon: Sparkles,
             showExpiry: true,
         },
-        team: {
-            badgeText: "Team Enterprise",
+        creator: {
+            badgeText: "Creator",
             badgeStyles: "bg-blue-500 text-white",
-            title: "Team Account Status",
-            icon: Users,
+            title: "Creator Account Status",
+            icon: Crown,
             showExpiry: true,
         }
     };
