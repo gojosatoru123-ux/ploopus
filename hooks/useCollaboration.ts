@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Peer, { DataConnection } from 'peerjs';
+import Peer, { DataConnection, PeerJSOption } from 'peerjs';
 import { NoteBlock } from '@/lib/types';
 
 export type CollabRole = 'host' | 'guest' | 'idle';
@@ -78,6 +78,69 @@ function djb2(str: string): number {
 }
 function hostPeerIdForRoom(roomId: string): string {
     return `nh${djb2(roomId).toString(16).padStart(8, '0')}`;
+}
+
+// ─── PeerJS / ICE configuration ───────────────────────────────────────────────
+// Everything here falls back to sane public defaults, so the app keeps working
+// with zero env setup. For production, override via .env:
+//
+//   NEXT_PUBLIC_PEER_HOST       — custom PeerServer host (omit to use PeerJS's
+//                                 public cloud broker, e.g. for local dev)
+//   NEXT_PUBLIC_PEER_PORT       — defaults to 443
+//   NEXT_PUBLIC_PEER_PATH       — defaults to '/'
+//   NEXT_PUBLIC_PEER_SECURE     — 'false' to use ws/http instead of wss/https
+//   NEXT_PUBLIC_PEER_KEY        — PeerServer API key, if yours requires one
+//   NEXT_PUBLIC_STUN_URLS       — comma-separated stun: URLs
+//   NEXT_PUBLIC_TURN_URL        — a turn: (or turns:) URL — needed for guests
+//                                 behind symmetric NATs / strict firewalls,
+//                                 where STUN alone can't establish a path
+//   NEXT_PUBLIC_TURN_USERNAME
+//   NEXT_PUBLIC_TURN_CREDENTIAL
+
+const DEFAULT_STUN_URLS = [
+    'stun:stun.l.google.com:19302',
+    'stun:global.stun.twilio.com:3478',
+];
+
+function buildIceServers(): RTCIceServer[] {
+    const servers: RTCIceServer[] = [];
+
+    const stunUrls = (process.env.NEXT_PUBLIC_STUN_URLS ?? DEFAULT_STUN_URLS.join(','))
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    if (stunUrls.length) servers.push({ urls: stunUrls });
+
+    const turnUrl = process.env.NEXT_PUBLIC_TURN_URL;
+    if (turnUrl) {
+        servers.push({
+            urls:       turnUrl,
+            username:   process.env.NEXT_PUBLIC_TURN_USERNAME,
+            credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
+        });
+    }
+
+    return servers;
+}
+
+function buildPeerOptions(): PeerJSOption {
+    const opts: PeerJSOption = {
+        debug:  1,
+        config: { iceServers: buildIceServers() },
+    };
+
+    // Only point at a custom signalling server if one is actually configured —
+    // otherwise let PeerJS fall back to its own public cloud broker.
+    const host = process.env.NEXT_PUBLIC_PEER_HOST;
+    if (host) {
+        opts.host   = host;
+        opts.port   = Number(process.env.NEXT_PUBLIC_PEER_PORT ?? 443);
+        opts.path   = process.env.NEXT_PUBLIC_PEER_PATH ?? '/';
+        opts.secure = process.env.NEXT_PUBLIC_PEER_SECURE !== 'false';
+        if (process.env.NEXT_PUBLIC_PEER_KEY) opts.key = process.env.NEXT_PUBLIC_PEER_KEY;
+    }
+
+    return opts;
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -393,9 +456,10 @@ export function useCollaboration({
         if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
         retryCountRef.current = 0;
 
+        const peerOptions = buildPeerOptions();
         const peer = isHost
-            ? new Peer(hostPeerIdForRoom(roomId), { debug: 1 })
-            : new Peer({ debug: 1 });
+            ? new Peer(hostPeerIdForRoom(roomId), peerOptions)
+            : new Peer(peerOptions);
 
         peerRef.current = peer;
 
