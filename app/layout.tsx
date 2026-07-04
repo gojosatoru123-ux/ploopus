@@ -87,10 +87,12 @@ export default function RootLayout({
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster toastOptions={{
           style: {
-            background: 'rgba(92,138,121, 0.2)',
-            backdropFilter: 'blur(12px)',
-            border: '1px solid rgba(92,138,121, 1)',
-            color: '#1a1a1a',
+            background: 'white',
+            borderLeft: '4px solid rgba(92,138,121, 1)',
+            borderRight: '1px solid rgba(92,138,121, 0.4)',  
+            borderTop: '1px solid rgba(92,138,121, 0.4)',  
+            borderBottom: '1px solid rgba(92,138,121, 0.4)',            
+            color: 'black',
           },
         }} />
       </body>
