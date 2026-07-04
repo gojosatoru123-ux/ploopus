@@ -249,7 +249,7 @@ const buildZip = (entries: ZipEntry[]): Blob => {
     le16(0),
   );
 
-  return new Blob([...localParts, centralDir, eocd], { type: "application/zip" });
+  return new Blob([...localParts, centralDir, eocd] as BlobPart[], { type: "application/zip" });
 };
 
 // ─── Public types ─────────────────────────────────────────────────────────────
