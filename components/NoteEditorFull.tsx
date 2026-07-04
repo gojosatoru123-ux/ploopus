@@ -17,6 +17,7 @@ import { SyncStatusIndicator } from "./utility/SyncStatusIndicator";
 import { toast } from "sonner";
 import AiAssistantModal from "./modals/AiAssistantModal";
 import PublishSiteModal from "./modals/PublishSiteModal";
+import { useRouter } from "next/navigation";
 
 interface NoteEditorFullProps {
   note: Note;
@@ -44,6 +45,7 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showAi, setShowAi] = useState(false);
   const menuContainerRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   useEffect(() => {
     const handleOutsideClick = (event: MouseEvent) => {
       if (menuContainerRef.current && !menuContainerRef.current.contains(event.target as Node)) {
@@ -649,6 +651,24 @@ const NoteEditorFull = ({ note, onUpdate, focusMode = false, onToggleFocusMode }
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
                     <p>Publish Site</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="relative">
+                      <motion.button
+                        onClick={() => router.push(`/collab/roomid123?noteid=${note.id}&host=1`)}
+                        className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </motion.button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Collab</p>
                   </TooltipContent>
                 </Tooltip>
 
