@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { db } from "@/db/drizzle"; // your drizzle instance
 import { nextCookies } from "better-auth/next-js";
+import { bearer } from "better-auth/plugins";
 import { schema } from "@/db/schema";
 import { customSession } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
@@ -34,5 +35,6 @@ export const auth = betterAuth({
                 session
             };
         }),
+        bearer(),
         nextCookies()] // make sure this is the last plugin in the array
 });
