@@ -40,34 +40,29 @@ export default function DesktopLogin() {
   };
 
   const handOffToken = async () => {
-    setStatus("connecting");
-    console.log("[desktop-login] fetching bearer token…");
+  setStatus("connecting");
+  console.log("[desktop-login] requesting token from exchange API…");
 
-    await authClient.getSession({
-      fetchOptions: {
-        onSuccess: (ctx) => {
-          const token = ctx.response.headers.get("set-auth-token");
-          console.log("[desktop-login] set-auth-token header:", token);
+  try {
+    const response = await fetch("/api/auth/get-desktop-token");
+    const data = await response.json();
 
-          if (!token) {
-            setStatus("error");
-            setErrorMsg("No token in response headers — check bearer() plugin is registered.");
-            return;
-          }
+    if (!response.ok || !data.token) {
+      throw new Error(data.error || "Failed to retrieve token");
+    }
 
-          const deepLink = `ploopus://auth-callback?token=${encodeURIComponent(token)}`;
-          console.log("[desktop-login] redirecting to:", deepLink);
-          window.location.href = deepLink;
-          setStatus("done");
-        },
-        onError: (ctx) => {
-          console.error("[desktop-login] getSession error:", ctx.error);
-          setStatus("error");
-          setErrorMsg(ctx.error.message ?? "Failed to fetch session");
-        },
-      },
-    });
-  };
+    const token = data.token;
+    const deepLink = `ploopus://auth-callback?token=${encodeURIComponent(token)}`;
+    
+    console.log("[desktop-login] redirecting to:", deepLink);
+    window.location.href = deepLink;
+    setStatus("done");
+  } catch (err: any) {
+    console.error("[desktop-login] Token exchange error:", err);
+    setStatus("error");
+    setErrorMsg(err.message || "Failed to connect to desktop app");
+  }
+};
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background text-white">
