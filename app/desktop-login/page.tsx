@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
 export default function DesktopLogin() {
-  const [status, setStatus] = useState
+  const [status, setStatus] = useState<
     "idle" | "checking" | "redirecting" | "connecting" | "done" | "error"
   >("checking");
   const [errorMsg, setErrorMsg] = useState("");
