@@ -26,5 +26,5 @@ export async function GET(req: Request) {
   };
   const { message, signature } = signLicense(payload);
 
-  return Response.json({ payload, signature }, { headers: CORS_HEADERS });
+  return Response.json({ message, signature }, { headers: CORS_HEADERS });
 }
