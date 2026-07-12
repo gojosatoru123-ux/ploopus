@@ -22,9 +22,10 @@ export async function GET(req: Request) {
   const payload = {
     user: session.user,
     subscription: session.subscription,
+    deviceId: req.nextUrl.searchParams.get("deviceid"),
     fetchedAt: Date.now(),
   };
   const { message, signature } = signLicense(payload);
 
-  return Response.json({ message, signature }, { headers: CORS_HEADERS });
+  return Response.json({ message, signature, deviceId: req.nextUrl.searchParams.get("deviceid")}, { headers: CORS_HEADERS });
 }
