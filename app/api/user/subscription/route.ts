@@ -1,6 +1,7 @@
 // app/api/user/subscription/route.ts
 import { auth } from "@/lib/auth";
 import { signLicense } from "@/lib/license";
+import { NextRequest, NextResponse } from "next/server";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -12,20 +13,25 @@ export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS_HEADERS });
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const session = await auth.api.getSession({ headers: req.headers });
 
   if (!session) {
-    return Response.json({ error: "unauthorized" }, { status: 401, headers: CORS_HEADERS });
+    return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: CORS_HEADERS });
+  }
+  const deviceId = req.nextUrl.searchParams.get("deviceid");
+  
+  if (!deviceId) {
+    return NextResponse.json({ error: "missing deviceid" }, { status: 400, headers: CORS_HEADERS });
   }
   
   const payload = {
     user: session.user,
     subscription: session.subscription,
-    deviceId: req.nextUrl.searchParams.get("deviceid"),
+    deviceId: deviceId,
     fetchedAt: Date.now(),
   };
   const { message, signature } = signLicense(payload);
 
-  return Response.json({ message, signature, deviceId: req.nextUrl.searchParams.get("deviceid")}, { headers: CORS_HEADERS });
+  return NextResponse.json({ message, signature, deviceId}, { headers: CORS_HEADERS });
 }
