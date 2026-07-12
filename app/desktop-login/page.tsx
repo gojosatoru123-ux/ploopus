@@ -29,7 +29,7 @@ export default function DesktopLogin() {
     console.log("[desktop-login] starting Google sign-in…");
     const { error } = await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/desktop-login",
+      callbackURL: window.location.pathname + window.location.search, // preserve code_challenge across redirect
     });
     if (error) {
       console.error("[desktop-login] signIn.social error:", error);
@@ -44,6 +44,10 @@ export default function DesktopLogin() {
   console.log("[desktop-login] requesting token from exchange API…");
 
   try {
+    const params = new URLSearchParams(window.location.search);
+    const codeChallenge = params.get("code_challenge");
+    if (!codeChallenge) throw new Error("Missing code_challenge");
+    
     const response = await fetch("/api/auth/get-desktop-token");
     const data = await response.json();
 
@@ -51,8 +55,16 @@ export default function DesktopLogin() {
       throw new Error(data.error || "Failed to retrieve token");
     }
 
-    const token = data.token;
-    const deepLink = `ploopus://auth-callback?token=${encodeURIComponent(token)}`;
+    // const token = data.token;
+    const exchangeCodeRes = await fetch("/api/auth/create-exchange-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: data.token, codeChallenge }),
+      });
+    const { code } = await exchangeCodeRes.json();
+    if (!code) throw new Error("Failed to create exchange code");
+    
+    const deepLink = `ploopus://auth-callback?code=${encodeURIComponent(code)}`;
     
     console.log("[desktop-login] redirecting to:", deepLink);
     window.location.href = deepLink;
