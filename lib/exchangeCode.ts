@@ -1,7 +1,13 @@
 // lib/exchangeCode.ts
 import { randomBytes, createCipheriv, createDecipheriv } from "crypto";
 
-const SECRET = Buffer.from(process.env.PKCE_EXCHANGE_SECRET!, "hex"); // 32 bytes
+const secretKey = process.env.PKCE_EXCHANGE_SECRET;
+
+if (!secretKey) {
+  throw new Error("PKCE_EXCHANGE_SECRET is not defined in the environment variables.");
+}
+
+const SECRET = Buffer.from(secretKey, "hex");
 
 interface ExchangePayload {
   token: string;
