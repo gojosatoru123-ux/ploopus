@@ -131,7 +131,7 @@ const BillingsPage = () => {
                                         onClick={() => handleCreateOrder(tier.plan.planName)}
                                         disabled={session?.subscription.planName===tier.plan.planName}
                                     >
-                                        {session?.subscription.planName===tier.plan.planName ? "Currently Subscribed To This Pack":tier.cta}
+                                        {session?.subscription?.planName===tier.plan.planName ? "Currently Subscribed To This Pack":tier.cta}
                                     </motion.button>
                                 </> :
                                 <>
