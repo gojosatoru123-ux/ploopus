@@ -129,7 +129,7 @@ const BillingsPage = () => {
                                         whileTap={{ scale: 0.95 }}
                                         className={`mt-6 w-full rounded-full py-2.5 text-sm font-medium shadow-sm sm:py-3 ${tier.btnBg}`}
                                         onClick={() => handleCreateOrder(tier.plan.planName)}
-                                        disabled={session?.subscription.planName===tier.plan.planName}
+                                        disabled={session?.subscription?.planName===tier.plan.planName}
                                     >
                                         {session?.subscription?.planName===tier.plan.planName ? "Currently Subscribed To This Pack":tier.cta}
                                     </motion.button>
