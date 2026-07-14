@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
 export default function DesktopGithubLogin() {
-  const [status, setStatus] = useState
+  const [status, setStatus] = useState<
     "checking" | "linking" | "connecting" | "done" | "error"
   >("checking");
   const [errorMsg, setErrorMsg] = useState("");
