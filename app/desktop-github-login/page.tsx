@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { Loader2, Github, Monitor, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default function DesktopGithubLogin() {
   const [status, setStatus] = useState<
@@ -70,12 +71,79 @@ export default function DesktopGithubLogin() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background text-white">
-      {status === "checking" && <p>Checking session…</p>}
-      {status === "linking" && <p>Redirecting to GitHub…</p>}
-      {status === "connecting" && <p>Connecting to Ploopus desktop app…</p>}
-      {status === "done" && <p>Done — you can close this tab.</p>}
-      {status === "error" && <p className="text-red-400">Something went wrong: {errorMsg}</p>}
+   <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background selection:bg-gold-400/30 relative overflow-hidden">
+      {/* Subtle organic top glow gradient imitating the main landing page aesthetic */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-sage-100/40 via-transparent to-transparent pointer-events-none" />
+
+      <div className="w-full max-w-md bg-card border border-border rounded-2xl p-8 shadow-card flex flex-col items-center text-center relative z-10">
+        
+        {/* Dynamic Theme Icon Wrapper */}
+        <div className="mb-6 flex items-center justify-center w-16 h-16 rounded-full bg-sage-50 border border-sage-100 text-primary">
+          {status === "checking" && (
+            <Loader2 className="w-7 h-7 animate-spin text-sage-500" />
+          )}
+          {status === "linking" && (
+            <Github className="w-7 h-7 text-sage-600 animate-pulse" />
+          )}
+          {status === "connecting" && (
+            <Monitor className="w-7 h-7 text-sage-600 animate-bounce" />
+          )}
+          {status === "done" && (
+            <CheckCircle2 className="w-7 h-7 text-sage-600" />
+          )}
+          {status === "error" && (
+            <AlertCircle className="w-7 h-7 text-destructive" />
+          )}
+        </div>
+
+        {/* Dynamic Context Block */}
+        <div className="w-full space-y-2">
+          {status === "checking" && (
+            <>
+              <h2 className="text-xl font-semibold text-foreground tracking-tight">Checking Session</h2>
+              <p className="text-sm text-muted-foreground">Verifying your active user session credentials...</p>
+            </>
+          )}
+
+          {status === "linking" && (
+            <>
+              <h2 className="text-xl font-semibold text-foreground tracking-tight">GitHub Integration</h2>
+              <p className="text-sm text-muted-foreground">Redirecting securely to authorize with GitHub services...</p>
+            </>
+          )}
+
+          {status === "connecting" && (
+            <>
+              <h2 className="text-xl font-semibold text-foreground tracking-tight">App Sync</h2>
+              <p className="text-sm text-muted-foreground">Establishing a secure socket to your Ploopus desktop application.</p>
+            </>
+          )}
+
+          {status === "done" && (
+            <>
+              <h2 className="text-xl font-semibold text-foreground tracking-tight">Connection Complete!</h2>
+              <p className="text-sm text-muted-foreground">
+                Process finished. You can now safely <span className="font-medium text-sage-600">close this browser tab</span>.
+              </p>
+            </>
+          )}
+
+          {status === "error" && (
+            <>
+              <h2 className="text-xl font-semibold text-destructive tracking-tight">Connection Failed</h2>
+              <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-lg font-medium break-words max-w-xs mx-auto">
+                {errorMsg || "An error occurred during authentication synchronization."}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Brand Accent Line */}
+        <div className="mt-8 pt-4 border-t border-border/60 w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+          <span className="w-1.5 h-1.5 rounded-full bg-gold-400" />
+          Your Second Brain, Stored On Your Device.
+        </div>
+      </div>
     </div>
   );
 }
